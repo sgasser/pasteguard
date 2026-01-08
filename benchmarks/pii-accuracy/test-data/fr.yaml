@@ -1,0 +1,42 @@
+test_cases:
+  # Phone (needs French context words)
+  - id: fr_phone
+    text: "Téléphone: 06 12 34 56 78"
+    language: fr
+    expected:
+      - type: PHONE_NUMBER
+        text: "06 12 34 56 78"
+
+  # Person (NER model)
+  - id: fr_person
+    text: "J'ai une réunion avec Marie Dubois demain à 10h"
+    language: fr
+    expected:
+      - type: PERSON
+        text: "Marie Dubois"
+
+  # Location (NER model)
+  - id: fr_location
+    text: "La conférence aura lieu à Lyon la semaine prochaine"
+    language: fr
+    expected:
+      - type: LOCATION
+        text: "Lyon"
+
+  # Mixed (real-world prompt)
+  - id: fr_mixed
+    text: "Contact de Jean Dupont: jean.dupont@example.fr, téléphone 06 98 76 54 32"
+    language: fr
+    expected:
+      - type: PERSON
+        text: "Jean Dupont"
+      - type: EMAIL_ADDRESS
+        text: "jean.dupont@example.fr"
+      - type: PHONE_NUMBER
+        text: "06 98 76 54 32"
+
+  # False Positive
+  - id: fr_fp
+    text: "Le temps est magnifique aujourd'hui"
+    language: fr
+    expected: []

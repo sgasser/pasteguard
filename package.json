@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome lint src",
     "format": "biome format src --write",
-    "check": "biome check src"
+    "check": "biome check src",
+    "benchmark:accuracy": "bun run benchmarks/pii-accuracy/run.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.6",

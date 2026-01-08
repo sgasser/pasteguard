@@ -1,0 +1,41 @@
+test_cases:
+  # Pattern-based recognizers - language independent
+  # Tested once since regex/checksum works the same for all languages
+
+  # Email
+  - id: global_email
+    text: "Contact me at john.doe@company.com"
+    language: en
+    expected:
+      - type: EMAIL_ADDRESS
+        text: "john.doe@company.com"
+
+  # IBAN
+  - id: global_iban
+    text: "Transfer to IBAN DE89370400440532013000"
+    language: en
+    expected:
+      - type: IBAN_CODE
+        text: "DE89370400440532013000"
+
+  # Credit Card
+  - id: global_credit_card
+    text: "Card number: 4111 1111 1111 1111"
+    language: en
+    expected:
+      - type: CREDIT_CARD
+        text: "4111 1111 1111 1111"
+
+  # IP Address
+  - id: global_ip
+    text: "Server IP is 8.8.8.8"
+    language: en
+    expected:
+      - type: IP_ADDRESS
+        text: "8.8.8.8"
+
+  # Empty text
+  - id: global_empty
+    text: ""
+    language: en
+    expected: []

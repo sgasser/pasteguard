@@ -229,6 +229,26 @@ bun test                                  # Run tests
 bun run check                             # Lint & format
 ```
 
+## Benchmarks
+
+PII detection accuracy benchmark with test cases for multiple languages:
+
+```bash
+# Start Presidio with all benchmark languages
+LANGUAGES=en,de,fr,it,es docker compose up presidio-analyzer -d
+
+# Run all tests
+bun run benchmarks/pii-accuracy/run.ts
+
+# Run specific languages only
+bun run benchmarks/pii-accuracy/run.ts --languages de,en
+
+# Verbose output
+bun run benchmarks/pii-accuracy/run.ts --verbose
+```
+
+Test data in `benchmarks/pii-accuracy/test-data/` (one file per language).
+
 ## License
 
 [Apache 2.0](LICENSE)

@@ -1,0 +1,42 @@
+test_cases:
+  # Phone (needs German context words)
+  - id: de_phone
+    text: "Telefon: +49 171 1234567"
+    language: de
+    expected:
+      - type: PHONE_NUMBER
+        text: "+49 171 1234567"
+
+  # Person (NER model)
+  - id: de_person
+    text: "Meeting mit Max Müller morgen um 10 Uhr"
+    language: de
+    expected:
+      - type: PERSON
+        text: "Max Müller"
+
+  # Location (NER model)
+  - id: de_location
+    text: "Das Meeting findet in München statt"
+    language: de
+    expected:
+      - type: LOCATION
+        text: "München"
+
+  # Mixed (real-world prompt)
+  - id: de_mixed
+    text: "Kontaktdaten von Hans Meier: hans.meier@example.com, Telefon 0171-1234567"
+    language: de
+    expected:
+      - type: PERSON
+        text: "Hans Meier"
+      - type: EMAIL_ADDRESS
+        text: "hans.meier@example.com"
+      - type: PHONE_NUMBER
+        text: "0171-1234567"
+
+  # False Positive
+  - id: de_fp
+    text: "Das Wetter ist heute sehr schön"
+    language: de
+    expected: []

@@ -1,0 +1,42 @@
+test_cases:
+  # Phone (needs Spanish context words)
+  - id: es_phone
+    text: "Teléfono: +34 612 345 678"
+    language: es
+    expected:
+      - type: PHONE_NUMBER
+        text: "+34 612 345 678"
+
+  # Person (NER model)
+  - id: es_person
+    text: "Reunión con Ana Martínez mañana a las 10"
+    language: es
+    expected:
+      - type: PERSON
+        text: "Ana Martínez"
+
+  # Location (NER model)
+  - id: es_location
+    text: "La reunión será en Madrid la próxima semana"
+    language: es
+    expected:
+      - type: LOCATION
+        text: "Madrid"
+
+  # Mixed (real-world prompt)
+  - id: es_mixed
+    text: "Contacto de Carlos García: carlos.garcia@example.es, teléfono +34 698 765 432"
+    language: es
+    expected:
+      - type: PERSON
+        text: "Carlos García"
+      - type: EMAIL_ADDRESS
+        text: "carlos.garcia@example.es"
+      - type: PHONE_NUMBER
+        text: "+34 698 765 432"
+
+  # False Positive
+  - id: es_fp
+    text: "El clima está muy agradable hoy"
+    language: es
+    expected: []

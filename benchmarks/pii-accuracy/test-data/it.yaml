@@ -1,0 +1,42 @@
+test_cases:
+  # Phone (needs Italian context words)
+  - id: it_phone
+    text: "Telefono: 333 1234567"
+    language: it
+    expected:
+      - type: PHONE_NUMBER
+        text: "333 1234567"
+
+  # Person (NER model)
+  - id: it_person
+    text: "Riunione con Giuseppe Verdi domani alle 10"
+    language: it
+    expected:
+      - type: PERSON
+        text: "Giuseppe Verdi"
+
+  # Location (NER model)
+  - id: it_location
+    text: "L'evento si terrà a Milano il prossimo mese"
+    language: it
+    expected:
+      - type: LOCATION
+        text: "Milano"
+
+  # Mixed (real-world prompt)
+  - id: it_mixed
+    text: "Contatto di Marco Rossi: marco.rossi@example.it, telefono 333 9876543"
+    language: it
+    expected:
+      - type: PERSON
+        text: "Marco Rossi"
+      - type: EMAIL_ADDRESS
+        text: "marco.rossi@example.it"
+      - type: PHONE_NUMBER
+        text: "333 9876543"
+
+  # False Positive
+  - id: it_fp
+    text: "Il caffè italiano è il migliore del mondo"
+    language: it
+    expected: []

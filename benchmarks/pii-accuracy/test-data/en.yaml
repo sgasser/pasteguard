@@ -1,0 +1,42 @@
+test_cases:
+  # Phone (needs English context words)
+  - id: en_phone
+    text: "Phone: (555) 123-4567"
+    language: en
+    expected:
+      - type: PHONE_NUMBER
+        text: "(555) 123-4567"
+
+  # Person (NER model)
+  - id: en_person
+    text: "Schedule a meeting with John Smith tomorrow"
+    language: en
+    expected:
+      - type: PERSON
+        text: "John Smith"
+
+  # Location (NER model)
+  - id: en_location
+    text: "The conference is in New York next week"
+    language: en
+    expected:
+      - type: LOCATION
+        text: "New York"
+
+  # Mixed (real-world prompt)
+  - id: en_mixed
+    text: "Customer John Doe (john@example.com), phone (555) 987-6543"
+    language: en
+    expected:
+      - type: PERSON
+        text: "John Doe"
+      - type: EMAIL_ADDRESS
+        text: "john@example.com"
+      - type: PHONE_NUMBER
+        text: "(555) 987-6543"
+
+  # False Positive
+  - id: en_fp
+    text: "The weather is nice today"
+    language: en
+    expected: []
