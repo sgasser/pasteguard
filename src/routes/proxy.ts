@@ -30,7 +30,7 @@ const ChatCompletionSchema = z
   })
   .passthrough();
 
-export const chatRoutes = new Hono();
+export const proxyRoutes = new Hono();
 
 /**
  * Type guard for MaskDecision
@@ -39,7 +39,7 @@ function isMaskDecision(decision: RoutingDecision): decision is MaskDecision {
   return decision.mode === "mask";
 }
 
-chatRoutes.get("/models", (c) => {
+proxyRoutes.get("/models", (c) => {
   const { upstream } = getRouter().getProvidersInfo();
 
   return proxy(`${upstream.baseUrl}/models`, {
@@ -52,7 +52,7 @@ chatRoutes.get("/models", (c) => {
 /**
  * POST /v1/chat/completions - OpenAI-compatible chat completion endpoint
  */
-chatRoutes.post(
+proxyRoutes.post(
   "/chat/completions",
   zValidator("json", ChatCompletionSchema, (result, c) => {
     if (!result.success) {

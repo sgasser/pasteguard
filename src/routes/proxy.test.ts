@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
-import { chatRoutes } from "./chat";
+import { proxyRoutes } from "./proxy";
 
 const app = new Hono();
-app.route("/openai/v1", chatRoutes);
+app.route("/openai/v1", proxyRoutes);
 
 describe("POST /openai/v1/chat/completions", () => {
   test("returns 400 for missing messages", async () => {

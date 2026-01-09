@@ -4,10 +4,10 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { getConfig } from "./config";
-import { chatRoutes } from "./routes/chat";
 import { dashboardRoutes } from "./routes/dashboard";
 import { healthRoutes } from "./routes/health";
 import { infoRoutes } from "./routes/info";
+import { proxyRoutes } from "./routes/proxy";
 import { getLogger } from "./services/logger";
 import { getPIIDetector } from "./services/pii-detector";
 
@@ -33,7 +33,7 @@ app.use("*", logger());
 
 app.route("/", healthRoutes);
 app.route("/", infoRoutes);
-app.route("/openai/v1", chatRoutes);
+app.route("/openai/v1", proxyRoutes);
 
 if (config.dashboard.enabled) {
   app.route("/dashboard", dashboardRoutes);
