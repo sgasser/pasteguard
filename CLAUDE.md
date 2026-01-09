@@ -18,24 +18,22 @@ OpenAI-compatible proxy with two privacy modes: route to local LLM or mask PII f
 src/
 ├── index.ts                 # Hono server entry
 ├── config.ts                # YAML config + Zod validation
-├── schemas/
-│   └── chat.ts              # Request/response schemas
-├── routes/                  # All route handlers
-│   ├── chat.ts              # POST /openai/v1/chat/completions
+├── routes/
+│   ├── proxy.ts             # POST /openai/v1/chat/completions
 │   ├── dashboard.tsx        # Dashboard routes + API
 │   ├── health.ts            # GET /health
 │   └── info.ts              # GET /info
-├── views/                   # JSX components
+├── views/
 │   └── dashboard/
 │       └── page.tsx         # Dashboard UI
 └── services/
-    ├── decision.ts             # Route/mask logic
-    ├── pii-detector.ts         # Presidio client
-    ├── llm-client.ts           # OpenAI/Ollama client
-    ├── masking.ts              # PII mask/unmask
-    ├── stream-transformer.ts   # SSE unmask for streaming
-    ├── language-detector.ts    # Auto language detection
-    └── logger.ts               # SQLite logging
+    ├── decision.ts          # Route/mask logic
+    ├── pii-detector.ts      # Presidio client
+    ├── llm-client.ts        # OpenAI/Ollama client
+    ├── masking.ts           # PII mask/unmask
+    ├── stream-transformer.ts # SSE unmask for streaming
+    ├── language-detector.ts # Auto language detection
+    └── logger.ts            # SQLite logging
 ```
 
 Tests are colocated (`*.test.ts`).
