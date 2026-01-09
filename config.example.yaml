@@ -89,6 +89,35 @@ pii_detection:
     # - MEDICAL_LICENSE
     # - URL
 
+# Secrets Detection settings (Secrets Shield)
+# Detects private keys and other secret credentials in requests
+secrets_detection:
+  # Enable secrets detection (default: true)
+  enabled: true
+
+  # Action to take when secrets are detected:
+  #   block:        Block the request with HTTP 422 (default, secure-by-default)
+  #   redact:       Replace secrets with placeholders and continue (irreversible)
+  #   route_local:  Route to local provider (only works in route mode)
+  action: block
+
+  # Secret types to detect
+  entities:
+    - OPENSSH_PRIVATE_KEY  # OpenSSH format: -----BEGIN OPENSSH PRIVATE KEY-----
+    - PEM_PRIVATE_KEY      # PEM formats: RSA, PRIVATE KEY, ENCRYPTED PRIVATE KEY
+
+  # Maximum characters to scan per request (performance limit)
+  # Set to 0 to scan entire request (not recommended for large payloads)
+  max_scan_chars: 200000
+
+  # Placeholder format for redaction (only used if action: redact)
+  # {N} will be replaced with sequential number
+  redact_placeholder: "<SECRET_REDACTED_{N}>"
+
+  # Log detected secret types (never logs secret content)
+  # Even if logging.log_content is true, secret content is never logged
+  log_detected_types: true
+
 # Logging settings
 logging:
   # SQLite database for request logs
