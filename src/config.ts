@@ -92,6 +92,17 @@ const DashboardSchema = z.object({
   auth: DashboardAuthSchema.optional(),
 });
 
+const SecretsDetectionSchema = z.object({
+  enabled: z.boolean().default(true),
+  action: z.enum(["block", "redact", "route_local"]).default("block"),
+  entities: z
+    .array(z.string())
+    .default(["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY"]),
+  max_scan_chars: z.coerce.number().int().min(0).default(200000),
+  redact_placeholder: z.string().default("<SECRET_REDACTED_{N}>"),
+  log_detected_types: z.boolean().default(true),
+});
+
 const UpstreamProviderSchema = z.object({
   type: z.enum(["openai"]),
   api_key: z.string().optional(),
@@ -111,6 +122,7 @@ const ConfigSchema = z
     pii_detection: PIIDetectionSchema,
     logging: LoggingSchema.default({}),
     dashboard: DashboardSchema.default({}),
+    secrets_detection: SecretsDetectionSchema.default({}),
   })
   .refine(
     (config) => {
@@ -123,12 +135,26 @@ const ConfigSchema = z
     {
       message: "Route mode requires 'providers.local' and 'routing' configuration",
     },
+  )
+  .refine(
+    (config) => {
+      // route_local action requires route mode
+      if (config.secrets_detection.action === "route_local" && config.mode === "mask") {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        "secrets_detection.action 'route_local' is not compatible with mode 'mask'. Use mode 'route' or change secrets_detection.action to 'block' or 'redact'",
+    },
   );
 
 export type Config = z.infer<typeof ConfigSchema>;
 export type UpstreamProvider = z.infer<typeof UpstreamProviderSchema>;
 export type LocalProvider = z.infer<typeof LocalProviderSchema>;
 export type MaskingConfig = z.infer<typeof MaskingSchema>;
+export type SecretsDetectionConfig = z.infer<typeof SecretsDetectionSchema>;
 
 /**
  * Replaces ${VAR} and ${VAR:-default} patterns with environment variable values
