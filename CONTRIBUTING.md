@@ -1,6 +1,6 @@
-# Contributing to LLM-Shield
+# Contributing to PasteGuard
 
-Thank you for considering contributing to LLM-Shield!
+Thank you for considering contributing to PasteGuard!
 
 ## Development Setup
 

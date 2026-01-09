@@ -1,7 +1,7 @@
 {
-  "name": "llm-shield",
+  "name": "pasteguard",
   "version": "0.1.0",
-  "description": "Intelligent privacy-aware routing for LLMs - OpenAI-compatible proxy that routes requests based on PII detection",
+  "description": "Guard your paste - Privacy-aware LLM proxy that masks PII before sending to cloud LLMs",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -42,6 +42,6 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sgasser/llm-shield"
+    "url": "https://github.com/sgasser/pasteguard"
   }
 }

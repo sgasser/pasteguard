@@ -6,7 +6,7 @@ const DashboardPage: FC = () => {
 			<head>
 				<meta charset="UTF-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-				<title>LLM-Shield Dashboard</title>
+				<title>PasteGuard Dashboard</title>
 				<link rel="preconnect" href="https://fonts.googleapis.com" />
 				<link
 					rel="preconnect"
@@ -119,7 +119,7 @@ const Header: FC = () => (
 				🛡️
 			</div>
 			<div class="text-xl font-bold tracking-tight text-text-primary">
-				LLM<span class="text-amber">Shield</span>
+				Paste<span class="text-amber">Guard</span>
 			</div>
 		</div>
 		<div class="flex items-center gap-4">

@@ -76,7 +76,7 @@ const ServerSchema = z.object({
 });
 
 const LoggingSchema = z.object({
-  database: z.string().default("./data/llm-shield.db"),
+  database: z.string().default("./data/pasteguard.db"),
   retention_days: z.coerce.number().int().min(0).default(30),
   log_content: z.boolean().default(false),
   log_masked_content: z.boolean().default(true),

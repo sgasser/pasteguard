@@ -1,4 +1,4 @@
-# LLM-Shield Language Registry
+# PasteGuard Language Registry
 # All 24 spaCy languages with trained pipelines
 #
 # Usage: Set LANGUAGES build arg to select which to install

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "llm-shield",
+      "name": "pasteguard",
       "dependencies": {
         "@hono/zod-validator": "^0.7.6",
         "eld": "^2.0.1",
@@ -91,7 +91,7 @@
 
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
 
-    "eld": ["eld@2.0.1", "", {}, "sha512-Lo+M5M7IL/N3MSXMbnfBrdsn+qu0rScPyOA/POvxKU7HsLEOfFOJuEBC96vmYxMJShxXtH+wnWVOhgu+rf7u9A=="],
+    "eld": ["eld@2.0.2", "", {}, "sha512-8ECUdQkhChI68V4n2j1zLsUKRGtOtBm3hA2RHrA05I9Y+BU7iLgClZnpGdEUpmAw3xKyVHQcSzuBVDkjCkP4ag=="],
 
     "enhanced-resolve": ["enhanced-resolve@5.18.4", "", { "dependencies": { "graceful-fs": "^4.2.4", "tapable": "^2.2.0" } }, "sha512-LgQMM4WXU3QI+SYgEc2liRgznaD5ojbmY3sb8LxyguVkIg5FxdpTkvk72te2R38/TGKxH634oLxXRGY6d7AP+Q=="],
 

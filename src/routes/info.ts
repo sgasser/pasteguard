@@ -14,9 +14,9 @@ infoRoutes.get("/info", (c) => {
   const languageValidation = detector.getLanguageValidation();
 
   const info: Record<string, unknown> = {
-    name: "LLM-Shield",
+    name: "PasteGuard",
     version: pkg.version,
-    description: "Intelligent privacy-aware LLM proxy",
+    description: "Guard your paste - Privacy-aware LLM proxy",
     mode: config.mode,
     providers: {
       upstream: {

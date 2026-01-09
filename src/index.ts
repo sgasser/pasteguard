@@ -154,8 +154,8 @@ Provider:
 
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║                       LLM-Shield                          ║
-║         Intelligent privacy-aware LLM proxy               ║
+║                       PasteGuard                          ║
+║         Guard your paste - Privacy-aware LLM proxy        ║
 ╚═══════════════════════════════════════════════════════════╝
 
 Server:     http://${host}:${port}

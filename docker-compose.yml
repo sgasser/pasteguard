@@ -1,5 +1,5 @@
 services:
-  llm-shield:
+  pasteguard:
     build: .
     ports:
       - "3000:3000"

@@ -1,4 +1,4 @@
-# LLM-Shield
+# PasteGuard
 
 OpenAI-compatible proxy with two privacy modes: route to local LLM or mask PII for upstream.
 
@@ -8,7 +8,7 @@ OpenAI-compatible proxy with two privacy modes: route to local LLM or mask PII f
 - Framework: Hono (with JSX for dashboard)
 - Validation: Zod
 - Styling: Tailwind CSS v4
-- Database: SQLite (`data/llm-shield.db`)
+- Database: SQLite (`data/pasteguard.db`)
 - PII Detection: Microsoft Presidio (Docker)
 - Code Style: Biome (see @biome.json)
 
@@ -81,4 +81,4 @@ bun install && bun run dev
 - `GET /info` - Mode info
 - `POST /openai/v1/chat/completions` - Main endpoint
 
-Response header `X-LLM-Shield-PII-Masked: true` indicates PII was masked.
+Response header `X-PasteGuard-PII-Masked: true` indicates PII was masked.

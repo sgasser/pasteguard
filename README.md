@@ -1,11 +1,11 @@
-# 🛡️ LLM-Shield
+# 🛡️ PasteGuard
 
-[![CI](https://github.com/sgasser/llm-shield/actions/workflows/ci.yml/badge.svg)](https://github.com/sgasser/llm-shield/actions/workflows/ci.yml)
+[![CI](https://github.com/sgasser/pasteguard/actions/workflows/ci.yml/badge.svg)](https://github.com/sgasser/pasteguard/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 Privacy proxy for LLMs. Masks personal data before sending to your provider (OpenAI, Azure, etc.), or routes sensitive requests to local LLM.
 
-<img src="docs/dashboard.png" width="100%" alt="LLM-Shield Dashboard">
+<img src="docs/dashboard.png" width="100%" alt="PasteGuard Dashboard">
 
 ## Mask Mode (Default)
 
@@ -56,8 +56,8 @@ Powered by [Microsoft Presidio](https://microsoft.github.io/presidio/).
 ### Docker (recommended)
 
 ```bash
-git clone https://github.com/sgasser/llm-shield.git
-cd llm-shield
+git clone https://github.com/sgasser/pasteguard.git
+cd pasteguard
 cp config.example.yaml config.yaml
 
 # Option 1: English only (default, ~1.5GB)
@@ -71,8 +71,8 @@ LANGUAGES=en,de,fr,es,it docker compose up -d
 ### Local Development
 
 ```bash
-git clone https://github.com/sgasser/llm-shield.git
-cd llm-shield
+git clone https://github.com/sgasser/pasteguard.git
+cd pasteguard
 bun install
 cp config.example.yaml config.yaml
 
@@ -113,7 +113,7 @@ LANGUAGES=en,de,fr,it,es docker compose build
 - Text language is auto-detected for each request
 - If detected language is not installed, falls back to `fallback_language` (default: `en`)
 - Dashboard shows fallback as `FR→EN` when French text is detected but only English is installed
-- Response header `X-LLM-Shield-Language-Fallback: true` indicates fallback was used
+- Response header `X-PasteGuard-Language-Fallback: true` indicates fallback was used
 
 Update `config.yaml` to match your installed languages:
 
@@ -175,7 +175,7 @@ pii_detection:
 
 ```yaml
 logging:
-  database: ./data/llm-shield.db
+  database: ./data/pasteguard.db
   retention_days: 30           # 0 = keep forever
   log_content: false           # Log full request/response
   log_masked_content: true     # Log masked content for dashboard
@@ -213,12 +213,12 @@ See [config.example.yaml](config.example.yaml) for all options.
 | Header | Value |
 |--------|-------|
 | `X-Request-ID` | Request identifier (forwarded or generated) |
-| `X-LLM-Shield-Mode` | `route` / `mask` |
-| `X-LLM-Shield-PII-Detected` | `true` / `false` |
-| `X-LLM-Shield-PII-Masked` | `true` / `false` (mask mode) |
-| `X-LLM-Shield-Provider` | `upstream` / `local` |
-| `X-LLM-Shield-Language` | Detected language code |
-| `X-LLM-Shield-Language-Fallback` | `true` if fallback was used |
+| `X-PasteGuard-Mode` | `route` / `mask` |
+| `X-PasteGuard-PII-Detected` | `true` / `false` |
+| `X-PasteGuard-PII-Masked` | `true` / `false` (mask mode) |
+| `X-PasteGuard-Provider` | `upstream` / `local` |
+| `X-PasteGuard-Language` | Detected language code |
+| `X-PasteGuard-Language-Fallback` | `true` if fallback was used |
 
 ## Development
 

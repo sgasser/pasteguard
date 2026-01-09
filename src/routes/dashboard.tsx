@@ -24,7 +24,7 @@ if (config.dashboard.auth) {
 		basicAuth({
 			username: config.dashboard.auth.username,
 			password: config.dashboard.auth.password,
-			realm: "LLM-Shield Dashboard",
+			realm: "PasteGuard Dashboard",
 		}),
 	);
 }

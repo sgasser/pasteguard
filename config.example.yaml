@@ -1,4 +1,4 @@
-# LLM-Shield Configuration
+# PasteGuard Configuration
 # Copy this file to config.yaml and adjust the values
 
 # Privacy mode: "mask" or "route"
@@ -92,7 +92,7 @@ pii_detection:
 # Logging settings
 logging:
   # SQLite database for request logs
-  database: ./data/llm-shield.db
+  database: ./data/pasteguard.db
 
   # Log retention in days (0 = keep forever)
   retention_days: 30

@@ -126,18 +126,18 @@ async function handleCompletion(
 }
 
 /**
- * Set X-LLM-Shield response headers
+ * Set X-PasteGuard response headers
  */
 function setShieldHeaders(c: Context, decision: RoutingDecision) {
-  c.header("X-LLM-Shield-Mode", decision.mode);
-  c.header("X-LLM-Shield-Provider", decision.provider);
-  c.header("X-LLM-Shield-PII-Detected", decision.piiResult.hasPII.toString());
-  c.header("X-LLM-Shield-Language", decision.piiResult.language);
+  c.header("X-PasteGuard-Mode", decision.mode);
+  c.header("X-PasteGuard-Provider", decision.provider);
+  c.header("X-PasteGuard-PII-Detected", decision.piiResult.hasPII.toString());
+  c.header("X-PasteGuard-Language", decision.piiResult.language);
   if (decision.piiResult.languageFallback) {
-    c.header("X-LLM-Shield-Language-Fallback", "true");
+    c.header("X-PasteGuard-Language-Fallback", "true");
   }
   if (decision.mode === "mask") {
-    c.header("X-LLM-Shield-PII-Masked", decision.piiResult.hasPII.toString());
+    c.header("X-PasteGuard-PII-Masked", decision.piiResult.hasPII.toString());
   }
 }
 

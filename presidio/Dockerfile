@@ -1,4 +1,4 @@
-# LLM-Shield Presidio Analyzer
+# PasteGuard Presidio Analyzer
 # Multi-language PII detection with configurable language support
 #
 # Build with specific languages:
