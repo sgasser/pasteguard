@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
@@ -181,6 +181,11 @@ export function loadConfig(configPath?: string): Config {
 
   for (const path of paths) {
     if (existsSync(path)) {
+      if (!statSync(path).isFile()) {
+        throw new Error(
+          `'${path}' is a directory, not a file. Run: cp config.example.yaml config.yaml`,
+        );
+      }
       configFile = readFileSync(path, "utf-8");
       break;
     }
