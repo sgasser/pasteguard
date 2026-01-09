@@ -93,7 +93,7 @@ proxyRoutes.post(
 
       if (secretsResult.detected) {
         const secretTypes = secretsResult.matches.map((m) => m.type);
-        const secretTypesStr = secretTypes.join(", ");
+        const secretTypesStr = secretTypes.join(",");
 
         // Block action - return 422 error
         if (config.secrets_detection.action === "block") {
