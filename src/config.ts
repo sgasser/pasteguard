@@ -101,6 +101,9 @@ const SecretEntityTypes = [
   "API_KEY_GITHUB",
   "JWT_TOKEN",
   "BEARER_TOKEN",
+  "ENV_PASSWORD",
+  "ENV_SECRET",
+  "CONNECTION_STRING",
 ] as const;
 
 const SecretsDetectionSchema = z.object({
