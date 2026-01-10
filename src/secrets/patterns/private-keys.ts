@@ -46,14 +46,28 @@ export const privateKeysDetector: PatternDetector = {
       // PRIVATE KEY (generic) - exclude RSA matches
       const privateKeyPattern = /-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----/g;
       const tempMatches: SecretsMatch[] = [];
-      detectPattern(text, privateKeyPattern, "PEM_PRIVATE_KEY", tempMatches, redactions, matchedPositions);
+      detectPattern(
+        text,
+        privateKeyPattern,
+        "PEM_PRIVATE_KEY",
+        tempMatches,
+        redactions,
+        matchedPositions,
+      );
       totalPemCount += tempMatches[0]?.count || 0;
 
       // ENCRYPTED PRIVATE KEY
       const encryptedPattern =
         /-----BEGIN ENCRYPTED PRIVATE KEY-----[\s\S]*?-----END ENCRYPTED PRIVATE KEY-----/g;
       const tempMatches2: SecretsMatch[] = [];
-      detectPattern(text, encryptedPattern, "PEM_PRIVATE_KEY", tempMatches2, redactions, matchedPositions);
+      detectPattern(
+        text,
+        encryptedPattern,
+        "PEM_PRIVATE_KEY",
+        tempMatches2,
+        redactions,
+        matchedPositions,
+      );
       totalPemCount += tempMatches2[0]?.count || 0;
 
       if (totalPemCount > 0) {
