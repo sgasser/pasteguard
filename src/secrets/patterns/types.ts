@@ -8,7 +8,10 @@ export type SecretEntityType =
   | "API_KEY_AWS"
   | "API_KEY_GITHUB"
   | "JWT_TOKEN"
-  | "BEARER_TOKEN";
+  | "BEARER_TOKEN"
+  | "ENV_PASSWORD"
+  | "ENV_SECRET"
+  | "CONNECTION_STRING";
 
 export interface SecretsMatch {
   type: SecretEntityType;
