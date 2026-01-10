@@ -82,3 +82,24 @@ bun install && bun run dev
 - `POST /openai/v1/chat/completions` - Main endpoint
 
 Response header `X-PasteGuard-PII-Masked: true` indicates PII was masked.
+
+## Documentation
+
+Docs are in `docs/` using [Mintlify](https://mintlify.com/).
+
+```bash
+# Install Mintlify CLI
+npm i -g mintlify
+
+# Start local dev server
+cd docs && mintlify dev
+```
+
+Opens at http://localhost:3001. Hot reloads on changes.
+
+Structure:
+- `mint.json` - Navigation and theme config
+- `introduction.mdx` / `quickstart.mdx` - Getting started
+- `concepts/` - Mask mode, route mode, PII/secrets detection
+- `configuration/` - All config options
+- `api-reference/` - Endpoints and response formats
