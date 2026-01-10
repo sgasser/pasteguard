@@ -1,11 +1,13 @@
-# 🛡️ PasteGuard
+<p align="center">
+  <img src="assets/wordmark-light.svg" width="220" height="44" alt="PasteGuard">
+</p>
 
 [![CI](https://github.com/sgasser/pasteguard/actions/workflows/ci.yml/badge.svg)](https://github.com/sgasser/pasteguard/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 Privacy proxy for LLMs. Masks personal data and secrets / credentials before sending to your provider (OpenAI, Azure, etc.), or routes sensitive requests to local LLM.
 
-<img src="docs/dashboard.png" width="100%" alt="PasteGuard Dashboard">
+<img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
 
 ## Mask Mode (Default)
 

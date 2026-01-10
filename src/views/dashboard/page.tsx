@@ -7,74 +7,124 @@ const DashboardPage: FC = () => {
 				<meta charset="UTF-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 				<title>PasteGuard Dashboard</title>
-				<link rel="preconnect" href="https://fonts.googleapis.com" />
-				<link
-					rel="preconnect"
-					href="https://fonts.gstatic.com"
-					crossOrigin="anonymous"
-				/>
-				<link
-					href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap"
-					rel="stylesheet"
-				/>
+				<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 				<link rel="stylesheet" href="/dashboard/tailwind.css" />
 				<style
 					// biome-ignore lint/security/noDangerouslySetInnerHtml: Custom CSS
 					dangerouslySetInnerHTML={{
 						__html: `
 							:root {
-								--page: #f8f7f4;
-								--surface: #ffffff;
-								--elevated: #fafaf9;
-								--subtle: #f3f2ef;
-								--detail: #fdfcfa;
-								--border: #e5e3df;
-								--border-subtle: #eeece8;
-								--text-primary: #1a1917;
-								--text-secondary: #5c5a56;
-								--text-muted: #9c9a96;
-								--amber: #d97706;
-								--amber-light: #fef3c7;
-								--blue: #2563eb;
-								--blue-light: #dbeafe;
-								--green: #059669;
-								--green-light: #d1fae5;
-								--teal: #0d9488;
-								--teal-light: #ccfbf1;
+								/* Brand Colors */
+								--color-accent: #b45309;
+								--color-accent-hover: #92400e;
+								--color-accent-light: #d97706;
+								--color-accent-bg: #fef3c7;
+								--color-accent-bg-subtle: #fffbeb;
+
+								/* Background Colors (Stone) */
+								--color-bg-page: #fafaf9;
+								--color-bg-surface: #ffffff;
+								--color-bg-elevated: #f5f5f4;
+								--color-border: #e7e5e4;
+								--color-border-subtle: #f5f5f4;
+
+								/* Text Colors (Stone) */
+								--color-text-primary: #1c1917;
+								--color-text-secondary: #44403c;
+								--color-text-muted: #57534e;
+								--color-text-subtle: #78716c;
+
+								/* Semantic Colors */
+								--color-success: #16a34a;
+								--color-success-bg: #dcfce7;
+								--color-error: #dc2626;
+								--color-error-bg: #fee2e2;
+								--color-info: #2563eb;
+								--color-info-bg: #dbeafe;
+								--color-teal: #0d9488;
+
+								/* Code Block Colors */
+								--color-code-bg: #1c1917;
+								--color-code-header: #292524;
+								--color-code-text: #e7e5e4;
+								--color-code-muted: #a8a29e;
+
+								/* Typography */
+								--font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+								--font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+								--tracking-tight: -0.02em;
+
+								/* Border Radius Scale */
+								--radius-sm: 6px;
+								--radius-md: 8px;
+								--radius-lg: 12px;
+								--radius-xl: 16px;
+
+								/* Shadow Scale */
+								--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+								--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+								--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+
+								/* Motion */
+								--duration-fast: 150ms;
+								--duration-normal: 200ms;
+								--ease-out: cubic-bezier(0, 0, 0.2, 1);
 							}
+
+							* { box-sizing: border-box; }
+
 							body {
-								font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-								background: var(--page);
-								color: var(--text-primary);
+								font-family: var(--font-sans);
+								background: var(--color-bg-page);
+								color: var(--color-text-primary);
+								line-height: 1.6;
 							}
-							.font-mono { font-family: 'DM Mono', 'SF Mono', monospace; }
-							.bg-page { background: var(--page); }
-							.bg-surface { background: var(--surface); }
-							.bg-elevated { background: var(--elevated); }
-							.bg-subtle { background: var(--subtle); }
-							.bg-detail { background: var(--detail); }
-							.bg-amber { background: var(--amber); }
-							.bg-amber-light { background: var(--amber-light); }
-							.bg-amber\\/10 { background: rgba(217, 119, 6, 0.1); }
-							.bg-blue { background: var(--blue); }
-							.bg-blue\\/10 { background: rgba(37, 99, 235, 0.1); }
-							.bg-green { background: var(--green); }
-							.bg-green\\/10 { background: rgba(5, 150, 105, 0.1); }
-							.bg-teal { background: var(--teal); }
-							.border-border { border-color: var(--border); }
-							.border-border-subtle { border-color: var(--border-subtle); }
-							.border-amber\\/20 { border-color: rgba(217, 119, 6, 0.2); }
-							.border-green\\/20 { border-color: rgba(5, 150, 105, 0.2); }
-							.text-text-primary { color: var(--text-primary); }
-							.text-text-secondary { color: var(--text-secondary); }
-							.text-text-muted { color: var(--text-muted); }
-							.text-amber { color: var(--amber); }
-							.text-blue { color: var(--blue); }
-							.text-green { color: var(--green); }
-							.text-teal { color: var(--teal); }
+
+							.font-mono { font-family: var(--font-mono); }
+
+							/* Background utilities */
+							.bg-page { background: var(--color-bg-page); }
+							.bg-surface { background: var(--color-bg-surface); }
+							.bg-elevated { background: var(--color-bg-elevated); }
+							.bg-detail { background: var(--color-bg-page); }
+							.bg-accent { background: var(--color-accent); }
+							.bg-accent-bg { background: var(--color-accent-bg); }
+							.bg-accent\\/10 { background: rgba(180, 83, 9, 0.1); }
+							.bg-info { background: var(--color-info); }
+							.bg-info\\/10 { background: rgba(37, 99, 235, 0.1); }
+							.bg-success { background: var(--color-success); }
+							.bg-success\\/10 { background: rgba(22, 163, 74, 0.1); }
+							.bg-teal { background: var(--color-teal); }
+
+							/* Border utilities */
+							.border-border { border-color: var(--color-border); }
+							.border-border-subtle { border-color: var(--color-border-subtle); }
+							.border-accent\\/20 { border-color: rgba(180, 83, 9, 0.2); }
+							.border-success\\/20 { border-color: rgba(22, 163, 74, 0.2); }
+
+							/* Text utilities */
+							.text-text-primary { color: var(--color-text-primary); }
+							.text-text-secondary { color: var(--color-text-secondary); }
+							.text-text-muted { color: var(--color-text-muted); }
+							.text-accent { color: var(--color-accent); }
+							.text-info { color: var(--color-info); }
+							.text-success { color: var(--color-success); }
+							.text-teal { color: var(--color-teal); }
+
+							/* Border radius */
+							.rounded-sm { border-radius: var(--radius-sm); }
+							.rounded-md { border-radius: var(--radius-md); }
+							.rounded-lg { border-radius: var(--radius-lg); }
+							.rounded-xl { border-radius: var(--radius-xl); }
+
+							/* Shadows */
+							.shadow-sm { box-shadow: var(--shadow-sm); }
+							.shadow-md { box-shadow: var(--shadow-md); }
+
+							/* Animations */
 							@keyframes pulse {
-								0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.3); }
-								50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(5, 150, 105, 0); }
+								0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.3); }
+								50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(22, 163, 74, 0); }
 							}
 							@keyframes spin {
 								to { transform: rotate(360deg); }
@@ -87,14 +137,56 @@ const DashboardPage: FC = () => {
 								from { opacity: 0; transform: translateY(-8px); }
 								to { opacity: 1; transform: translateY(0); }
 							}
+							@keyframes pulseBar {
+								0%, 100% { opacity: 0.3; }
+								50% { opacity: 1; }
+							}
 							.animate-pulse-dot { animation: pulse 2s ease-in-out infinite; }
 							.animate-spin { animation: spin 0.8s linear infinite; }
-							.animate-fade-in { animation: fadeIn 0.35s ease-out backwards; }
-							.animate-slide-down { animation: slideDown 0.25s ease-out; }
+							.animate-fade-in { animation: fadeIn 0.35s var(--ease-out) backwards; }
+							.animate-slide-down { animation: slideDown 0.25s var(--ease-out); }
+
+							/* Brand signature: Redaction Bar Loader */
+							.loader-bars {
+								display: flex;
+								flex-direction: column;
+								gap: 6px;
+							}
+							.loader-bar {
+								height: 6px;
+								border-radius: 3px;
+								background: var(--color-accent);
+								animation: pulseBar 1.5s ease-in-out infinite;
+							}
+							.loader-bar:nth-child(1) { width: 60px; animation-delay: 0s; }
+							.loader-bar:nth-child(2) { width: 45px; animation-delay: 0.15s; }
+							.loader-bar:nth-child(3) { width: 52px; animation-delay: 0.3s; }
+
+							/* Route mode visibility */
 							.route-only { display: none; }
 							[data-mode="route"] .route-only { display: block; }
 							[data-mode="route"] th.route-only,
 							[data-mode="route"] td.route-only { display: table-cell; }
+
+							/* Transitions */
+							.transition-all {
+								transition: all var(--duration-fast) var(--ease-out);
+							}
+							.transition-colors {
+								transition: background-color var(--duration-fast) var(--ease-out),
+								            border-color var(--duration-fast) var(--ease-out),
+								            color var(--duration-fast) var(--ease-out);
+							}
+							.transition-transform {
+								transition: transform var(--duration-fast) var(--ease-out);
+							}
+
+							/* Card hover effect */
+							.card-hover:hover {
+								box-shadow: var(--shadow-md);
+								transform: translateY(-2px);
+								border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+							}
 						`,
 					}}
 				/>
@@ -114,23 +206,26 @@ const DashboardPage: FC = () => {
 
 const Header: FC = () => (
 	<header class="flex justify-between items-center mb-10">
-		<div class="flex items-center gap-2.5">
-			<div class="w-9 h-9 bg-gradient-to-br from-slate-50 to-slate-200 border border-border rounded-lg flex items-center justify-center text-lg shadow-sm">
-				🛡️
-			</div>
-			<div class="text-xl font-bold tracking-tight text-text-primary">
-				Paste<span class="text-amber">Guard</span>
+		<div class="flex items-center gap-3">
+			<svg class="w-9 h-9" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<path d="M32 6C20 6 12 12 12 12v20c0 12 8 22 20 26 12-4 20-14 20-26V12s-8-6-20-6z" stroke="var(--color-accent)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+				<rect x="22" y="24" width="20" height="4" rx="2" fill="var(--color-accent)"/>
+				<rect x="22" y="32" width="14" height="4" rx="2" fill="var(--color-accent)" opacity="0.6"/>
+				<rect x="22" y="40" width="17" height="4" rx="2" fill="var(--color-accent)" opacity="0.3"/>
+			</svg>
+			<div class="text-xl font-bold text-text-primary" style="letter-spacing: var(--tracking-tight)">
+				Paste<span class="text-accent">Guard</span>
 			</div>
 		</div>
 		<div class="flex items-center gap-4">
 			<span
 				id="mode-badge"
-				class="inline-flex items-center px-3 py-1.5 rounded-lg font-mono text-[0.7rem] font-medium tracking-wide uppercase"
+				class="inline-flex items-center px-3 py-1.5 rounded-md font-mono text-[0.7rem] font-medium tracking-wide uppercase bg-elevated text-text-muted"
 			>
 				—
 			</span>
 			<div class="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-full text-xs text-text-secondary shadow-sm">
-				<div class="w-[7px] h-[7px] bg-green rounded-full animate-pulse-dot" />
+				<div class="w-[7px] h-[7px] bg-success rounded-full animate-pulse-dot" />
 				<span>Live</span>
 			</div>
 		</div>
@@ -148,7 +243,7 @@ const StatsGrid: FC = () => (
 			label="Routed Local"
 			labelId="pii-label"
 			valueId="pii-requests"
-			accent="amber"
+			accent="accent"
 		/>
 		<StatCard label="Avg PII Scan" valueId="avg-scan" accent="teal" />
 		<StatCard label="Requests/Hour" valueId="requests-hour" />
@@ -156,14 +251,14 @@ const StatsGrid: FC = () => (
 			id="upstream-card"
 			label="Upstream"
 			valueId="upstream-requests"
-			accent="blue"
+			accent="info"
 			routeOnly
 		/>
 		<StatCard
 			id="local-card"
 			label="Local"
 			valueId="local-requests"
-			accent="green"
+			accent="success"
 			routeOnly
 		/>
 	</div>
@@ -174,14 +269,14 @@ const StatCard: FC<{
 	label: string;
 	labelId?: string;
 	valueId: string;
-	accent?: "amber" | "blue" | "green" | "teal";
+	accent?: "accent" | "info" | "success" | "teal";
 	routeOnly?: boolean;
 }> = ({ id, label, labelId, valueId, accent, routeOnly }) => {
 	const accentClass = accent
 		? {
-				amber: "text-amber",
-				blue: "text-blue",
-				green: "text-green",
+				accent: "text-accent",
+				info: "text-info",
+				success: "text-success",
 				teal: "text-teal",
 			}[accent]
 		: "";
@@ -189,7 +284,7 @@ const StatCard: FC<{
 	return (
 		<div
 			id={id}
-			class={`bg-surface border border-border-subtle rounded-xl p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 animate-fade-in ${routeOnly ? "route-only" : ""}`}
+			class={`bg-surface border border-border-subtle rounded-xl p-5 shadow-sm transition-all card-hover animate-fade-in ${routeOnly ? "route-only" : ""}`}
 		>
 			<div
 				id={labelId}
@@ -199,7 +294,8 @@ const StatCard: FC<{
 			</div>
 			<div
 				id={valueId}
-				class={`text-3xl font-bold tabular-nums tracking-tight ${accentClass}`}
+				class={`text-3xl font-bold tabular-nums ${accentClass}`}
+				style="letter-spacing: var(--tracking-tight)"
 			>
 				—
 			</div>
@@ -218,22 +314,22 @@ const Charts: FC = () => (
 			</div>
 			<div
 				id="provider-split"
-				class="flex h-10 rounded-lg overflow-hidden bg-subtle"
+				class="flex h-10 rounded-md overflow-hidden bg-elevated"
 			>
-				<div class="flex items-center justify-center font-mono text-[0.7rem] font-medium text-white bg-blue min-w-[48px] transition-all duration-400 w-1/2">
+				<div class="flex items-center justify-center font-mono text-[0.7rem] font-medium text-white bg-info min-w-[48px] transition-all w-1/2">
 					50%
 				</div>
-				<div class="flex items-center justify-center font-mono text-[0.7rem] font-medium text-white bg-green min-w-[48px] transition-all duration-400 w-1/2">
+				<div class="flex items-center justify-center font-mono text-[0.7rem] font-medium text-white bg-success min-w-[48px] transition-all w-1/2">
 					50%
 				</div>
 			</div>
 			<div class="flex gap-6 mt-4">
 				<div class="flex items-center gap-2 text-xs text-text-secondary">
-					<div class="w-2.5 h-2.5 rounded bg-blue" />
+					<div class="w-2.5 h-2.5 rounded-sm bg-info" />
 					<span>Upstream</span>
 				</div>
 				<div class="flex items-center gap-2 text-xs text-text-secondary">
-					<div class="w-2.5 h-2.5 rounded bg-green" />
+					<div class="w-2.5 h-2.5 rounded-sm bg-success" />
 					<span>Local</span>
 				</div>
 			</div>
@@ -246,9 +342,13 @@ const Charts: FC = () => (
 				Entity Types Detected
 			</div>
 			<div id="entity-chart" class="flex flex-col gap-2.5">
-				<div class="text-center py-10 text-text-muted">
-					<div class="text-2xl mb-3 opacity-40">📊</div>
-					<div class="text-sm">No PII detected yet</div>
+				<div class="flex flex-col items-center py-10 gap-3">
+					<div class="loader-bars" style="opacity: 0.3">
+						<div class="loader-bar" style="animation: none" />
+						<div class="loader-bar" style="animation: none" />
+						<div class="loader-bar" style="animation: none" />
+					</div>
+					<div class="text-sm text-text-muted">No PII detected yet</div>
 				</div>
 			</div>
 		</div>
@@ -288,9 +388,13 @@ const LogsSection: FC = () => (
 					<tbody id="logs-body">
 						<tr>
 							<td colSpan={6}>
-								<div class="flex justify-center items-center p-10 text-text-muted text-sm">
-									<div class="w-[18px] h-[18px] border-2 border-border border-t-amber rounded-full animate-spin mr-2.5" />
-									Loading...
+								<div class="flex flex-col justify-center items-center p-10 gap-3">
+									<div class="loader-bars">
+										<div class="loader-bar" />
+										<div class="loader-bar" />
+										<div class="loader-bar" />
+									</div>
+									<span class="text-text-muted text-sm">Loading requests...</span>
 								</div>
 							</td>
 						</tr>
@@ -326,8 +430,8 @@ async function fetchStats() {
     const modeBadge = document.getElementById('mode-badge');
     modeBadge.textContent = data.mode.toUpperCase();
     modeBadge.className = data.mode === 'route'
-      ? 'inline-flex items-center px-3 py-1.5 rounded-lg font-mono text-[0.7rem] font-medium tracking-wide uppercase bg-green/10 text-green border border-green/20'
-      : 'inline-flex items-center px-3 py-1.5 rounded-lg font-mono text-[0.7rem] font-medium tracking-wide uppercase bg-amber/10 text-amber border border-amber/20';
+      ? 'inline-flex items-center px-3 py-1.5 rounded-md font-mono text-[0.7rem] font-medium tracking-wide uppercase bg-success/10 text-success border border-success/20'
+      : 'inline-flex items-center px-3 py-1.5 rounded-md font-mono text-[0.7rem] font-medium tracking-wide uppercase bg-accent/10 text-accent border border-accent/20';
 
     const piiLabel = document.getElementById('pii-label');
     if (data.mode === 'mask') {
@@ -347,8 +451,8 @@ async function fetchStats() {
       const localPct = 100 - upstreamPct;
 
       document.getElementById('provider-split').innerHTML =
-        '<div class="flex items-center justify-center font-mono text-[0.7rem] font-medium text-white bg-blue min-w-[48px] transition-all duration-400" style="width:' + Math.max(upstreamPct, 10) + '%">' + upstreamPct + '%</div>' +
-        '<div class="flex items-center justify-center font-mono text-[0.7rem] font-medium text-white bg-green min-w-[48px] transition-all duration-400" style="width:' + Math.max(localPct, 10) + '%">' + localPct + '%</div>';
+        '<div class="flex items-center justify-center font-mono text-[0.7rem] font-medium text-white bg-info min-w-[48px] transition-all" style="width:' + Math.max(upstreamPct, 10) + '%">' + upstreamPct + '%</div>' +
+        '<div class="flex items-center justify-center font-mono text-[0.7rem] font-medium text-white bg-success min-w-[48px] transition-all" style="width:' + Math.max(localPct, 10) + '%">' + localPct + '%</div>';
     }
 
     const chartEl = document.getElementById('entity-chart');
@@ -357,14 +461,14 @@ async function fetchStats() {
       chartEl.innerHTML = data.entity_breakdown.slice(0, 6).map(e =>
         '<div class="grid grid-cols-[100px_1fr_40px] items-center gap-3">' +
           '<div class="font-mono text-[0.65rem] text-text-secondary truncate">' + e.entity + '</div>' +
-          '<div class="h-1.5 bg-subtle rounded overflow-hidden">' +
-            '<div class="h-full bg-gradient-to-r from-amber to-amber-700 rounded transition-all duration-400" style="width:' + ((e.count / maxCount) * 100) + '%"></div>' +
+          '<div class="h-1.5 bg-elevated rounded-sm overflow-hidden">' +
+            '<div class="h-full bg-accent rounded-sm transition-all" style="width:' + ((e.count / maxCount) * 100) + '%"></div>' +
           '</div>' +
           '<div class="font-mono text-[0.7rem] font-medium text-right text-text-primary">' + e.count + '</div>' +
         '</div>'
       ).join('');
     } else {
-      chartEl.innerHTML = '<div class="text-center py-10 text-text-muted"><div class="text-2xl mb-3 opacity-40">📊</div><div class="text-sm">No PII detected yet</div></div>';
+      chartEl.innerHTML = '<div class="flex flex-col items-center py-10 gap-3"><div class="loader-bars" style="opacity:0.3"><div class="loader-bar" style="animation:none"></div><div class="loader-bar" style="animation:none"></div><div class="loader-bar" style="animation:none"></div></div><div class="text-sm text-text-muted">No PII detected yet</div></div>';
     }
   } catch (err) {
     console.error('Failed to fetch stats:', err);
@@ -381,8 +485,8 @@ function toggleRow(logId) {
   });
   document.querySelectorAll('.log-row-expanded').forEach(el => el.classList.remove('log-row-expanded'));
   document.querySelectorAll('.arrow-icon').forEach(el => {
-    el.classList.remove('rotate-90', 'bg-amber/10', 'text-amber');
-    el.classList.add('bg-subtle', 'text-text-muted');
+    el.classList.remove('rotate-90', 'bg-accent/10', 'text-accent');
+    el.classList.add('bg-elevated', 'text-text-muted');
   });
 
   if (!wasExpanded) {
@@ -396,8 +500,8 @@ function toggleRow(logId) {
       detailRow.classList.add('detail-row-visible');
 
       if (arrow) {
-        arrow.classList.remove('bg-subtle', 'text-text-muted');
-        arrow.classList.add('rotate-90', 'bg-amber/10', 'text-amber');
+        arrow.classList.remove('bg-elevated', 'text-text-muted');
+        arrow.classList.add('rotate-90', 'bg-accent/10', 'text-accent');
       }
 
       expandedRowId = logId;
@@ -413,7 +517,7 @@ function formatMaskedPreview(maskedContent, entities) {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/&lt;([A-Z_]+_\\d+)&gt;/g, '<span class="bg-amber-light text-amber px-1 py-0.5 rounded font-medium">&lt;$1&gt;</span>');
+      .replace(/&lt;([A-Z_]+_\\d+)&gt;/g, '<span class="bg-accent-bg text-accent px-1 py-0.5 rounded-sm font-medium">&lt;$1&gt;</span>');
   }
   if (!entities || entities.length === 0) {
     return '<span class="text-text-muted">No PII detected in this request</span>';
@@ -428,8 +532,8 @@ function renderEntityList(entities) {
   const counts = {};
   for (const e of entities) counts[e] = (counts[e] || 0) + 1;
   return '<div class="flex flex-col gap-1.5">' + Object.entries(counts).map(([type, count]) =>
-    '<div class="flex items-center gap-2.5 text-xs p-2 px-3 bg-surface border border-border-subtle rounded-lg">' +
-      '<span class="font-mono text-[0.65rem] font-medium px-1.5 py-0.5 bg-amber/10 text-amber rounded">' + type + '</span>' +
+    '<div class="flex items-center gap-2.5 text-xs p-2 px-3 bg-surface border border-border-subtle rounded-md">' +
+      '<span class="font-mono text-[0.65rem] font-medium px-1.5 py-0.5 bg-accent/10 text-accent rounded-sm">' + type + '</span>' +
       '<span class="font-mono text-[0.7rem] text-text-primary flex-1">' + count + ' ' + (count === 1 ? 'instance' : 'instances') + '</span>' +
     '</div>'
   ).join('') + '</div>';
@@ -456,7 +560,7 @@ async function fetchLogs() {
 
       // Show original→fallback when fallback was used (e.g. FR→EN)
       const langDisplay = log.language_fallback && detectedLang
-        ? '<span class="text-amber" title="Language not supported, fallback used">' + formatLang(detectedLang) + '</span><span class="text-text-muted text-[0.5rem] mx-0.5">→</span><span>' + lang.toUpperCase() + '</span>'
+        ? '<span class="text-accent" title="Language not supported, fallback used">' + formatLang(detectedLang) + '</span><span class="text-text-muted text-[0.5rem] mx-0.5">→</span><span>' + lang.toUpperCase() + '</span>'
         : lang.toUpperCase();
       const logId = log.id || index;
       const isExpanded = expandedRowId === logId;
@@ -464,18 +568,18 @@ async function fetchLogs() {
       const mainRow =
         '<tr id="log-' + logId + '" class="cursor-pointer transition-colors hover:bg-elevated ' + (isExpanded ? 'log-row-expanded bg-elevated' : '') + '" onclick="toggleRow(' + logId + ')">' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
-            '<span id="arrow-' + logId + '" class="arrow-icon inline-flex items-center justify-center w-[18px] h-[18px] mr-2 rounded bg-subtle text-text-muted text-[0.65rem] transition-transform ' + (isExpanded ? 'rotate-90 bg-amber/10 text-amber' : '') + '">▶</span>' +
+            '<span id="arrow-' + logId + '" class="arrow-icon inline-flex items-center justify-center w-[18px] h-[18px] mr-2 rounded-sm bg-elevated text-text-muted text-[0.65rem] transition-transform ' + (isExpanded ? 'rotate-90 bg-accent/10 text-accent' : '') + '">▶</span>' +
             '<span class="font-mono text-[0.7rem] text-text-secondary">' + time + '</span>' +
           '</td>' +
           '<td class="route-only text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
-            '<span class="inline-flex items-center px-2 py-1 rounded font-mono text-[0.6rem] font-medium uppercase tracking-wide ' +
-              (log.provider === 'upstream' ? 'bg-blue/10 text-blue' : 'bg-green/10 text-green') + '">' + log.provider + '</span>' +
+            '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide ' +
+              (log.provider === 'upstream' ? 'bg-info/10 text-info' : 'bg-success/10 text-success') + '">' + log.provider + '</span>' +
           '</td>' +
           '<td class="font-mono text-[0.7rem] text-text-secondary px-4 py-3 border-b border-border-subtle align-middle">' + log.model + '</td>' +
           '<td class="font-mono text-[0.65rem] font-medium px-4 py-3 border-b border-border-subtle align-middle">' + langDisplay + '</td>' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
             (entities.length > 0
-              ? '<div class="flex flex-wrap gap-1">' + entities.map(e => '<span class="font-mono text-[0.55rem] px-1.5 py-0.5 bg-subtle border border-border rounded text-text-secondary">' + e.trim() + '</span>').join('') + '</div>'
+              ? '<div class="flex flex-wrap gap-1">' + entities.map(e => '<span class="font-mono text-[0.55rem] px-1.5 py-0.5 bg-elevated border border-border rounded-sm text-text-secondary">' + e.trim() + '</span>').join('') + '</div>'
               : '<span class="text-text-muted">—</span>') +
           '</td>' +
           '<td class="font-mono text-[0.7rem] text-teal px-4 py-3 border-b border-border-subtle align-middle">' + log.scan_time_ms + 'ms</td>' +
