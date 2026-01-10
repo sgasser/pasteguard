@@ -34,6 +34,7 @@ export function extractTextFromRequest(body: ChatCompletionRequest): string {
  * - Private keys: OpenSSH, PEM (RSA, generic, encrypted)
  * - API keys: OpenAI, AWS, GitHub
  * - Tokens: JWT, Bearer
+ * - Environment variables: Passwords, secrets, connection strings
  *
  * Respects max_scan_chars limit for performance.
  */
