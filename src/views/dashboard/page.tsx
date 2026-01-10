@@ -185,6 +185,7 @@ const DashboardPage: FC = () => {
 							.card-hover:hover {
 								box-shadow: var(--shadow-md);
 								transform: translateY(-2px);
+								border-color: #d3ab8c; /* fallback for browsers without color-mix */
 								border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
 							}
 						`,
