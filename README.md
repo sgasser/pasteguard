@@ -118,6 +118,9 @@ Works with any OpenAI-compatible tool:
 - GitHub tokens
 - JWT tokens
 - Bearer tokens
+- Env passwords
+- Env secrets
+- Connection strings
 
 ## Tech Stack
 
