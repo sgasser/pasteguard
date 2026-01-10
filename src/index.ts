@@ -31,6 +31,15 @@ app.use("*", requestIdMiddleware);
 app.use("*", cors());
 app.use("*", logger());
 
+// Favicon
+app.get("/favicon.svg", (c) => {
+  const svg = `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M32 6C20 6 12 12 12 12v20c0 12 8 22 20 26 12-4 20-14 20-26V12s-8-6-20-6z" fill="#b45309"/></svg>`;
+  return c.body(svg, 200, {
+    "Content-Type": "image/svg+xml",
+    "Cache-Control": "public, max-age=86400",
+  });
+});
+
 app.route("/", healthRoutes);
 app.route("/", infoRoutes);
 app.route("/openai/v1", proxyRoutes);
