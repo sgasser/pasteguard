@@ -1,14 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import type { MaskingConfig, SecretsDetectionConfig } from "../config";
+import type { SecretsDetectionConfig } from "../config";
 import type { ChatMessage } from "../services/llm-client";
 import { maskMessages } from "../services/masking";
 import type { PIIEntity } from "../services/pii-detector";
-import { detectSecrets } from "./detect";
-import { redactSecrets } from "./redact";
 import type { ContentPart } from "../utils/content";
 
 describe("Multimodal content handling", () => {
-  const secretsConfig: SecretsDetectionConfig = {
+  const _secretsConfig: SecretsDetectionConfig = {
     enabled: true,
     action: "redact",
     entities: ["API_KEY_OPENAI"],
@@ -72,9 +70,7 @@ describe("Multimodal content handling", () => {
       const messages: ChatMessage[] = [
         {
           role: "user",
-          content: [
-            { type: "text", text: "Contact Alice at alice@secret.com" },
-          ],
+          content: [{ type: "text", text: "Contact Alice at alice@secret.com" }],
         },
       ];
 
@@ -89,7 +85,7 @@ describe("Multimodal content handling", () => {
       expect(Array.isArray(masked[0].content)).toBe(true);
 
       const maskedContent = masked[0].content as ContentPart[];
-      
+
       // Verify the text is actually masked (not the original)
       expect(maskedContent[0].text).not.toContain("Alice");
       expect(maskedContent[0].text).not.toContain("alice@secret.com");
@@ -125,10 +121,10 @@ describe("Multimodal content handling", () => {
 
       // At minimum, verify that the entity is masked somewhere
       const fullMasked = maskedContent
-        .filter(p => p.type === "text")
-        .map(p => p.text)
+        .filter((p) => p.type === "text")
+        .map((p) => p.text)
         .join("\n");
-      
+
       expect(fullMasked).toContain("<EMAIL_ADDRESS_");
       expect(fullMasked).not.toContain("email@example.com");
     });

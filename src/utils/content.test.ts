@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { extractTextContent, hasTextContent, type ContentPart } from "./content";
+import { type ContentPart, extractTextContent, hasTextContent } from "./content";
 
 describe("extractTextContent", () => {
   test("returns empty string for null", () => {

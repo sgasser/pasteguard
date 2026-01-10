@@ -228,12 +228,12 @@ function redactMessagesWithSecrets(
       // Track offset position within the concatenated text for this message
       // (matches how extractTextContent joins parts with \n)
       let partOffset = 0;
-      
+
       // Redact only text parts of array content with proper offset tracking
       const redactedContent = msg.content.map((part: ContentPart) => {
         if (part.type === "text" && typeof part.text === "string") {
           const partLength = part.text.length;
-          
+
           // Find redactions that apply to this specific part
           const partRedactions = messageRedactions
             .filter((r) => r.start < partOffset + partLength && r.end > partOffset)
@@ -242,7 +242,7 @@ function redactMessagesWithSecrets(
               start: Math.max(0, r.start - partOffset),
               end: Math.min(partLength, r.end - partOffset),
             }));
-          
+
           if (partRedactions.length > 0) {
             const { redacted, context: updatedContext } = redactSecrets(
               part.text,
@@ -254,7 +254,7 @@ function redactMessagesWithSecrets(
             partOffset += partLength + 1; // +1 for \n separator
             return { ...part, text: redacted };
           }
-          
+
           partOffset += partLength + 1; // +1 for \n separator
           return part;
         }

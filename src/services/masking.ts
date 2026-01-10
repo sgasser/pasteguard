@@ -1,5 +1,5 @@
 import type { MaskingConfig } from "../config";
-import { extractTextContent, type ContentPart } from "../utils/content";
+import { extractTextContent } from "../utils/content";
 import type { ChatCompletionResponse, ChatMessage } from "./llm-client";
 import type { PIIEntity } from "./pii-detector";
 
@@ -118,22 +118,22 @@ export function maskMessages(
 
   const masked = messages.map((msg, i) => {
     const entities = entitiesByMessage[i] || [];
-    
+
     // Handle array content (multimodal messages)
     if (Array.isArray(msg.content)) {
       if (entities.length === 0) {
         return msg;
       }
-      
+
       // Track offset position within the concatenated text for this message
       // (matches how extractTextContent joins parts with \n)
       let partOffset = 0;
-      
+
       // Mask only text parts with proper offset tracking
       const maskedContent = msg.content.map((part) => {
         if (part.type === "text" && typeof part.text === "string") {
           const partLength = part.text.length;
-          
+
           // Find entities that apply to this specific part
           const partEntities = entities
             .filter((e) => e.start < partOffset + partLength && e.end > partOffset)
@@ -142,22 +142,22 @@ export function maskMessages(
               start: Math.max(0, e.start - partOffset),
               end: Math.min(partLength, e.end - partOffset),
             }));
-          
+
           if (partEntities.length > 0) {
             const { masked: maskedText } = mask(part.text, partEntities, context);
             partOffset += partLength + 1; // +1 for \n separator
             return { ...part, text: maskedText };
           }
-          
+
           partOffset += partLength + 1; // +1 for \n separator
           return part;
         }
         return part;
       });
-      
+
       return { ...msg, content: maskedContent };
     }
-    
+
     // Handle string content (text-only messages)
     const text = extractTextContent(msg.content);
     const { masked: maskedContent } = mask(text, entities, context);
