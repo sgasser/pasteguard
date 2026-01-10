@@ -96,9 +96,10 @@ secrets_detection:
   enabled: true
 
   # Action to take when secrets are detected:
-  #   block:        Block the request with HTTP 400 (default, secure-by-default)
-  #   redact:       Replace secrets with placeholders, unmask in response (reversible)
+  #   block:        Block the request with HTTP 400
+  #   redact:       Replace secrets with placeholders, unmask in response
   #   route_local:  Route to local provider (only works in route mode)
+  # Default: redact (if not specified)
   action: block
 
   # Secret types to detect

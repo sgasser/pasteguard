@@ -7,9 +7,9 @@ import type { SecretsDetectionResult, SecretsMatch, SecretsRedaction } from "./p
 // Re-export types from patterns module for backwards compatibility
 export type {
   SecretEntityType,
+  SecretsDetectionResult,
   SecretsMatch,
   SecretsRedaction,
-  SecretsDetectionResult,
 } from "./patterns/types";
 
 /**
