@@ -1,11 +1,30 @@
-import type { SecretsMatch, SecretsRedaction, SecretEntityType } from "../detect";
-
 /**
- * Result of a pattern detection run
+ * All supported secret entity types
  */
-export interface DetectionResult {
+export type SecretEntityType =
+  | "OPENSSH_PRIVATE_KEY"
+  | "PEM_PRIVATE_KEY"
+  | "API_KEY_OPENAI"
+  | "API_KEY_AWS"
+  | "API_KEY_GITHUB"
+  | "JWT_TOKEN"
+  | "BEARER_TOKEN";
+
+export interface SecretsMatch {
+  type: SecretEntityType;
+  count: number;
+}
+
+export interface SecretsRedaction {
+  start: number;
+  end: number;
+  type: SecretEntityType;
+}
+
+export interface SecretsDetectionResult {
+  detected: boolean;
   matches: SecretsMatch[];
-  redactions: SecretsRedaction[];
+  redactions?: SecretsRedaction[];
 }
 
 /**
@@ -19,5 +38,5 @@ export interface PatternDetector {
   patterns: SecretEntityType[];
 
   /** Run detection for enabled entity types */
-  detect(text: string, enabledTypes: Set<string>): DetectionResult;
+  detect(text: string, enabledTypes: Set<string>): SecretsDetectionResult;
 }
