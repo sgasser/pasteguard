@@ -133,13 +133,7 @@ export class Router {
       };
     }
 
-    const detector = getPIIDetector();
-    const fullScan = await detector.analyzeAllMessages(messages, {
-      language: piiResult.language,
-      usedFallback: piiResult.languageFallback,
-    });
-
-    const { masked, context } = maskMessages(messages, fullScan.entitiesByMessage);
+    const { masked, context } = maskMessages(messages, piiResult.entitiesByMessage);
 
     const entityTypes = [...new Set(piiResult.newEntities.map((e) => e.entity_type))];
 
