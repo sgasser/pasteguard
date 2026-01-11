@@ -41,6 +41,24 @@ describe("POST /openai/v1/chat/completions", () => {
 
     expect(res.status).toBe(400);
   });
+
+  test("accepts developer role (GPT-5.x compatibility)", async () => {
+    const res = await app.request("/openai/v1/chat/completions", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [
+          { role: "developer", content: "You are a helpful assistant" },
+          { role: "user", content: "Hello" },
+        ],
+        model: "gpt-5.2",
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    // Should not be 400 (validation passed)
+    // Will be 401/502 without API key, but that's fine - we're testing validation
+    expect(res.status).not.toBe(400);
+  });
 });
 
 describe("GET /openai/v1/models", () => {

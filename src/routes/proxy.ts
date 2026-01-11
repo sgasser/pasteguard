@@ -30,7 +30,7 @@ const ChatCompletionSchema = z
       .array(
         z
           .object({
-            role: z.enum(["system", "user", "assistant", "tool"]),
+            role: z.enum(["system", "developer", "user", "assistant", "tool", "function"]),
             content: z.union([z.string(), z.array(z.any()), z.null()]).optional(),
           })
           .passthrough(), // Allow additional fields like name, tool_calls, etc.

@@ -6,7 +6,7 @@ import type { MessageContent } from "../utils/content";
  * Supports both text-only (content: string) and multimodal (content: array) formats
  */
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "developer" | "user" | "assistant";
   content: MessageContent;
 }
 
