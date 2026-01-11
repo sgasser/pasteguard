@@ -16,7 +16,7 @@ infoRoutes.get("/info", (c) => {
   const info: Record<string, unknown> = {
     name: "PasteGuard",
     version: pkg.version,
-    description: "Guard your paste - Privacy-aware LLM proxy",
+    description: "Privacy proxy for LLMs",
     mode: config.mode,
     providers: {
       upstream: {

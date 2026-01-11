@@ -1,0 +1,28 @@
+<svg viewBox="0 0 220 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- PasteGuard Wordmark - Dark Mode -->
+
+  <!-- Logo icon (exact same as logo-dark.svg, scaled to 40px height) -->
+  <g transform="translate(2, 2) scale(0.625)">
+    <path
+      d="M32 6C20 6 12 12 12 12v20c0 12 8 22 20 26 12-4 20-14 20-26V12s-8-6-20-6z"
+      stroke="#d97706"
+      stroke-width="4.8"
+      fill="none"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <rect x="22" y="24" width="20" height="4" rx="2" fill="#d97706"/>
+    <rect x="22" y="32" width="14" height="4" rx="2" fill="#d97706" opacity="0.6"/>
+    <rect x="22" y="40" width="17" height="4" rx="2" fill="#d97706" opacity="0.3"/>
+  </g>
+
+  <!-- Text: PasteGuard (no space) -->
+  <text
+    x="48"
+    y="30"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-size="22"
+    font-weight="700"
+    fill="#fafaf9"
+  >Paste<tspan fill="#d97706">Guard</tspan></text>
+</svg>

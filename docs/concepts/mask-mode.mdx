@@ -1,0 +1,91 @@
+---
+title: Mask Mode
+description: Replace PII with placeholders before sending to your provider
+---
+
+# Mask Mode
+
+Mask mode replaces PII with placeholders before sending to your LLM provider. The response is automatically unmasked before returning to you.
+
+## How It Works
+
+<Steps>
+  <Step title="Request arrives">
+    Your app sends: `"Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)"`
+  </Step>
+  <Step title="PII detected">
+    PasteGuard finds: `Dr. Sarah Chen` (PERSON), `sarah.chen@hospital.org` (EMAIL)
+  </Step>
+  <Step title="Masked request sent">
+    Provider receives: `"Write a follow-up email to <PERSON_1> (<EMAIL_ADDRESS_1>)"`
+  </Step>
+  <Step title="Response masked">
+    Provider responds: `"Dear <PERSON_1>, Following up on our discussion..."`
+  </Step>
+  <Step title="Response unmasked">
+    You receive: `"Dear Dr. Sarah Chen, Following up on our discussion..."`
+  </Step>
+</Steps>
+
+## When to Use
+
+- Simple setup without local infrastructure
+- Want to use external LLM providers while protecting PII
+
+## Configuration
+
+```yaml
+mode: mask
+
+providers:
+  upstream:
+    type: openai
+    base_url: https://api.openai.com/v1
+```
+
+### Masking Options
+
+```yaml
+masking:
+  show_markers: false
+  marker_text: "[protected]"
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `show_markers` | `false` | Add visual markers around unmasked values |
+| `marker_text` | `[protected]` | Marker text if enabled |
+
+## Response Headers
+
+Mask mode sets these headers on responses:
+
+```
+X-PasteGuard-Mode: mask
+X-PasteGuard-Provider: upstream
+X-PasteGuard-PII-Detected: true
+X-PasteGuard-PII-Masked: true
+X-PasteGuard-Language: en
+```
+
+If the detected language wasn't configured and fell back to `fallback_language`:
+
+```
+X-PasteGuard-Language-Fallback: true
+```
+
+## Streaming Support
+
+Mask mode supports streaming responses. PasteGuard buffers tokens and unmasks placeholders in real-time as they arrive.
+
+```python
+stream = client.chat.completions.create(
+    model="gpt-5.2",
+    messages=[{"role": "user", "content": "Email Dr. Sarah Chen at sarah.chen@hospital.org"}],
+    stream=True
+)
+
+for chunk in stream:
+    # PII is already unmasked in each chunk
+    print(chunk.choices[0].delta.content, end="")
+```

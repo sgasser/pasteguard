@@ -1,0 +1,89 @@
+---
+title: PII Detection Config
+description: Configure PII detection settings
+---
+
+# PII Detection Configuration
+
+```yaml
+pii_detection:
+  presidio_url: http://localhost:5002
+  languages: [en, de]
+  fallback_language: en
+  score_threshold: 0.7
+  entities:
+    - PERSON
+    - EMAIL_ADDRESS
+    - PHONE_NUMBER
+    - CREDIT_CARD
+    - IBAN_CODE
+    - IP_ADDRESS
+    - LOCATION
+```
+
+## Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `presidio_url` | `http://localhost:5002` | Presidio analyzer URL |
+| `languages` | `[en]` | Languages to detect. Must match Docker build |
+| `fallback_language` | `en` | Fallback if detected language not in list |
+| `score_threshold` | `0.7` | Minimum confidence (0.0-1.0) |
+| `entities` | See below | Entity types to detect |
+
+## Languages
+
+Languages must be installed during Docker build:
+
+```bash
+LANGUAGES=en,de,fr docker compose build
+```
+
+Available languages (24):
+`ca`, `zh`, `hr`, `da`, `nl`, `en`, `fi`, `fr`, `de`, `el`, `it`, `ja`, `ko`, `lt`, `mk`, `nb`, `pl`, `pt`, `ro`, `ru`, `sl`, `es`, `sv`, `uk`
+
+### Single Language
+
+If only one language is specified, language detection is skipped for better performance:
+
+```yaml
+pii_detection:
+  languages: [en]
+```
+
+### Fallback Language
+
+If the detected language isn't in your list, the fallback is used:
+
+```yaml
+pii_detection:
+  languages: [en, de]
+  fallback_language: en  # Used for French text, etc.
+```
+
+## Entities
+
+| Entity | Examples |
+|--------|----------|
+| `PERSON` | Dr. Sarah Chen, John Smith |
+| `EMAIL_ADDRESS` | sarah.chen@hospital.org |
+| `PHONE_NUMBER` | +1-555-123-4567 |
+| `CREDIT_CARD` | 4111-1111-1111-1111 |
+| `IBAN_CODE` | DE89 3704 0044 0532 0130 00 |
+| `IP_ADDRESS` | 192.168.1.1 |
+| `LOCATION` | New York, 123 Main St |
+| `US_SSN` | 123-45-6789 |
+| `US_PASSPORT` | 123456789 |
+| `CRYPTO` | Bitcoin addresses |
+| `URL` | https://example.com |
+
+## Score Threshold
+
+Higher = fewer false positives, might miss some PII. Lower = catches more PII, more false positives.
+
+```yaml
+pii_detection:
+  score_threshold: 0.7  # Default, good balance
+  # score_threshold: 0.5  # More aggressive
+  # score_threshold: 0.9  # More conservative
+```

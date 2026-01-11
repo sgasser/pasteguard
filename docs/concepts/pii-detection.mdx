@@ -1,0 +1,68 @@
+---
+title: PII Detection
+description: Personal data detection powered by Microsoft Presidio
+---
+
+# PII Detection
+
+PasteGuard uses Microsoft Presidio for PII detection, supporting 24 languages with automatic language detection.
+
+## Supported Entities
+
+| Entity | Examples |
+|--------|----------|
+| `PERSON` | Dr. Sarah Chen, John Smith |
+| `EMAIL_ADDRESS` | sarah.chen@hospital.org |
+| `PHONE_NUMBER` | +1-555-123-4567 |
+| `CREDIT_CARD` | 4111-1111-1111-1111 |
+| `IBAN_CODE` | DE89 3704 0044 0532 0130 00 |
+| `IP_ADDRESS` | 192.168.1.1 |
+| `LOCATION` | New York, 123 Main St |
+| `US_SSN` | 123-45-6789 |
+| `US_PASSPORT` | 123456789 |
+| `CRYPTO` | Bitcoin addresses |
+| `URL` | https://example.com |
+
+## Language Support
+
+PasteGuard supports 24 languages. The language is auto-detected from your input text.
+
+**Available languages:** Catalan, Chinese, Croatian, Danish, Dutch, English, Finnish, French, German, Greek, Italian, Japanese, Korean, Lithuanian, Macedonian, Norwegian, Polish, Portuguese, Romanian, Russian, Slovenian, Spanish, Swedish, Ukrainian
+
+### Configure Languages
+
+Languages must be installed during Docker build:
+
+```bash
+LANGUAGES=en,de,fr docker compose build
+```
+
+If only one language is specified, language detection is skipped for better performance.
+
+## Confidence Scoring
+
+Each detected entity has a confidence score (0.0 - 1.0). The default threshold is 0.7.
+
+- **Higher threshold** = fewer false positives, might miss some PII
+- **Lower threshold** = catches more PII, more false positives
+
+```yaml
+pii_detection:
+  score_threshold: 0.7
+```
+
+## Response Headers
+
+When PII is detected:
+
+```
+X-PasteGuard-PII-Detected: true
+X-PasteGuard-PII-Masked: true   # mask mode only
+X-PasteGuard-Language: en
+```
+
+If the fallback language was used:
+
+```
+X-PasteGuard-Language-Fallback: true
+```

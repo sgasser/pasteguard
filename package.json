@@ -1,7 +1,7 @@
 {
   "name": "pasteguard",
   "version": "0.1.0",
-  "description": "Guard your paste - Privacy-aware LLM proxy that masks PII before sending to cloud LLMs",
+  "description": "Privacy proxy for LLMs. Masks personal data and secrets before sending to your provider.",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {

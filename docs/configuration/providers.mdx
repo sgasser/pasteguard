@@ -1,0 +1,141 @@
+---
+title: Providers
+description: Configure your LLM providers
+---
+
+# Providers
+
+PasteGuard supports two provider types: your configured provider (upstream) and local.
+
+## Upstream Provider
+
+Required for both modes. Your LLM provider (OpenAI, Azure, etc.).
+
+```yaml
+providers:
+  upstream:
+    type: openai
+    base_url: https://api.openai.com/v1
+    # api_key: ${OPENAI_API_KEY}  # Optional fallback
+```
+
+| Option | Description |
+|--------|-------------|
+| `type` | `openai` |
+| `base_url` | API endpoint |
+| `api_key` | Optional. Used if client doesn't send Authorization header |
+
+### Supported Providers
+
+Any OpenAI-compatible API works:
+
+```yaml
+# OpenAI
+providers:
+  upstream:
+    type: openai
+    base_url: https://api.openai.com/v1
+
+# Azure OpenAI
+providers:
+  upstream:
+    type: openai
+    base_url: https://your-resource.openai.azure.com/openai/v1
+
+# OpenRouter
+providers:
+  upstream:
+    type: openai
+    base_url: https://openrouter.ai/api/v1
+    api_key: ${OPENROUTER_API_KEY}
+
+# LiteLLM Proxy
+providers:
+  upstream:
+    type: openai
+    base_url: http://localhost:4000  # LiteLLM default port
+
+# Together AI
+providers:
+  upstream:
+    type: openai
+    base_url: https://api.together.xyz/v1
+
+# Groq
+providers:
+  upstream:
+    type: openai
+    base_url: https://api.groq.com/openai/v1
+```
+
+## Local Provider
+
+Required for Route mode only. Your local LLM.
+
+```yaml
+providers:
+  local:
+    type: ollama
+    base_url: http://localhost:11434
+    model: llama3.2
+```
+
+| Option | Description |
+|--------|-------------|
+| `type` | `ollama` or `openai` (for compatible servers) |
+| `base_url` | Local LLM endpoint |
+| `model` | Model to use for all PII requests |
+| `api_key` | Only needed for OpenAI-compatible servers |
+
+### Ollama
+
+```yaml
+providers:
+  local:
+    type: ollama
+    base_url: http://localhost:11434
+    model: llama3.2
+```
+
+### vLLM
+
+```yaml
+providers:
+  local:
+    type: openai
+    base_url: http://localhost:8000/v1
+    model: meta-llama/Llama-2-7b-chat-hf
+```
+
+### llama.cpp
+
+```yaml
+providers:
+  local:
+    type: openai
+    base_url: http://localhost:8080/v1
+    model: local
+```
+
+### LocalAI
+
+```yaml
+providers:
+  local:
+    type: openai
+    base_url: http://localhost:8080/v1
+    model: your-model
+    api_key: ${LOCAL_API_KEY}  # if required
+```
+
+## API Key Handling
+
+PasteGuard forwards your client's `Authorization` header to your provider. You can optionally set `api_key` in config as a fallback:
+
+```yaml
+providers:
+  upstream:
+    type: openai
+    base_url: https://api.openai.com/v1
+    api_key: ${OPENAI_API_KEY}  # Used if client doesn't send auth
+```

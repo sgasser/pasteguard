@@ -1,0 +1,103 @@
+---
+title: Status
+description: Health check and info endpoints
+---
+
+# Status Endpoints
+
+## Health Check
+
+Check if PasteGuard and its dependencies are running.
+
+```
+GET /health
+```
+
+### Request
+
+```bash
+curl http://localhost:3000/health
+```
+
+### Response
+
+Returns HTTP 200 when healthy, HTTP 503 when degraded.
+
+```json
+{
+  "status": "healthy",
+  "services": {
+    "presidio": "up"
+  },
+  "timestamp": "2026-01-15T10:30:00Z"
+}
+```
+
+When a service is down:
+
+```json
+{
+  "status": "degraded",
+  "services": {
+    "presidio": "down"
+  },
+  "timestamp": "2026-01-15T10:30:00Z"
+}
+```
+
+In route mode, `local_llm` is also included in services.
+
+---
+
+## Info
+
+Get current configuration and mode.
+
+```
+GET /info
+```
+
+### Request
+
+```bash
+curl http://localhost:3000/info
+```
+
+### Response
+
+```json
+{
+  "name": "PasteGuard",
+  "version": "1.0.0",
+  "description": "Privacy proxy for LLMs",
+  "mode": "mask",
+  "providers": {
+    "upstream": { "type": "openai" }
+  },
+  "pii_detection": {
+    "languages": ["en"],
+    "fallback_language": "en",
+    "score_threshold": 0.7,
+    "entities": ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER"]
+  },
+  "masking": {
+    "show_markers": false
+  }
+}
+```
+
+When language validation is available, `languages` becomes an object:
+
+```json
+{
+  "pii_detection": {
+    "languages": {
+      "configured": ["en", "de", "fr"],
+      "available": ["en", "de"],
+      "missing": ["fr"]
+    }
+  }
+}
+```
+
+In route mode, `routing` and `providers.local` are also included.

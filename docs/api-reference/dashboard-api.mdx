@@ -1,0 +1,100 @@
+---
+title: Dashboard API
+description: Request logs and statistics
+---
+
+# Dashboard API
+
+The dashboard provides an API for accessing request logs and statistics.
+
+## Logs
+
+Get request history with pagination.
+
+```
+GET /dashboard/api/logs
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | number | 100 | Number of logs to return (max 1000) |
+| `offset` | number | 0 | Pagination offset |
+
+### Request
+
+```bash
+curl "http://localhost:3000/dashboard/api/logs?limit=100&offset=0"
+```
+
+### Response
+
+```json
+{
+  "logs": [
+    {
+      "id": 1,
+      "timestamp": "2026-01-15T10:30:00Z",
+      "mode": "mask",
+      "provider": "upstream",
+      "model": "gpt-5.2",
+      "pii_detected": true,
+      "entities": "[\"EMAIL_ADDRESS\",\"PERSON\"]",
+      "latency_ms": 1234,
+      "scan_time_ms": 45,
+      "prompt_tokens": 150,
+      "completion_tokens": 200,
+      "user_agent": "OpenAI-Python/1.0.0",
+      "language": "en",
+      "language_fallback": false,
+      "detected_language": "en",
+      "masked_content": "Hello <EMAIL_ADDRESS_1>",
+      "secrets_detected": 0,
+      "secrets_types": null
+    }
+  ],
+  "pagination": {
+    "limit": 100,
+    "offset": 0,
+    "count": 1
+  }
+}
+```
+
+---
+
+## Statistics
+
+Get aggregated statistics.
+
+```
+GET /dashboard/api/stats
+```
+
+### Request
+
+```bash
+curl http://localhost:3000/dashboard/api/stats
+```
+
+### Response
+
+```json
+{
+  "total_requests": 1500,
+  "pii_requests": 342,
+  "pii_percentage": 22.8,
+  "upstream_requests": 1200,
+  "local_requests": 300,
+  "avg_scan_time_ms": 45,
+  "total_tokens": 125000,
+  "requests_last_hour": 42,
+  "entity_breakdown": [
+    { "entity": "EMAIL_ADDRESS", "count": 150 },
+    { "entity": "PERSON", "count": 120 },
+    { "entity": "PHONE_NUMBER", "count": 72 }
+  ],
+  "mode": "mask"
+}
+```

@@ -1,0 +1,134 @@
+---
+title: Quickstart
+description: Get PasteGuard running in 2 minutes
+---
+
+# Quickstart
+
+## 1. Start PasteGuard
+
+```bash
+git clone https://github.com/sgasser/pasteguard.git
+cd pasteguard
+cp config.example.yaml config.yaml
+docker compose up -d
+```
+
+PasteGuard runs on `http://localhost:3000`. Dashboard at `http://localhost:3000/dashboard`.
+
+<Accordion title="Multiple Languages">
+By default, only English is installed (~1.5GB image). To add more languages:
+
+```bash
+# English + German + French (~2.5GB)
+LANGUAGES=en,de,fr docker compose up -d --build
+```
+
+Update `config.yaml` to match:
+
+```yaml
+pii_detection:
+  languages:
+    - en
+    - de
+    - fr
+```
+
+See [PII Detection Config](/configuration/pii-detection) for all 24 available languages.
+</Accordion>
+
+## 2. Make a Request
+
+Point your OpenAI client to PasteGuard:
+
+<CodeGroup>
+
+```python Python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:3000/openai/v1",
+    api_key="your-openai-key"
+)
+
+response = client.chat.completions.create(
+    model="gpt-5.2",
+    messages=[
+        {"role": "user", "content": "Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)"}
+    ]
+)
+
+print(response.choices[0].message.content)
+```
+
+```javascript JavaScript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://localhost:3000/openai/v1',
+  apiKey: 'your-openai-key'
+});
+
+const response = await client.chat.completions.create({
+  model: 'gpt-5.2',
+  messages: [
+    { role: 'user', content: 'Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)' }
+  ]
+});
+
+console.log(response.choices[0].message.content);
+```
+
+```bash cURL
+curl http://localhost:3000/openai/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.2",
+    "messages": [
+      {"role": "user", "content": "Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)"}
+    ]
+  }'
+```
+
+</CodeGroup>
+
+## 3. Verify PII Protection
+
+Check the response headers:
+
+```
+X-PasteGuard-PII-Detected: true
+X-PasteGuard-PII-Masked: true
+```
+
+The name and email were masked before reaching OpenAI and restored in the response.
+
+## 4. View Dashboard
+
+Open `http://localhost:3000/dashboard` in your browser to see:
+
+- Request history
+- Detected PII entities
+- Masked content sent to the LLM
+
+<Frame>
+  <img src="/images/dashboard.png" alt="PasteGuard Dashboard" />
+</Frame>
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Mask Mode" icon="eye-slash" href="/concepts/mask-mode">
+    How PII masking works
+  </Card>
+  <Card title="Route Mode" icon="code-branch" href="/concepts/route-mode">
+    Route sensitive requests locally
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Customize detection and providers
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/chat-completions">
+    Explore the API
+  </Card>
+</CardGroup>

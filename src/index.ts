@@ -175,7 +175,7 @@ Provider:
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                       PasteGuard                          ║
-║         Guard your paste - Privacy-aware LLM proxy        ║
+║              Privacy proxy for LLMs                       ║
 ╚═══════════════════════════════════════════════════════════╝
 
 Server:     http://${host}:${port}

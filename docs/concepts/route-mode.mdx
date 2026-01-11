@@ -1,0 +1,126 @@
+---
+title: Route Mode
+description: Route PII requests to a local LLM
+---
+
+# Route Mode
+
+Route mode sends requests containing PII to a local LLM. Requests without PII go to your configured provider.
+
+## How It Works
+
+<CardGroup cols={2}>
+  <Card title="Request with PII" icon="shield-check">
+    Routed to **Local LLM** (Ollama, vLLM, llama.cpp, etc.)
+
+    PII stays on your network.
+  </Card>
+  <Card title="Request without PII" icon="cloud">
+    Routed to **Your Provider** (OpenAI, Azure, etc.)
+
+    Full provider performance.
+  </Card>
+</CardGroup>
+
+## When to Use
+
+- Have local GPU resources
+- Need complete data isolation for sensitive requests
+- Must prevent any PII from leaving your network
+
+## Configuration
+
+```yaml
+mode: route
+
+providers:
+  upstream:
+    type: openai
+    base_url: https://api.openai.com/v1
+  local:
+    type: ollama
+    base_url: http://localhost:11434
+    model: llama3.2
+
+routing:
+  default: upstream
+  on_pii_detected: local
+```
+
+### Routing Options
+
+| Option | Description |
+|--------|-------------|
+| `default` | Provider for requests without PII |
+| `on_pii_detected` | Provider for requests with PII |
+
+## Local Provider Setup
+
+### Ollama
+
+```yaml
+providers:
+  local:
+    type: ollama
+    base_url: http://localhost:11434
+    model: llama3.2
+```
+
+### vLLM
+
+```yaml
+providers:
+  local:
+    type: openai
+    base_url: http://localhost:8000/v1
+    model: meta-llama/Llama-2-7b-chat-hf
+```
+
+### llama.cpp
+
+```yaml
+providers:
+  local:
+    type: openai
+    base_url: http://localhost:8080/v1
+    model: local
+```
+
+### LocalAI
+
+```yaml
+providers:
+  local:
+    type: openai
+    base_url: http://localhost:8080/v1
+    model: your-model-name
+    api_key: ${LOCAL_API_KEY}  # if required
+```
+
+## Response Headers
+
+Route mode sets these headers on responses:
+
+When a request is routed to local:
+
+```
+X-PasteGuard-Mode: route
+X-PasteGuard-Provider: local
+X-PasteGuard-PII-Detected: true
+X-PasteGuard-Language: en
+```
+
+When routed to your provider:
+
+```
+X-PasteGuard-Mode: route
+X-PasteGuard-Provider: upstream
+X-PasteGuard-PII-Detected: false
+X-PasteGuard-Language: en
+```
+
+If the detected language wasn't configured and fell back to `fallback_language`:
+
+```
+X-PasteGuard-Language-Fallback: true
+```

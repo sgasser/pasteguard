@@ -1,0 +1,80 @@
+---
+title: Introduction
+description: Privacy proxy for LLMs
+---
+
+# What is PasteGuard?
+
+PasteGuard is an OpenAI-compatible proxy that protects personal data and secrets before sending to your LLM provider (OpenAI, Azure, etc.).
+
+## The Problem
+
+When using LLM APIs, every prompt is sent to external servers - including customer names, emails, and sensitive business data. Many organizations have policies against sending PII to third-party AI services.
+
+## The Solution
+
+PasteGuard sits between your app and the LLM API:
+
+```
+Your App → PasteGuard → LLM API
+```
+
+Two privacy modes:
+
+| Mode | How it works |
+|------|--------------|
+| **Mask** | Replace PII with placeholders, send to provider, restore in response |
+| **Route** | PII requests stay on your local LLM (Ollama, vLLM, llama.cpp), others go to your configured provider |
+
+## Quick Example
+
+<Steps>
+  <Step title="You send a prompt">
+    ```
+    Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)
+    ```
+  </Step>
+  <Step title="PasteGuard masks PII">
+    Detected: `Dr. Sarah Chen` → `<PERSON_1>`, `sarah.chen@hospital.org` → `<EMAIL_ADDRESS_1>`
+  </Step>
+  <Step title="OpenAI receives">
+    ```
+    Write a follow-up email to <PERSON_1> (<EMAIL_ADDRESS_1>)
+    ```
+  </Step>
+  <Step title="You get the response (unmasked)">
+    ```
+    Dear Dr. Sarah Chen, Following up on our discussion...
+    ```
+  </Step>
+</Steps>
+
+<Note>The LLM never sees the real data. PII is masked before sending and restored in the response.</Note>
+
+## Features
+
+- **PII Detection** — Names, emails, phone numbers, credit cards, IBANs, and more
+- **Secrets Detection** — API keys, tokens, private keys caught before they reach the LLM
+- **Streaming Support** — Real-time unmasking as tokens arrive
+- **24 Languages** — Works in English, German, French, and 21 more
+- **OpenAI-Compatible** — Change one URL, keep your code
+- **Self-Hosted** — Your servers, your data stays yours
+- **Open Source** — Apache 2.0 license, full transparency
+- **Dashboard** — See every protected request in real-time
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get running in 2 minutes
+  </Card>
+  <Card title="Mask Mode" icon="eye-slash" href="/concepts/mask-mode">
+    Replace PII with placeholders
+  </Card>
+  <Card title="Route Mode" icon="code-branch" href="/concepts/route-mode">
+    Route PII to local LLM
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Customize your setup
+  </Card>
+</CardGroup>

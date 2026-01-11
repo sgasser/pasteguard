@@ -150,7 +150,7 @@ logging:
   log_content: false
 
   # Log masked content for dashboard preview (default: true)
-  # Shows what was actually sent to upstream LLM with PII replaced by tokens
+  # Shows what was actually sent to upstream LLM with PII replaced by placeholders
   # Disable if you don't want any content stored, even masked
   log_masked_content: true
 

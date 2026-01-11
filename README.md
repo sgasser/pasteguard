@@ -2,303 +2,116 @@
   <img src="assets/wordmark-light.svg" width="220" height="44" alt="PasteGuard">
 </p>
 
-[![CI](https://github.com/sgasser/pasteguard/actions/workflows/ci.yml/badge.svg)](https://github.com/sgasser/pasteguard/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/sgasser/pasteguard/actions/workflows/ci.yml"><img src="https://github.com/sgasser/pasteguard/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
+</p>
 
-Privacy proxy for LLMs. Masks personal data and secrets / credentials before sending to your provider (OpenAI, Azure, etc.), or routes sensitive requests to local LLM.
+<p align="center">
+  Privacy proxy for LLMs. Masks personal data and secrets before sending to your provider.
+</p>
+
+<p align="center">
+  <a href="#quick-start"><strong>Quick Start</strong></a> ·
+  <a href="https://pasteguard.com/docs"><strong>Documentation</strong></a> ·
+  <a href="https://pasteguard.com/docs/integrations"><strong>Integrations</strong></a>
+</p>
+
+<br/>
 
 <img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
 
-## Mask Mode (Default)
+## What is PasteGuard?
 
-Replaces personal data with placeholders before sending to LLM. Unmasks the response automatically.
+When you use LLM APIs, every prompt is sent to external servers — including customer names, emails, and sensitive business data. Many organizations have policies against sending PII to third-party AI services.
+
+PasteGuard is an OpenAI-compatible proxy that sits between your app and the LLM API. It detects personal data and secrets before they leave your network.
+
+**Two ways to protect your data:**
+
+- **Mask Mode** — Replace PII with placeholders, send to your provider, restore in response. No local infrastructure needed.
+- **Route Mode** — Send PII requests to a local LLM (Ollama, vLLM, llama.cpp), everything else to your provider. Data never leaves your network.
+
+Works with OpenAI, Azure, and any OpenAI-compatible API. Just change one URL.
+
+## Features
+
+- **PII Detection** — Names, emails, phone numbers, credit cards, IBANs, and more
+- **Secrets Detection** — API keys, tokens, private keys caught before they reach the LLM
+- **Streaming Support** — Real-time unmasking as tokens arrive
+- **24 Languages** — Works in English, German, French, and 21 more
+- **OpenAI-Compatible** — Change one URL, keep your code
+- **Self-Hosted** — Your servers, your data stays yours
+- **Open Source** — Apache 2.0 license, full transparency
+- **Dashboard** — See every protected request in real-time
+
+## How It Works
 
 ```
-You send:              "Email john@acme.com about the meeting with Sarah Miller"
-OpenAI receives:       "Email <EMAIL_1> about the meeting with <PERSON_1>"
-OpenAI responds:       "I'll contact <EMAIL_1> to schedule with <PERSON_1>..."
-You receive:           "I'll contact john@acme.com to schedule with Sarah Miller..."
+You send:     "Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)
+               about next week's project meeting"
+
+LLM receives: "Write a follow-up email to <PERSON_1> (<EMAIL_ADDRESS_1>)
+               about next week's project meeting"
+
+LLM responds: "Dear <PERSON_1>, Following up on our discussion..."
+
+You receive:  "Dear Dr. Sarah Chen, Following up on our discussion..."
 ```
 
-- No local GPU needed
-- Supports streaming with real-time unmasking
-
-## Route Mode
-
-Requests with personal data go to local LLM. Everything else goes to your provider.
-
-```
-"Help with code review"              → OpenAI (best quality)
-"Email john@acme.com about..."       → Ollama (stays on your network)
-```
-
-- Requires local LLM (Ollama, vLLM, LocalAI)
-- Full data isolation - personal data never leaves your network
-
-## What It Detects
-
-### PII (Personal Identifiable Information)
-
-| Type          | Examples                    |
-| ------------- | --------------------------- |
-| Names         | John Smith, Sarah Miller    |
-| Emails        | john@acme.com               |
-| Phone numbers | +1 555 123 4567             |
-| Credit cards  | 4111-1111-1111-1111         |
-| IBANs         | DE89 3704 0044 0532 0130 00 |
-| IP addresses  | 192.168.1.1                 |
-| Locations     | New York, Berlin            |
-
-Additional entity types can be enabled: `US_SSN`, `US_PASSPORT`, `CRYPTO`, `NRP`, `MEDICAL_LICENSE`, `URL`.
-
-### Secrets (Secrets Shield)
-
-| Type                 | Pattern                                                                                                   |
-| -------------------- | --------------------------------------------------------------------------------------------------------- |
-| OpenSSH private keys | `-----BEGIN OPENSSH PRIVATE KEY-----`                                                                     |
-| PEM private keys     | `-----BEGIN RSA PRIVATE KEY-----`, `-----BEGIN PRIVATE KEY-----`, `-----BEGIN ENCRYPTED PRIVATE KEY-----` |
-| OpenAI API keys      | `sk-proj-...`, `sk-...` (48+ chars)                                                                       |
-| AWS access keys      | `AKIA...` (20 chars)                                                                                      |
-| GitHub tokens        | `ghp_...`, `gho_...`, `ghu_...`, `ghs_...`, `ghr_...`                                                      |
-| JWT tokens           | `eyJ...` (three base64 segments)                                                                          |
-| Bearer tokens        | `Bearer ...` (20+ char tokens)                                                                            |
-
-Secrets detection runs **before** PII detection. Three actions available:
-- **block** (default): Returns HTTP 400, request never reaches LLM
-- **redact**: Replaces secrets with placeholders, unredacts in response (reversible)
-- **route_local**: Routes to local LLM (route mode only)
-
-Detected secrets are never logged in their original form.
-
-**Languages**: 24 languages supported (configurable at build time). Auto-detected per request.
-
-Powered by [Microsoft Presidio](https://microsoft.github.io/presidio/).
+PasteGuard sits between your app and the LLM provider. It's OpenAI-compatible — just change the base URL.
 
 ## Quick Start
 
-### Docker (recommended)
-
 ```bash
 git clone https://github.com/sgasser/pasteguard.git
 cd pasteguard
 cp config.example.yaml config.yaml
-
-# Option 1: English only (default, ~1.5GB)
 docker compose up -d
-
-# Option 2: Multiple languages (~2.5GB)
-# Edit config.yaml to add languages, then:
-LANGUAGES=en,de,fr,es,it docker compose up -d
 ```
 
-### Local Development
-
-```bash
-git clone https://github.com/sgasser/pasteguard.git
-cd pasteguard
-bun install
-cp config.example.yaml config.yaml
-
-# Option 1: English only (default)
-docker compose up presidio-analyzer -d
-
-# Option 2: Multiple languages
-# Edit config.yaml to add languages, then:
-LANGUAGES=en,de,fr,es,it docker compose build presidio-analyzer
-docker compose up presidio-analyzer -d
-
-bun run dev
-```
+Point your app to `http://localhost:3000/openai/v1` instead of `https://api.openai.com/v1`.
 
 Dashboard: http://localhost:3000/dashboard
 
-**Usage:** Point your app to `http://localhost:3000/openai/v1` instead of `https://api.openai.com/v1`.
+For multiple languages, configuration options, and more: **[Read the docs →](https://pasteguard.com/docs/quickstart)**
 
-## Language Configuration
+## Integrations
 
-By default, only English is installed to minimize image size. Add more languages at build time:
+Works with any OpenAI-compatible tool:
 
-```bash
-# English only (default, smallest image ~1.5GB)
-docker compose build
+- OpenAI SDK (Python/JS)
+- LangChain
+- LlamaIndex
+- Cursor
+- Open WebUI
+- LibreChat
 
-# English + German
-LANGUAGES=en,de docker compose build
+**[See all integrations →](https://pasteguard.com/docs/integrations)**
 
-# Multiple languages
-LANGUAGES=en,de,fr,it,es docker compose build
-```
+## What It Detects
 
-**Available languages (24):**
-`ca`, `zh`, `hr`, `da`, `nl`, `en`, `fi`, `fr`, `de`, `el`, `it`, `ja`, `ko`, `lt`, `mk`, `nb`, `pl`, `pt`, `ro`, `ru`, `sl`, `es`, `sv`, `uk`
+**PII** (powered by [Microsoft Presidio](https://microsoft.github.io/presidio/))
+- Names
+- Emails
+- Phone numbers
+- Credit cards
+- IBANs
+- IP addresses
+- Locations
 
-**Language Fallback Behavior:**
+**Secrets**
+- OpenSSH private keys
+- PEM private keys
+- OpenAI API keys
+- AWS access keys
+- GitHub tokens
+- JWT tokens
+- Bearer tokens
 
-- Text language is auto-detected for each request
-- If detected language is not installed, falls back to `fallback_language` (default: `en`)
-- Dashboard shows fallback as `FR→EN` when French text is detected but only English is installed
-- Response header `X-PasteGuard-Language-Fallback: true` indicates fallback was used
+## Tech Stack
 
-Update `config.yaml` to match your installed languages:
-
-```yaml
-pii_detection:
-  languages:
-    - en
-    - de
-```
-
-See [presidio/languages.yaml](presidio/languages.yaml) for full details including context words.
-
-## Configuration
-
-**Mask mode:**
-
-```yaml
-mode: mask
-providers:
-  upstream:
-    type: openai
-    base_url: https://api.openai.com/v1
-masking:
-  placeholder_format: "<{TYPE}_{N}>" # Format for masked values
-  show_markers: false # Add visual markers to unmasked values
-```
-
-**Route mode:**
-
-```yaml
-mode: route
-providers:
-  upstream:
-    type: openai
-    base_url: https://api.openai.com/v1
-  local:
-    type: ollama
-    base_url: http://localhost:11434
-    model: llama3.2 # Model for all local requests
-routing:
-  default: upstream
-  on_pii_detected: local
-```
-
-**Customize PII detection:**
-
-```yaml
-pii_detection:
-  score_threshold: 0.7 # Confidence (0.0 - 1.0)
-  entities: # What to detect
-    - PERSON
-    - EMAIL_ADDRESS
-    - PHONE_NUMBER
-    - CREDIT_CARD
-    - IBAN_CODE
-```
-
-**Secrets detection (Secrets Shield):**
-
-```yaml
-secrets_detection:
-  enabled: true # Enable secrets detection
-  action: block # block | redact | route_local
-  entities: # Secret types to detect
-    - OPENSSH_PRIVATE_KEY
-    - PEM_PRIVATE_KEY
-    # API Keys (opt-in):
-    # - API_KEY_OPENAI
-    # - API_KEY_AWS
-    # - API_KEY_GITHUB
-    # Tokens (opt-in):
-    # - JWT_TOKEN
-    # - BEARER_TOKEN
-  max_scan_chars: 200000 # Performance limit (0 = no limit)
-  log_detected_types: true # Log types (never logs content)
-```
-
-- **block** (default): Returns HTTP 400 error, request never reaches LLM
-- **redact**: Replaces secrets with placeholders, unredacts in response (reversible, like PII masking)
-- **route_local**: Routes to local provider when secrets detected (requires route mode)
-
-**Logging options:**
-
-```yaml
-logging:
-  database: ./data/pasteguard.db
-  retention_days: 30           # 0 = keep forever
-  log_content: false           # Log full request/response
-  log_masked_content: true     # Log masked content for dashboard
-```
-
-**Dashboard authentication:**
-
-```yaml
-dashboard:
-  auth:
-    username: admin
-    password: ${DASHBOARD_PASSWORD}
-```
-
-**Environment variables:** Config values support `${VAR}` and `${VAR:-default}` substitution.
-
-See [config.example.yaml](config.example.yaml) for all options.
-
-## API Reference
-
-**Endpoints:**
-
-| Endpoint                           | Description                  |
-| ---------------------------------- | ---------------------------- |
-| `POST /openai/v1/chat/completions` | Chat API (OpenAI-compatible) |
-| `GET /openai/v1/models`            | List models                  |
-| `GET /dashboard`                   | Monitoring UI                |
-| `GET /dashboard/api/logs`          | Request logs (JSON)          |
-| `GET /dashboard/api/stats`         | Statistics (JSON)            |
-| `GET /health`                      | Health check                 |
-| `GET /info`                        | Current configuration        |
-
-**Response headers:**
-
-| Header | Value |
-|--------|-------|
-| `X-Request-ID` | Request identifier (forwarded or generated) |
-| `X-PasteGuard-Mode` | `route` / `mask` |
-| `X-PasteGuard-PII-Detected` | `true` / `false` |
-| `X-PasteGuard-PII-Masked` | `true` / `false` (mask mode) |
-| `X-PasteGuard-Provider` | `upstream` / `local` |
-| `X-PasteGuard-Language` | Detected language code |
-| `X-PasteGuard-Language-Fallback` | `true` if fallback was used |
-| `X-PasteGuard-Secrets-Detected` | `true` if secrets detected |
-| `X-PasteGuard-Secrets-Types` | Comma-separated list (e.g., `OPENSSH_PRIVATE_KEY,API_KEY_OPENAI`) |
-| `X-PasteGuard-Secrets-Redacted` | `true` if secrets were redacted (action: redact) |
-
-## Development
-
-```bash
-docker compose up presidio-analyzer -d    # Start detection service
-bun run dev                               # Dev server with hot reload
-bun test                                  # Run tests
-bun run check                             # Lint & format
-```
-
-## Benchmarks
-
-PII detection accuracy benchmark with test cases for multiple languages:
-
-```bash
-# Start Presidio with all benchmark languages
-LANGUAGES=en,de,fr,it,es docker compose up presidio-analyzer -d
-
-# Run all tests
-bun run benchmarks/pii-accuracy/run.ts
-
-# Run specific languages only
-bun run benchmarks/pii-accuracy/run.ts --languages de,en
-
-# Verbose output
-bun run benchmarks/pii-accuracy/run.ts --verbose
-```
-
-Test data in `benchmarks/pii-accuracy/test-data/` (one file per language).
+[Bun](https://bun.sh) · [Hono](https://hono.dev) · [Microsoft Presidio](https://microsoft.github.io/presidio/) · SQLite
 
 ## License
 

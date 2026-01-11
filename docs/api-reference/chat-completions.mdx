@@ -1,0 +1,122 @@
+---
+title: Chat Completions
+description: POST /openai/v1/chat/completions
+---
+
+# Chat Completions
+
+Generate chat completions. Identical to OpenAI's endpoint.
+
+```
+POST /openai/v1/chat/completions
+```
+
+## Request
+
+```bash
+curl http://localhost:3000/openai/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.2",
+    "messages": [
+      {"role": "user", "content": "Hello"}
+    ]
+  }'
+```
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `model` | string | Yes | Model ID (e.g., `gpt-5.2`) |
+| `messages` | array | Yes | Conversation messages |
+| `stream` | boolean | No | Enable streaming |
+| `temperature` | number | No | Sampling temperature (0-2) |
+| `max_tokens` | number | No | Maximum tokens to generate |
+
+All OpenAI parameters are supported and forwarded to your provider.
+
+## Response
+
+```json
+{
+  "id": "chatcmpl-abc123",
+  "object": "chat.completion",
+  "created": 1677858242,
+  "model": "gpt-5.2",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hello! How can I help you today?"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 10,
+    "completion_tokens": 15,
+    "total_tokens": 25
+  }
+}
+```
+
+## Streaming
+
+Set `stream: true` for Server-Sent Events:
+
+<CodeGroup>
+
+```python Python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:3000/openai/v1")
+
+stream = client.chat.completions.create(
+    model="gpt-5.2",
+    messages=[{"role": "user", "content": "Write a haiku"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")
+```
+
+```javascript JavaScript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://localhost:3000/openai/v1'
+});
+
+const stream = await client.chat.completions.create({
+  model: 'gpt-5.2',
+  messages: [{ role: 'user', content: 'Write a haiku' }],
+  stream: true
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || '');
+}
+```
+
+</CodeGroup>
+
+## Response Headers
+
+PasteGuard adds headers to indicate PII and secrets handling:
+
+| Header | Description |
+|--------|-------------|
+| `X-PasteGuard-Mode` | Current mode (`mask` or `route`) |
+| `X-PasteGuard-Provider` | Provider used (`upstream` or `local`) |
+| `X-PasteGuard-PII-Detected` | `true` if PII was found |
+| `X-PasteGuard-PII-Masked` | `true` if PII was masked (mask mode only) |
+| `X-PasteGuard-Language` | Detected language code |
+| `X-PasteGuard-Language-Fallback` | `true` if configured language was not available |
+| `X-PasteGuard-Secrets-Detected` | `true` if secrets were found |
+| `X-PasteGuard-Secrets-Types` | Comma-separated list of detected secret types |
+| `X-PasteGuard-Secrets-Redacted` | `true` if secrets were redacted |

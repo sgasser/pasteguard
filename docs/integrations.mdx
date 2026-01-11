@@ -1,0 +1,134 @@
+---
+title: Integrations
+description: Use PasteGuard with IDEs, chat interfaces, and SDKs
+---
+
+# Integrations
+
+PasteGuard works with any tool that supports the OpenAI API. Just change the base URL to point to PasteGuard.
+
+## Cursor
+
+In Cursor settings, configure a custom OpenAI base URL:
+
+1. Open **Settings** → **Models**
+2. Scroll to **API Keys** section
+3. Enable **Override OpenAI Base URL** toggle
+4. Enter:
+   ```
+   http://localhost:3000/openai/v1
+   ```
+5. Add your OpenAI API key above
+
+All requests from Cursor now go through PasteGuard with PII protection.
+
+## Chat Interfaces
+
+### Open WebUI
+
+In your Docker Compose or environment:
+
+```yaml
+services:
+  open-webui:
+    environment:
+      - OPENAI_API_BASE_URL=http://pasteguard:3000/openai/v1
+      - OPENAI_API_KEY=your-key
+```
+
+Or point Open WebUI to PasteGuard as an "OpenAI-compatible" connection.
+
+### LibreChat
+
+Configure in your `librechat.yaml`:
+
+```yaml
+version: 1.2.8
+cache: true
+endpoints:
+  custom:
+    - name: "PasteGuard"
+      apiKey: "${OPENAI_API_KEY}"
+      baseURL: "http://localhost:3000/openai/v1"
+      models:
+        default: ["gpt-5.2"]
+        fetch: false
+      titleConvo: true
+      titleModel: "gpt-5.2"
+```
+
+## Python / JavaScript
+
+### OpenAI SDK
+
+<CodeGroup>
+
+```python Python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:3000/openai/v1",
+    api_key="your-key"
+)
+```
+
+```javascript JavaScript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://localhost:3000/openai/v1',
+  apiKey: 'your-key'
+});
+```
+
+</CodeGroup>
+
+### LangChain
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    base_url="http://localhost:3000/openai/v1",
+    api_key="your-key"
+)
+```
+
+### LlamaIndex
+
+```python
+from llama_index.llms.openai_like import OpenAILike
+
+llm = OpenAILike(
+    api_base="http://localhost:3000/openai/v1",
+    api_key="your-key",
+    model="gpt-5.2",
+    is_chat_model=True
+)
+```
+
+## Environment Variable
+
+Most tools respect the `OPENAI_API_BASE` or `OPENAI_BASE_URL` environment variable:
+
+```bash
+export OPENAI_API_BASE=http://localhost:3000/openai/v1
+export OPENAI_API_KEY=your-key
+```
+
+## Verify It Works
+
+Check the response headers to confirm PasteGuard is processing requests:
+
+```bash
+curl -i http://localhost:3000/openai/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-5.2", "messages": [{"role": "user", "content": "Hi"}]}'
+```
+
+Look for:
+```
+X-PasteGuard-Mode: mask
+X-PasteGuard-Provider: upstream
+```

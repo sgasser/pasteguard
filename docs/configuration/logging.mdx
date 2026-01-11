@@ -1,0 +1,90 @@
+---
+title: Logging
+description: Configure request logging
+---
+
+# Logging Configuration
+
+```yaml
+logging:
+  database: ./data/pasteguard.db
+  retention_days: 30
+  log_content: false
+  log_masked_content: true
+```
+
+## Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `database` | `./data/pasteguard.db` | SQLite database path |
+| `retention_days` | `30` | Days to keep logs. `0` = forever |
+| `log_content` | `false` | Log raw request/response (contains PII!) |
+| `log_masked_content` | `true` | Log masked version for dashboard |
+
+## Database
+
+Logs are stored in SQLite:
+
+```yaml
+logging:
+  database: ./data/pasteguard.db
+```
+
+In Docker, this is persisted via volume:
+
+```yaml
+volumes:
+  - ./data:/app/data
+```
+
+## Retention
+
+Logs older than `retention_days` are automatically deleted:
+
+```yaml
+logging:
+  retention_days: 30   # Keep for 30 days
+  # retention_days: 7  # Keep for 7 days
+  # retention_days: 0  # Keep forever
+```
+
+## Content Logging
+
+### Raw Content (not recommended)
+
+Logs original request/response including PII:
+
+```yaml
+logging:
+  log_content: true  # Contains sensitive data!
+```
+
+### Masked Content (default)
+
+Logs masked version for dashboard preview:
+
+```yaml
+logging:
+  log_masked_content: true
+```
+
+Shows what was actually sent to your provider with PII replaced by placeholders.
+
+### No Content
+
+Disable all content logging:
+
+```yaml
+logging:
+  log_content: false
+  log_masked_content: false
+```
+
+Only metadata (timestamps, models, PII detected) is logged.
+
+## Security
+
+- Secret content is **never** logged, even if `log_content: true`
+- Only secret types are logged if `log_detected_types: true`
+- Masked content shows placeholders like `<EMAIL_ADDRESS_1>`, not real PII

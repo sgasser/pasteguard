@@ -1,0 +1,71 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "PasteGuard",
+  "logo": {
+    "light": "/wordmark-light.svg",
+    "dark": "/wordmark-dark.svg",
+    "href": "/"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#b45309",
+    "light": "#b45309",
+    "dark": "#d97706",
+    "background": {
+      "light": "#fafaf9",
+      "dark": "#0c0a09"
+    }
+  },
+  "font": {
+    "headings": {
+      "family": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "weight": 700
+    },
+    "body": {
+      "family": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/sgasser/pasteguard"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": ["introduction", "quickstart", "integrations"]
+    },
+    {
+      "group": "Concepts",
+      "pages": [
+        "concepts/mask-mode",
+        "concepts/route-mode",
+        "concepts/pii-detection",
+        "concepts/secrets-detection"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/chat-completions",
+        "api-reference/models",
+        "api-reference/status",
+        "api-reference/dashboard-api"
+      ]
+    },
+    {
+      "group": "Configuration",
+      "pages": [
+        "configuration/overview",
+        "configuration/providers",
+        "configuration/pii-detection",
+        "configuration/secrets-detection",
+        "configuration/logging"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/sgasser/pasteguard"
+  }
+}

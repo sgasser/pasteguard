@@ -1,0 +1,59 @@
+---
+title: Models
+description: GET /openai/v1/models
+---
+
+# Models
+
+List available models from your configured provider.
+
+```
+GET /openai/v1/models
+```
+
+## Request
+
+```bash
+curl http://localhost:3000/openai/v1/models \
+  -H "Authorization: Bearer $OPENAI_API_KEY"
+```
+
+## Response
+
+```json
+{
+  "object": "list",
+  "data": [
+    {"id": "gpt-5.2", "object": "model", "owned_by": "openai"}
+  ]
+}
+```
+
+## SDK Usage
+
+<CodeGroup>
+
+```python Python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:3000/openai/v1")
+
+models = client.models.list()
+for model in models:
+    print(model.id)
+```
+
+```javascript JavaScript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://localhost:3000/openai/v1'
+});
+
+const models = await client.models.list();
+for (const model of models.data) {
+  console.log(model.id);
+}
+```
+
+</CodeGroup>
