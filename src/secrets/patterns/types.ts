@@ -38,5 +38,5 @@ export interface PatternDetector {
   patterns: SecretEntityType[];
 
   /** Run detection for enabled entity types */
-  detect(text: string, enabledTypes: Set<string>): SecretsDetectionResult;
+  detect(text: string, enabledTypes: Set<SecretEntityType>): SecretsDetectionResult;
 }

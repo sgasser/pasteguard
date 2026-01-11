@@ -1,4 +1,4 @@
-import type { SecretsMatch, SecretsRedaction } from "./types";
+import type { SecretEntityType, SecretsMatch, SecretsRedaction } from "./types";
 
 /**
  * Helper to detect secrets matching a pattern and collect matches/redactions
@@ -6,7 +6,7 @@ import type { SecretsMatch, SecretsRedaction } from "./types";
 export function detectPattern(
   text: string,
   pattern: RegExp,
-  entityType: string,
+  entityType: SecretEntityType,
   matches: SecretsMatch[],
   redactions: SecretsRedaction[],
   existingPositions?: Set<number>,
@@ -22,12 +22,12 @@ export function detectPattern(
       redactions.push({
         start: match.index,
         end: match.index + match[0].length,
-        type: entityType as SecretsRedaction["type"],
+        type: entityType,
       });
     }
   }
   if (count > 0) {
-    matches.push({ type: entityType as SecretsMatch["type"], count });
+    matches.push({ type: entityType, count });
   }
   return count;
 }
