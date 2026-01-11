@@ -101,11 +101,14 @@ const SecretEntityTypes = [
   "API_KEY_GITHUB",
   "JWT_TOKEN",
   "BEARER_TOKEN",
+  "ENV_PASSWORD",
+  "ENV_SECRET",
+  "CONNECTION_STRING",
 ] as const;
 
 const SecretsDetectionSchema = z.object({
   enabled: z.boolean().default(true),
-  action: z.enum(["block", "redact", "route_local"]).default("block"),
+  action: z.enum(["block", "redact", "route_local"]).default("redact"),
   entities: z.array(z.enum(SecretEntityTypes)).default(["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY"]),
   max_scan_chars: z.coerce.number().int().min(0).default(200000),
   redact_placeholder: z.string().default("<SECRET_REDACTED_{N}>"),

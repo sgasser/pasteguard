@@ -72,7 +72,7 @@ docker compose up -d
 
 Point your app to `http://localhost:3000/openai/v1` instead of `https://api.openai.com/v1`.
 
-Dashboard: http://localhost:3000/dashboard
+Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 
 For multiple languages, configuration options, and more: **[Read the docs →](https://pasteguard.com/docs/quickstart)**
 
@@ -108,6 +108,9 @@ Works with any OpenAI-compatible tool:
 - GitHub tokens
 - JWT tokens
 - Bearer tokens
+- Env passwords
+- Env secrets
+- Connection strings
 
 ## Tech Stack
 

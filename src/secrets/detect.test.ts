@@ -332,6 +332,281 @@ describe("detectSecrets - Bearer Tokens", () => {
   });
 });
 
+describe("detectSecrets - ENV_PASSWORD", () => {
+  const passwordConfig: SecretsDetectionConfig = {
+    ...defaultConfig,
+    entities: ["ENV_PASSWORD"],
+  };
+
+  test("detects DB_PASSWORD with value", () => {
+    const text = "DB_PASSWORD=mysecretpassword123";
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].type).toBe("ENV_PASSWORD");
+    expect(result.matches[0].count).toBe(1);
+  });
+
+  test("detects PASSWORD with quoted value", () => {
+    const text = `ADMIN_PASSWORD="super_secret_pass"`;
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("ENV_PASSWORD");
+  });
+
+  test("detects PASSWORD with single-quoted value", () => {
+    const text = "MYSQL_ROOT_PASSWORD='p@ssw0rd!123'";
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("ENV_PASSWORD");
+  });
+
+  test("detects _PWD suffix variation", () => {
+    const text = "DB_PWD=mypassword123";
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("ENV_PASSWORD");
+  });
+
+  test("detects ADMIN_PWD variation", () => {
+    const text = "ADMIN_PWD=secretadminpwd";
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("ENV_PASSWORD");
+  });
+
+  test("detects PASSWORD with colon assignment (YAML style)", () => {
+    const text = "database_password: productionpass123";
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("ENV_PASSWORD");
+  });
+
+  test("detects multiple password patterns", () => {
+    const text = `DB_PASSWORD=secret123456
+REDIS_PASSWORD='another_secret'
+ADMIN_PWD=adminpass123`;
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].count).toBe(3);
+  });
+
+  test("avoids false positive - password value too short", () => {
+    const text = "DB_PASSWORD=short";
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(false);
+  });
+
+  test("avoids false positive - empty password", () => {
+    const text = `DB_PASSWORD=""`;
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(false);
+  });
+
+  test("avoids false positive - placeholder value too short", () => {
+    const text = "DB_PASSWORD=change";
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.detected).toBe(false);
+  });
+
+  test("redaction positions are correct", () => {
+    const text = "config: DB_PASSWORD=mysecretpassword123 here";
+    const result = detectSecrets(text, passwordConfig);
+    expect(result.redactions).toBeDefined();
+    expect(result.redactions?.length).toBe(1);
+    const redacted = text.slice(result.redactions![0].start, result.redactions![0].end);
+    expect(redacted).toBe("DB_PASSWORD=mysecretpassword123");
+  });
+});
+
+describe("detectSecrets - ENV_SECRET", () => {
+  const secretConfig: SecretsDetectionConfig = {
+    ...defaultConfig,
+    entities: ["ENV_SECRET"],
+  };
+
+  test("detects APP_SECRET with value", () => {
+    const text = "APP_SECRET=abc123xyz789def456";
+    const result = detectSecrets(text, secretConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].type).toBe("ENV_SECRET");
+  });
+
+  test("detects JWT_SECRET with quoted value", () => {
+    const text = `JWT_SECRET="my-super-secret-jwt-key"`;
+    const result = detectSecrets(text, secretConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("ENV_SECRET");
+  });
+
+  test("detects SESSION_SECRET", () => {
+    const text = "SESSION_SECRET='longsessionsecretvalue'";
+    const result = detectSecrets(text, secretConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("ENV_SECRET");
+  });
+
+  test("detects RAILS_SECRET_KEY_BASE style", () => {
+    const text = "RAILS_SECRET=abcdef123456789xyz";
+    const result = detectSecrets(text, secretConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("ENV_SECRET");
+  });
+
+  test("detects SECRET with colon assignment (YAML style)", () => {
+    const text = "app_secret: production_secret_key_here";
+    const result = detectSecrets(text, secretConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("ENV_SECRET");
+  });
+
+  test("detects multiple secret patterns", () => {
+    const text = `APP_SECRET=secret123456
+JWT_SECRET="another_jwt_secret"
+SESSION_SECRET=session_key_here`;
+    const result = detectSecrets(text, secretConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].count).toBe(3);
+  });
+
+  test("avoids false positive - secret value too short", () => {
+    const text = "APP_SECRET=short";
+    const result = detectSecrets(text, secretConfig);
+    expect(result.detected).toBe(false);
+  });
+
+  test("avoids false positive - empty secret", () => {
+    const text = `JWT_SECRET=""`;
+    const result = detectSecrets(text, secretConfig);
+    expect(result.detected).toBe(false);
+  });
+
+  test("redaction positions are correct", () => {
+    const text = "export APP_SECRET=mysupersecretvalue123 # comment";
+    const result = detectSecrets(text, secretConfig);
+    expect(result.redactions).toBeDefined();
+    expect(result.redactions?.length).toBe(1);
+    const redacted = text.slice(result.redactions![0].start, result.redactions![0].end);
+    expect(redacted).toBe("APP_SECRET=mysupersecretvalue123");
+  });
+});
+
+describe("detectSecrets - CONNECTION_STRING", () => {
+  const connConfig: SecretsDetectionConfig = {
+    ...defaultConfig,
+    entities: ["CONNECTION_STRING"],
+  };
+
+  test("detects postgres connection string", () => {
+    const text = "postgres://user:password123@localhost:5432/mydb";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects postgresql connection string", () => {
+    const text = "postgresql://admin:secret@db.example.com:5432/production";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects mysql connection string", () => {
+    const text = "mysql://root:p@ssw0rd@db.host.com:3306/appdb";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects mariadb connection string", () => {
+    const text = "mariadb://dbuser:dbpass123@mariadb.local/database";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects mongodb connection string", () => {
+    const text = "mongodb://admin:mongopass@cluster.mongodb.net:27017/mydb";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects mongodb+srv connection string", () => {
+    const text = "mongodb+srv://user:atlaspass@cluster.mongodb.net/database";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects redis connection string", () => {
+    const text = "redis://default:redispassword@redis.example.com:6379";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects amqp connection string", () => {
+    const text = "amqp://guest:guestpass@rabbitmq.local:5672/vhost";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects amqps (secure) connection string", () => {
+    const text = "amqps://user:securepass@mq.example.com:5671/";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects connection string with any variable name", () => {
+    const text = "MY_CUSTOM_DB_URL=postgres://user:secret@host/db";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects quoted connection string", () => {
+    const text = `DATABASE_URL="postgres://user:pass123@localhost/db"`;
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].type).toBe("CONNECTION_STRING");
+  });
+
+  test("detects multiple connection strings", () => {
+    const text = `PRIMARY_DB=postgres://user:pass@host1/db1
+REPLICA_DB=postgres://user:pass@host2/db2
+CACHE=redis://default:pass@redis:6379`;
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches[0].count).toBe(3);
+  });
+
+  test("avoids false positive - URL without password", () => {
+    const text = "postgres://localhost:5432/mydb";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(false);
+  });
+
+  test("avoids false positive - http/https URLs", () => {
+    const text = "https://user:pass@example.com/api";
+    const result = detectSecrets(text, connConfig);
+    expect(result.detected).toBe(false);
+  });
+
+  test("redaction covers full connection string", () => {
+    const text = "export DB=postgres://admin:secret123@db.example.com:5432/prod";
+    const result = detectSecrets(text, connConfig);
+    expect(result.redactions).toBeDefined();
+    expect(result.redactions?.length).toBe(1);
+    const redacted = text.slice(result.redactions![0].start, result.redactions![0].end);
+    expect(redacted).toBe("postgres://admin:secret123@db.example.com:5432/prod");
+  });
+});
+
 describe("detectSecrets - Mixed secret types", () => {
   const allConfig: SecretsDetectionConfig = {
     ...defaultConfig,
@@ -343,6 +618,9 @@ describe("detectSecrets - Mixed secret types", () => {
       "API_KEY_GITHUB",
       "JWT_TOKEN",
       "BEARER_TOKEN",
+      "ENV_PASSWORD",
+      "ENV_SECRET",
+      "CONNECTION_STRING",
     ],
   };
 

@@ -96,9 +96,10 @@ secrets_detection:
   enabled: true
 
   # Action to take when secrets are detected:
-  #   block:        Block the request with HTTP 400 (default, secure-by-default)
-  #   redact:       Replace secrets with placeholders, unmask in response (reversible)
+  #   block:        Block the request with HTTP 400
+  #   redact:       Replace secrets with placeholders, unmask in response
   #   route_local:  Route to local provider (only works in route mode)
+  # Default: redact (if not specified)
   action: block
 
   # Secret types to detect
@@ -114,6 +115,11 @@ secrets_detection:
   # Tokens (opt-in):
   #   - JWT_TOKEN:           JSON Web Tokens (eyJ...)
   #   - BEARER_TOKEN:        Bearer tokens in Authorization-style contexts
+  #
+  # Environment Variables (opt-in):
+  #   - ENV_PASSWORD:        Password variables (DB_PASSWORD=..., ADMIN_PWD=...)
+  #   - ENV_SECRET:          Secret variables (APP_SECRET=..., JWT_SECRET=...)
+  #   - CONNECTION_STRING:   Database URLs with credentials (postgres://user:pass@host/db)
   entities:
     - OPENSSH_PRIVATE_KEY
     - PEM_PRIVATE_KEY
@@ -123,6 +129,10 @@ secrets_detection:
     # - API_KEY_GITHUB
     # - JWT_TOKEN
     # - BEARER_TOKEN
+    # Uncomment to detect environment variable credentials:
+    # - ENV_PASSWORD
+    # - ENV_SECRET
+    # - CONNECTION_STRING
 
   # Maximum characters to scan per request (performance limit)
   # Note: Secrets placed after this limit won't be detected.
