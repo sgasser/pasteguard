@@ -19,7 +19,14 @@
 
 <br/>
 
-<img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
+<p align="center">
+  <img src="assets/demo.gif" width="720" alt="PasteGuard Demo">
+</p>
+<p align="center">
+  <em>Your App → PasteGuard → OpenAI — PII never reaches external servers</em>
+</p>
+
+<br/>
 
 ## What is PasteGuard?
 
@@ -73,6 +80,9 @@ docker compose up -d
 Point your app to `http://localhost:3000/openai/v1` instead of `https://api.openai.com/v1`.
 
 Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
+
+<img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
+<p><em>Every request logged with masked content preview</em></p>
 
 For multiple languages, configuration options, and more: **[Read the docs →](https://pasteguard.com/docs/quickstart)**
 
