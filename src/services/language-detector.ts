@@ -51,17 +51,11 @@ export class LanguageDetector {
   }
 
   detect(text: string): LanguageDetectionResult {
-    if (this.configuredLanguages.length === 1) {
-      return {
-        language: this.configuredLanguages[0],
-        usedFallback: false,
-      };
-    }
-
     const result = eld.detect(text);
     const detectedIso = result.language;
     const scores = result.getScores();
     const confidence = scores[detectedIso] ?? 0;
+
     // Use override if exists, otherwise use the detected code as-is (most are 1:1)
     const presidioLang = (ISO_TO_PRESIDIO_OVERRIDES[detectedIso] ||
       detectedIso) as SupportedLanguage;

@@ -51,7 +51,6 @@ pii_detection:
 
   # Supported languages for PII detection
   # Auto-detects language from input text and uses appropriate model
-  # If only one language is specified, language detection is skipped
   #
   # Languages must match what was installed during docker build:
   #   LANGUAGES=en,de docker-compose build
