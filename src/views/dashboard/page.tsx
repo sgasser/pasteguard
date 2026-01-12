@@ -95,12 +95,15 @@ const DashboardPage: FC = () => {
 							.bg-success { background: var(--color-success); }
 							.bg-success\\/10 { background: rgba(22, 163, 74, 0.1); }
 							.bg-teal { background: var(--color-teal); }
+							.bg-error { background: var(--color-error); }
+							.bg-error\\/10 { background: rgba(220, 38, 38, 0.1); }
 
 							/* Border utilities */
 							.border-border { border-color: var(--color-border); }
 							.border-border-subtle { border-color: var(--color-border-subtle); }
 							.border-accent\\/20 { border-color: rgba(180, 83, 9, 0.2); }
 							.border-success\\/20 { border-color: rgba(22, 163, 74, 0.2); }
+							.border-error\\/20 { border-color: rgba(220, 38, 38, 0.2); }
 
 							/* Text utilities */
 							.text-text-primary { color: var(--color-text-primary); }
@@ -110,6 +113,7 @@ const DashboardPage: FC = () => {
 							.text-info { color: var(--color-info); }
 							.text-success { color: var(--color-success); }
 							.text-teal { color: var(--color-teal); }
+							.text-error { color: var(--color-error); }
 
 							/* Border radius */
 							.rounded-sm { border-radius: var(--radius-sm); }
@@ -382,13 +386,16 @@ const LogsSection: FC = () => (
 								PII Entities
 							</th>
 							<th class="bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
+								Secrets
+							</th>
+							<th class="bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
 								Scan Time
 							</th>
 						</tr>
 					</thead>
 					<tbody id="logs-body">
 						<tr>
-							<td colSpan={6}>
+							<td colSpan={7}>
 								<div class="flex flex-col justify-center items-center p-10 gap-3">
 									<div class="loader-bars">
 										<div class="loader-bar" />
@@ -547,13 +554,15 @@ async function fetchLogs() {
     const tbody = document.getElementById('logs-body');
 
     if (data.logs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6"><div class="text-center py-10 text-text-muted"><div class="text-2xl mb-3 opacity-40">📋</div><div class="text-sm">No requests yet</div></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7"><div class="text-center py-10 text-text-muted"><div class="text-2xl mb-3 opacity-40">📋</div><div class="text-sm">No requests yet</div></div></td></tr>';
       return;
     }
 
     tbody.innerHTML = data.logs.map((log, index) => {
       const time = new Date(log.timestamp).toLocaleTimeString();
       const entities = log.entities ? log.entities.split(',').filter(e => e.trim()) : [];
+      const secretsTypes = log.secrets_types ? log.secrets_types.split(',').filter(s => s.trim()) : [];
+      const secretsDetected = log.secrets_detected === 1;
       const lang = log.language || 'en';
       const detectedLang = log.detected_language;
 
@@ -583,12 +592,17 @@ async function fetchLogs() {
               ? '<div class="flex flex-wrap gap-1">' + entities.map(e => '<span class="font-mono text-[0.55rem] px-1.5 py-0.5 bg-elevated border border-border rounded-sm text-text-secondary">' + e.trim() + '</span>').join('') + '</div>'
               : '<span class="text-text-muted">—</span>') +
           '</td>' +
+          '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
+            (secretsDetected
+              ? '<div class="flex flex-wrap gap-1">' + (secretsTypes.length > 0 ? secretsTypes.map(s => '<span class="font-mono text-[0.55rem] px-1.5 py-0.5 bg-error/10 border border-error/20 rounded-sm text-error">' + s.trim() + '</span>').join('') : '<span class="font-mono text-[0.55rem] px-1.5 py-0.5 bg-error/10 border border-error/20 rounded-sm text-error">DETECTED</span>') + '</div>'
+              : '<span class="text-text-muted">—</span>') +
+          '</td>' +
           '<td class="font-mono text-[0.7rem] text-teal px-4 py-3 border-b border-border-subtle align-middle">' + log.scan_time_ms + 'ms</td>' +
         '</tr>';
 
       const detailRow =
         '<tr id="detail-' + logId + '" class="' + (isExpanded ? 'detail-row-visible' : 'hidden') + '">' +
-          '<td colspan="6" class="p-0 bg-detail border-b border-border-subtle">' +
+          '<td colspan="7" class="p-0 bg-detail border-b border-border-subtle">' +
             '<div class="p-4 px-5 animate-slide-down">' +
               '<div class="font-mono text-xs leading-relaxed text-text-secondary bg-surface border border-border-subtle rounded-lg p-3 whitespace-pre-wrap break-words">' + formatMaskedPreview(log.masked_content, entities) + '</div>' +
             '</div>' +
