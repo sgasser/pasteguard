@@ -1,0 +1,113 @@
+---
+title: Installation
+description: Docker images and deployment options
+---
+
+# Installation
+
+PasteGuard provides prebuilt Docker images for quick deployment. No build step required.
+
+## Docker Images
+
+PasteGuard uses two containers that work together:
+
+| Image | Purpose | Size |
+|-------|---------|------|
+| `ghcr.io/sgasser/pasteguard` | Proxy server, dashboard, API | ~100MB |
+| `ghcr.io/sgasser/pasteguard-presidio` | PII detection (Python + spaCy models) | 1.5-3GB |
+
+The proxy receives requests, sends text to Presidio for PII scanning, masks detected entities, and forwards to the upstream LLM.
+
+### Presidio Language Tags
+
+| Tag | Languages | Size | Use Case |
+|-----|-----------|------|----------|
+| `en` / `latest` | English | ~1.5GB | Default, English-only teams |
+| `eu` | en, de, es, fr, it, nl, pl, pt, ro | ~3GB | European businesses |
+
+## Quick Start
+
+```bash
+git clone https://github.com/sgasser/pasteguard.git
+cd pasteguard
+cp config.example.yaml config.yaml
+docker compose up -d
+```
+
+This uses the `en` (English-only) image by default.
+
+## European Languages
+
+For German, Spanish, French, Italian, Dutch, Polish, Portuguese, and Romanian support:
+
+```bash
+PRESIDIO_TAG=eu docker compose up -d
+```
+
+Update your `config.yaml` to enable the languages you need:
+
+```yaml
+pii_detection:
+  languages:
+    - en
+    - de
+    - fr
+    - es
+    - it
+```
+
+## Custom Language Builds
+
+For languages not included in prebuilt images (Nordic, Asian, Eastern European), build locally:
+
+```bash
+# Example: English + German + Japanese
+LANGUAGES=en,de,ja docker compose up -d --build
+```
+
+### Available Languages (24)
+
+| Code | Language | Code | Language |
+|------|----------|------|----------|
+| `en` | English | `ja` | Japanese |
+| `de` | German | `ko` | Korean |
+| `fr` | French | `zh` | Chinese |
+| `es` | Spanish | `sv` | Swedish |
+| `it` | Italian | `da` | Danish |
+| `nl` | Dutch | `nb` | Norwegian |
+| `pt` | Portuguese | `fi` | Finnish |
+| `pl` | Polish | `el` | Greek |
+| `ru` | Russian | `ro` | Romanian |
+| `uk` | Ukrainian | `hr` | Croatian |
+| `ca` | Catalan | `sl` | Slovenian |
+| `lt` | Lithuanian | `mk` | Macedonian |
+
+See `presidio/languages.yaml` for details.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRESIDIO_TAG` | `en` | Presidio image tag (`en`, `eu`) |
+| `LANGUAGES` | `en` | Languages for local build |
+
+## Verify Installation
+
+```bash
+# Check health
+curl http://localhost:3000/health
+
+# Check mode and languages
+curl http://localhost:3000/info
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Make your first request
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Customize PasteGuard
+  </Card>
+</CardGroup>

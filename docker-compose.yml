@@ -1,5 +1,6 @@
 services:
   pasteguard:
+    image: ghcr.io/sgasser/pasteguard:latest
     build: .
     ports:
       - "3000:3000"
@@ -16,14 +17,10 @@ services:
     restart: unless-stopped
 
   presidio-analyzer:
+    image: ghcr.io/sgasser/pasteguard-presidio:${PRESIDIO_TAG:-en}
     build:
       context: ./presidio
       args:
-        # Languages to install for PII detection
-        # Available: ca, zh, hr, da, nl, en, fi, fr, de, el, it, ja, ko,
-        #            lt, mk, nb, pl, pt, ro, ru, sl, es, sv, uk
-        # See presidio/languages.yaml for full list
-        # Example: LANGUAGES=en,de,fr docker-compose build
         LANGUAGES: ${LANGUAGES:-en}
     ports:
       - "5002:3000"

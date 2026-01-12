@@ -34,7 +34,7 @@
   "navigation": [
     {
       "group": "Getting Started",
-      "pages": ["introduction", "quickstart", "integrations"]
+      "pages": ["introduction", "quickstart", "installation", "integrations"]
     },
     {
       "group": "Concepts",

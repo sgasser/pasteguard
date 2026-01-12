@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_APP: ${{ github.repository }}
+  IMAGE_NAME_PRESIDIO: ${{ github.repository }}-presidio
+
+jobs:
+  build-app:
+    name: Build App
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_APP }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-presidio:
+    name: Build Presidio (${{ matrix.tag }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - tag: en
+            languages: "en"
+            latest: true
+          - tag: eu
+            languages: "en,de,es,fr,it,nl,pl,pt,ro"
+            latest: false
+    steps:
+      - name: Free disk space
+        uses: endersonmenezes/free-disk-space@v3
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          remove_tool_cache: true
+
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./presidio
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: LANGUAGES=${{ matrix.languages }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PRESIDIO }}:${{ matrix.tag }}
+            ${{ matrix.latest && format('{0}/{1}:latest', env.REGISTRY, env.IMAGE_NAME_PRESIDIO) || '' }}
+          cache-from: type=gha,scope=presidio-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=presidio-${{ matrix.tag }}

@@ -16,26 +16,9 @@ docker compose up -d
 
 PasteGuard runs on `http://localhost:3000`. Dashboard at `http://localhost:3000/dashboard`.
 
-<Accordion title="Multiple Languages">
-By default, only English is installed (~1.5GB image). To add more languages:
-
-```bash
-# English + German + French (~2.5GB)
-LANGUAGES=en,de,fr docker compose up -d --build
-```
-
-Update `config.yaml` to match:
-
-```yaml
-pii_detection:
-  languages:
-    - en
-    - de
-    - fr
-```
-
-See [PII Detection Config](/configuration/pii-detection) for all 24 available languages.
-</Accordion>
+<Note>
+For European languages (German, French, Spanish, etc.), see [Installation](/installation#european-languages).
+</Note>
 
 ## 2. Make a Request
 
@@ -119,6 +102,9 @@ Open `http://localhost:3000/dashboard` in your browser to see:
 ## What's Next?
 
 <CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Docker images and language options
+  </Card>
   <Card title="Mask Mode" icon="eye-slash" href="/concepts/mask-mode">
     How PII masking works
   </Card>
@@ -127,8 +113,5 @@ Open `http://localhost:3000/dashboard` in your browser to see:
   </Card>
   <Card title="Configuration" icon="gear" href="/configuration/overview">
     Customize detection and providers
-  </Card>
-  <Card title="API Reference" icon="code" href="/api-reference/chat-completions">
-    Explore the API
   </Card>
 </CardGroup>

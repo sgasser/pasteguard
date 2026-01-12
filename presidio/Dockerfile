@@ -35,6 +35,21 @@ RUN python generate-configs.py \
 # =============================================================================
 FROM mcr.microsoft.com/presidio-analyzer:latest
 
+# Pass LANGUAGES to this stage for conditional Rust installation
+ARG LANGUAGES
+
+# Install Rust compiler only if Japanese (ja) is included
+# Japanese requires sudachipy which needs Rust to compile
+RUN if echo "${LANGUAGES}" | grep -q "ja"; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+            curl \
+            build-essential \
+        && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+ENV PATH="/root/.cargo/bin:${PATH}"
+
 # Copy generated configuration files
 COPY --from=generator /output/nlp-config.yaml /usr/bin/presidio_analyzer/conf/default.yaml
 COPY --from=generator /output/recognizers-config.yaml /usr/bin/presidio_analyzer/conf/default_recognizers.yaml
