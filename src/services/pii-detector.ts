@@ -124,10 +124,14 @@ export class PIIDetector {
   ): Promise<PIIDetectionResult> {
     const startTime = Date.now();
 
+    // Scan all message roles that may contain user-provided content
+    // This includes system messages which often contain RAG context from user documents
+    const scannedRoles = ["system", "developer", "user", "assistant"];
+
     const entitiesByMessage = await Promise.all(
       messages.map((message) => {
         const text = extractTextContent(message.content);
-        return text && (message.role === "user" || message.role === "assistant")
+        return text && scannedRoles.includes(message.role)
           ? this.detectPII(text, langResult.language)
           : Promise.resolve([]);
       }),

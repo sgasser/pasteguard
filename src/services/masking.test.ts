@@ -240,6 +240,37 @@ describe("maskMessages", () => {
     expect(masked[0].role).toBe("system");
     expect(masked[1].role).toBe("user");
   });
+
+  test("masks PII in system messages (RAG context)", () => {
+    const messages: ChatMessage[] = [
+      {
+        role: "system",
+        content:
+          "Context: John Doe lives at 12 Main Street. Email: john@example.com",
+      },
+      { role: "user", content: "Extract the data" },
+    ];
+
+    const entitiesByMessage: PIIEntity[][] = [
+      [
+        { entity_type: "PERSON", start: 9, end: 17, score: 0.9 },
+        { entity_type: "LOCATION", start: 27, end: 41, score: 0.85 },
+        { entity_type: "EMAIL_ADDRESS", start: 50, end: 66, score: 1.0 },
+      ],
+      [],
+    ];
+
+    const { masked, context } = maskMessages(messages, entitiesByMessage);
+
+    expect(masked[0].content).toBe(
+      "Context: <PERSON_1> lives at <LOCATION_1>. Email: <EMAIL_ADDRESS_1>",
+    );
+    expect(masked[1].content).toBe("Extract the data");
+
+    expect(context.mapping["<PERSON_1>"]).toBe("John Doe");
+    expect(context.mapping["<LOCATION_1>"]).toBe("12 Main Street");
+    expect(context.mapping["<EMAIL_ADDRESS_1>"]).toBe("john@example.com");
+  });
 });
 
 describe("streaming unmask", () => {
