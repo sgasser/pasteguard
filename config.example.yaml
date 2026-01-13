@@ -43,8 +43,8 @@ pii_detection:
   # Supported languages for PII detection
   # Auto-detects language from input text and uses appropriate model
   #
-  # Languages must match what was installed during docker build:
-  #   LANGUAGES=en,de docker-compose build
+  # Languages must match the Docker image tag (en, eu) or custom build:
+  #   PASTEGUARD_TAG=eu docker compose up -d
   #
   # Available (24 languages): ca, zh, hr, da, nl, en, fi, fr, de, el,
   #   it, ja, ko, lt, mk, nb, pl, pt, ro, ru, sl, es, sv, uk
@@ -104,11 +104,6 @@ secrets_detection:
   # Tokens (opt-in):
   #   - JWT_TOKEN:           JSON Web Tokens (eyJ...)
   #   - BEARER_TOKEN:        Bearer tokens in Authorization-style contexts
-  #
-  # Environment Variables (opt-in):
-  #   - ENV_PASSWORD:        Password variables (DB_PASSWORD=..., ADMIN_PWD=...)
-  #   - ENV_SECRET:          Secret variables (APP_SECRET=..., JWT_SECRET=...)
-  #   - CONNECTION_STRING:   Database URLs with credentials (postgres://user:pass@host/db)
   entities:
     - OPENSSH_PRIVATE_KEY
     - PEM_PRIVATE_KEY
@@ -118,10 +113,6 @@ secrets_detection:
     # - API_KEY_GITHUB
     # - JWT_TOKEN
     # - BEARER_TOKEN
-    # Uncomment to detect environment variable credentials:
-    # - ENV_PASSWORD
-    # - ENV_SECRET
-    # - CONNECTION_STRING
 
   # Maximum characters to scan per request (performance limit)
   # Note: Secrets placed after this limit won't be detected.

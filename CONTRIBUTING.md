@@ -7,7 +7,7 @@ Thank you for considering contributing to PasteGuard!
 1. Fork and clone the repository
 2. Install dependencies: `bun install`
 3. Copy config: `cp config.example.yaml config.yaml`
-4. Start Presidio: `docker compose up presidio-analyzer -d`
+4. Start Presidio: `docker compose up presidio -d`
 5. Run dev server: `bun run dev`
 
 ## Code Quality

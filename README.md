@@ -19,14 +19,7 @@
 
 <br/>
 
-<p align="center">
-  <img src="assets/demo.gif" width="720" alt="PasteGuard Demo">
-</p>
-<p align="center">
-  <em>Your App → PasteGuard → OpenAI — PII never reaches external servers</em>
-</p>
-
-<br/>
+<img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
 
 ## What is PasteGuard?
 
@@ -82,20 +75,32 @@ PasteGuard sits between your app and your provider. It's OpenAI-compatible — j
 ## Quick Start
 
 ```bash
-git clone https://github.com/sgasser/pasteguard.git
-cd pasteguard
-cp config.example.yaml config.yaml
-docker compose up -d
+curl -O https://raw.githubusercontent.com/sgasser/pasteguard/main/config.example.yaml
+mv config.example.yaml config.yaml
+docker run -d --name pasteguard -p 3000:3000 \
+  -v ./config.yaml:/app/config.yaml:ro \
+  -v ./data:/app/data \
+  ghcr.io/sgasser/pasteguard:en
 ```
 
 Point your app to `http://localhost:3000/openai/v1` instead of `https://api.openai.com/v1`.
 
 Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 
-<img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
-<p><em>Every request logged with masked content preview</em></p>
+### Multiple Languages
 
-For multiple languages, configuration options, and more: **[Read the docs →](https://pasteguard.com/docs/quickstart)**
+Default uses English only. For European languages (German, Spanish, French, Italian, Dutch, Polish, Portuguese, Romanian):
+
+```bash
+docker run -d --name pasteguard -p 3000:3000 \
+  -v ./config.yaml:/app/config.yaml:ro \
+  -v ./data:/app/data \
+  ghcr.io/sgasser/pasteguard:eu
+```
+
+For other languages, build locally. See [Installation docs](https://pasteguard.com/docs/installation).
+
+For configuration options and more: **[Read the docs →](https://pasteguard.com/docs/quickstart)**
 
 ## Integrations
 
@@ -129,9 +134,6 @@ Works with any OpenAI-compatible tool:
 - GitHub tokens
 - JWT tokens
 - Bearer tokens
-- Env passwords
-- Env secrets
-- Connection strings
 
 ## Tech Stack
 

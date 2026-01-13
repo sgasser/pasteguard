@@ -31,10 +31,14 @@ PasteGuard supports 24 languages. The language is auto-detected from your input 
 
 ### Configure Languages
 
-Languages must be installed during Docker build:
+Use prebuilt images or build locally:
 
 ```bash
-LANGUAGES=en,de,fr docker compose build
+# Use EU image (en, de, es, fr, it, nl, pl, pt, ro)
+PASTEGUARD_TAG=eu docker compose up -d
+
+# Or build with custom languages
+LANGUAGES=en,de,fr docker compose up -d --build
 ```
 
 If only one language is specified, language detection is skipped for better performance.

@@ -1,36 +1,50 @@
+# PasteGuard - Docker Compose (All-in-One Image)
+#
+# Production:
+#   docker compose up -d
+#
+# Development (only Presidio, run Bun locally with hot-reload):
+#   docker compose up presidio -d
+#   bun run dev
+#
+# European languages:
+#   PASTEGUARD_TAG=eu docker compose up -d
+#
+# Custom languages (local build):
+#   LANGUAGES=en,de,ja docker compose up -d --build
+
 services:
+  # Production: Full all-in-one
   pasteguard:
-    build: .
+    image: ghcr.io/sgasser/pasteguard:${PASTEGUARD_TAG:-en}
+    build:
+      context: .
+      args:
+        LANGUAGES: ${LANGUAGES:-en}
     ports:
       - "3000:3000"
     env_file:
-      - .env
-    environment:
-      - PRESIDIO_URL=http://presidio-analyzer:3000
+      - path: .env
+        required: false
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - ./data:/app/data
-    depends_on:
-      presidio-analyzer:
-        condition: service_healthy
     restart: unless-stopped
 
-  presidio-analyzer:
+  # Development: Only Presidio (for local Bun with hot-reload)
+  presidio:
+    profiles: ["dev"]
+    image: ghcr.io/sgasser/pasteguard:${PASTEGUARD_TAG:-en}
     build:
-      context: ./presidio
+      context: .
       args:
-        # Languages to install for PII detection
-        # Available: ca, zh, hr, da, nl, en, fi, fr, de, el, it, ja, ko,
-        #            lt, mk, nb, pl, pt, ro, ru, sl, es, sv, uk
-        # See presidio/languages.yaml for full list
-        # Example: LANGUAGES=en,de,fr docker-compose build
         LANGUAGES: ${LANGUAGES:-en}
     ports:
-      - "5002:3000"
+      - "5002:5002"
+    environment:
+      - START_APP=false
+      - PORT=5002
+      - WORKERS=1
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      disable: true
     restart: unless-stopped

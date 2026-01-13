@@ -60,20 +60,25 @@ See @config.example.yaml for full configuration.
 
 ## Setup
 
-**Production:** `docker compose up -d`
-
-**Development:**
+**Production:**
 ```bash
 cp config.example.yaml config.yaml
-docker compose up presidio-analyzer -d
-bun install && bun run dev
+docker compose up -d
 ```
 
-**Dependencies:**
-- Presidio (port 5002) - required
-- Ollama (port 11434) - route mode only
+**Development:** Presidio in Docker, Bun locally with hot-reload:
+```bash
+docker compose up presidio -d
+bun run dev
+```
 
-**Multi-language PII:** Build with `LANGUAGES=en,de,fr docker compose build`. See @presidio/languages.yaml for 24 available languages.
+**Multi-language:** Use EU image or build custom:
+```bash
+PASTEGUARD_TAG=eu docker compose up -d
+LANGUAGES=en,de,ja docker compose up -d --build
+```
+
+See @presidio/languages.yaml for 24 available languages.
 
 ## Testing
 
