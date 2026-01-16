@@ -525,7 +525,7 @@ function formatMaskedPreview(maskedContent, entities) {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/&lt;([A-Z_]+_\\d+)&gt;/g, '<span class="bg-accent-bg text-accent px-1 py-0.5 rounded-sm font-medium">&lt;$1&gt;</span>');
+      .replace(/\\[\\[([A-Z_]+_\\d+)\\]\\]/g, '<span class="bg-accent-bg text-accent px-1 py-0.5 rounded-sm font-medium">[[$1]]</span>');
   }
   if (!entities || entities.length === 0) {
     return '<span class="text-text-muted">No PII detected in this request</span>';

@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import type { SecretsDetectionConfig } from "../config";
 import type { SecretsRedaction } from "./detect";
 import {
   createRedactionContext,
@@ -11,21 +10,12 @@ import {
   unredactStreamChunk,
 } from "./redact";
 
-const defaultConfig: SecretsDetectionConfig = {
-  enabled: true,
-  action: "redact",
-  entities: ["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY", "API_KEY_OPENAI"],
-  max_scan_chars: 200000,
-  redact_placeholder: "<SECRET_REDACTED_{N}>",
-  log_detected_types: true,
-};
-
 const sampleSecret = "sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx";
 
 describe("redactSecrets", () => {
   test("returns original text when no redactions", () => {
     const text = "Hello world";
-    const result = redactSecrets(text, [], defaultConfig);
+    const result = redactSecrets(text, []);
     expect(result.redacted).toBe("Hello world");
     expect(Object.keys(result.context.mapping)).toHaveLength(0);
   });
@@ -35,10 +25,10 @@ describe("redactSecrets", () => {
     const redactions: SecretsRedaction[] = [
       { start: 14, end: 14 + sampleSecret.length, type: "API_KEY_OPENAI" },
     ];
-    const result = redactSecrets(text, redactions, defaultConfig);
+    const result = redactSecrets(text, redactions);
 
-    expect(result.redacted).toBe("My API key is <SECRET_REDACTED_API_KEY_OPENAI_1>");
-    expect(result.context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"]).toBe(sampleSecret);
+    expect(result.redacted).toBe("My API key is [[SECRET_REDACTED_API_KEY_OPENAI_1]]");
+    expect(result.context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"]).toBe(sampleSecret);
   });
 
   test("redacts multiple secrets of same type", () => {
@@ -51,11 +41,11 @@ describe("redactSecrets", () => {
         type: "API_KEY_OPENAI",
       },
     ];
-    const result = redactSecrets(text, redactions, defaultConfig);
+    const result = redactSecrets(text, redactions);
 
     // Same secret value should get same placeholder
     expect(result.redacted).toBe(
-      "Key1: <SECRET_REDACTED_API_KEY_OPENAI_1> Key2: <SECRET_REDACTED_API_KEY_OPENAI_1>",
+      "Key1: [[SECRET_REDACTED_API_KEY_OPENAI_1]] Key2: [[SECRET_REDACTED_API_KEY_OPENAI_1]]",
     );
     expect(Object.keys(result.context.mapping)).toHaveLength(1);
   });
@@ -71,10 +61,10 @@ describe("redactSecrets", () => {
         type: "API_KEY_AWS",
       },
     ];
-    const result = redactSecrets(text, redactions, defaultConfig);
+    const result = redactSecrets(text, redactions);
 
-    expect(result.redacted).toContain("<SECRET_REDACTED_API_KEY_OPENAI_1>");
-    expect(result.redacted).toContain("<SECRET_REDACTED_API_KEY_AWS_1>");
+    expect(result.redacted).toContain("[[SECRET_REDACTED_API_KEY_OPENAI_1]]");
+    expect(result.redacted).toContain("[[SECRET_REDACTED_API_KEY_AWS_1]]");
     expect(Object.keys(result.context.mapping)).toHaveLength(2);
   });
 
@@ -84,32 +74,18 @@ describe("redactSecrets", () => {
     const redactions1: SecretsRedaction[] = [
       { start: 5, end: 5 + sampleSecret.length, type: "API_KEY_OPENAI" },
     ];
-    redactSecrets(text1, redactions1, defaultConfig, context);
+    redactSecrets(text1, redactions1, context);
 
     const anotherSecret = "sk-proj-xyz789abc123def456ghi789jkl012mno345pqr678";
     const text2 = `Another: ${anotherSecret}`;
     const redactions2: SecretsRedaction[] = [
       { start: 9, end: 9 + anotherSecret.length, type: "API_KEY_OPENAI" },
     ];
-    const result2 = redactSecrets(text2, redactions2, defaultConfig, context);
+    const result2 = redactSecrets(text2, redactions2, context);
 
     // Second secret should get incremented counter
-    expect(result2.redacted).toBe("Another: <SECRET_REDACTED_API_KEY_OPENAI_2>");
+    expect(result2.redacted).toBe("Another: [[SECRET_REDACTED_API_KEY_OPENAI_2]]");
     expect(Object.keys(context.mapping)).toHaveLength(2);
-  });
-
-  test("handles custom placeholder format", () => {
-    const customConfig: SecretsDetectionConfig = {
-      ...defaultConfig,
-      redact_placeholder: "[REDACTED:{N}]",
-    };
-    const text = `Key: ${sampleSecret}`;
-    const redactions: SecretsRedaction[] = [
-      { start: 5, end: 5 + sampleSecret.length, type: "API_KEY_OPENAI" },
-    ];
-    const result = redactSecrets(text, redactions, customConfig);
-
-    expect(result.redacted).toBe("Key: [REDACTED:API_KEY_OPENAI_1]");
   });
 });
 
@@ -123,9 +99,9 @@ describe("unredactSecrets", () => {
 
   test("restores single secret", () => {
     const context = createRedactionContext();
-    context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"] = sampleSecret;
+    context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"] = sampleSecret;
 
-    const text = "My API key is <SECRET_REDACTED_API_KEY_OPENAI_1>";
+    const text = "My API key is [[SECRET_REDACTED_API_KEY_OPENAI_1]]";
     const result = unredactSecrets(text, context);
 
     expect(result).toBe(`My API key is ${sampleSecret}`);
@@ -134,10 +110,11 @@ describe("unredactSecrets", () => {
   test("restores multiple secrets", () => {
     const context = createRedactionContext();
     const awsKey = "AKIAIOSFODNN7EXAMPLE";
-    context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"] = sampleSecret;
-    context.mapping["<SECRET_REDACTED_API_KEY_AWS_1>"] = awsKey;
+    context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"] = sampleSecret;
+    context.mapping["[[SECRET_REDACTED_API_KEY_AWS_1]]"] = awsKey;
 
-    const text = "OpenAI: <SECRET_REDACTED_API_KEY_OPENAI_1> AWS: <SECRET_REDACTED_API_KEY_AWS_1>";
+    const text =
+      "OpenAI: [[SECRET_REDACTED_API_KEY_OPENAI_1]] AWS: [[SECRET_REDACTED_API_KEY_AWS_1]]";
     const result = unredactSecrets(text, context);
 
     expect(result).toBe(`OpenAI: ${sampleSecret} AWS: ${awsKey}`);
@@ -145,10 +122,10 @@ describe("unredactSecrets", () => {
 
   test("restores repeated placeholders", () => {
     const context = createRedactionContext();
-    context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"] = sampleSecret;
+    context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"] = sampleSecret;
 
     const text =
-      "Key1: <SECRET_REDACTED_API_KEY_OPENAI_1> Key2: <SECRET_REDACTED_API_KEY_OPENAI_1>";
+      "Key1: [[SECRET_REDACTED_API_KEY_OPENAI_1]] Key2: [[SECRET_REDACTED_API_KEY_OPENAI_1]]";
     const result = unredactSecrets(text, context);
 
     expect(result).toBe(`Key1: ${sampleSecret} Key2: ${sampleSecret}`);
@@ -170,11 +147,11 @@ Please store them securely.
       },
     ];
 
-    const { redacted, context } = redactSecrets(originalText, redactions, defaultConfig);
+    const { redacted, context } = redactSecrets(originalText, redactions);
 
     // Verify secret is not in redacted text
     expect(redacted).not.toContain(sampleSecret);
-    expect(redacted).toContain("<SECRET_REDACTED_API_KEY_OPENAI_1>");
+    expect(redacted).toContain("[[SECRET_REDACTED_API_KEY_OPENAI_1]]");
 
     // Unredact and verify original is restored
     const restored = unredactSecrets(redacted, context);
@@ -183,7 +160,7 @@ Please store them securely.
 
   test("handles empty redactions array", () => {
     const text = "No secrets here";
-    const { redacted, context } = redactSecrets(text, [], defaultConfig);
+    const { redacted, context } = redactSecrets(text, []);
     const restored = unredactSecrets(redacted, context);
     expect(restored).toBe(text);
   });
@@ -200,13 +177,9 @@ describe("redactMessagesSecrets", () => {
       [],
     ];
 
-    const { redacted, context } = redactMessagesSecrets(
-      messages,
-      redactionsByMessage,
-      defaultConfig,
-    );
+    const { redacted, context } = redactMessagesSecrets(messages, redactionsByMessage);
 
-    expect(redacted[0].content).toContain("<SECRET_REDACTED_API_KEY_OPENAI_1>");
+    expect(redacted[0].content).toContain("[[SECRET_REDACTED_API_KEY_OPENAI_1]]");
     expect(redacted[0].content).not.toContain(sampleSecret);
     expect(redacted[1].content).toBe("I'll help you with that.");
     expect(Object.keys(context.mapping)).toHaveLength(1);
@@ -222,7 +195,7 @@ describe("redactMessagesSecrets", () => {
       [{ start: 5, end: 5 + sampleSecret.length, type: "API_KEY_OPENAI" }],
     ];
 
-    const { redacted } = redactMessagesSecrets(messages, redactionsByMessage, defaultConfig);
+    const { redacted } = redactMessagesSecrets(messages, redactionsByMessage);
 
     expect(redacted[0].role).toBe("system");
     expect(redacted[1].role).toBe("user");
@@ -238,15 +211,11 @@ describe("redactMessagesSecrets", () => {
       [{ start: 6, end: 6 + sampleSecret.length, type: "API_KEY_OPENAI" }],
     ];
 
-    const { redacted, context } = redactMessagesSecrets(
-      messages,
-      redactionsByMessage,
-      defaultConfig,
-    );
+    const { redacted, context } = redactMessagesSecrets(messages, redactionsByMessage);
 
     // Same secret should get same placeholder across messages
-    expect(redacted[0].content).toBe("Key1: <SECRET_REDACTED_API_KEY_OPENAI_1>");
-    expect(redacted[1].content).toBe("Key2: <SECRET_REDACTED_API_KEY_OPENAI_1>");
+    expect(redacted[0].content).toBe("Key1: [[SECRET_REDACTED_API_KEY_OPENAI_1]]");
+    expect(redacted[1].content).toBe("Key2: [[SECRET_REDACTED_API_KEY_OPENAI_1]]");
     expect(Object.keys(context.mapping)).toHaveLength(1);
   });
 });
@@ -254,11 +223,11 @@ describe("redactMessagesSecrets", () => {
 describe("streaming unredact", () => {
   test("unredacts complete placeholder in chunk", () => {
     const context = createRedactionContext();
-    context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"] = sampleSecret;
+    context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"] = sampleSecret;
 
     const { output, remainingBuffer } = unredactStreamChunk(
       "",
-      "Key: <SECRET_REDACTED_API_KEY_OPENAI_1> end",
+      "Key: [[SECRET_REDACTED_API_KEY_OPENAI_1]] end",
       context,
     );
 
@@ -268,21 +237,21 @@ describe("streaming unredact", () => {
 
   test("buffers partial placeholder", () => {
     const context = createRedactionContext();
-    context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"] = sampleSecret;
+    context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"] = sampleSecret;
 
-    const { output, remainingBuffer } = unredactStreamChunk("", "Key: <SECRET_RED", context);
+    const { output, remainingBuffer } = unredactStreamChunk("", "Key: [[SECRET_RED", context);
 
     expect(output).toBe("Key: ");
-    expect(remainingBuffer).toBe("<SECRET_RED");
+    expect(remainingBuffer).toBe("[[SECRET_RED");
   });
 
   test("completes buffered placeholder", () => {
     const context = createRedactionContext();
-    context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"] = sampleSecret;
+    context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"] = sampleSecret;
 
     const { output, remainingBuffer } = unredactStreamChunk(
-      "<SECRET_RED",
-      "ACTED_API_KEY_OPENAI_1> done",
+      "[[SECRET_RED",
+      "ACTED_API_KEY_OPENAI_1]] done",
       context,
     );
 
@@ -301,7 +270,7 @@ describe("streaming unredact", () => {
 
   test("flushes remaining buffer", () => {
     const context = createRedactionContext();
-    context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"] = sampleSecret;
+    context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"] = sampleSecret;
 
     const result = flushRedactionBuffer("<incomplete", context);
     expect(result).toBe("<incomplete");
@@ -317,7 +286,7 @@ describe("streaming unredact", () => {
 describe("unredactResponse", () => {
   test("unredacts all choices in response", () => {
     const context = createRedactionContext();
-    context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"] = sampleSecret;
+    context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"] = sampleSecret;
 
     const response = {
       id: "test",
@@ -329,7 +298,7 @@ describe("unredactResponse", () => {
           index: 0,
           message: {
             role: "assistant" as const,
-            content: "Your key is <SECRET_REDACTED_API_KEY_OPENAI_1>",
+            content: "Your key is [[SECRET_REDACTED_API_KEY_OPENAI_1]]",
           },
           finish_reason: "stop" as const,
         },
@@ -342,7 +311,7 @@ describe("unredactResponse", () => {
 
   test("handles multiple choices", () => {
     const context = createRedactionContext();
-    context.mapping["<SECRET_REDACTED_API_KEY_OPENAI_1>"] = sampleSecret;
+    context.mapping["[[SECRET_REDACTED_API_KEY_OPENAI_1]]"] = sampleSecret;
 
     const response = {
       id: "test",
@@ -354,7 +323,7 @@ describe("unredactResponse", () => {
           index: 0,
           message: {
             role: "assistant" as const,
-            content: "Choice 1: <SECRET_REDACTED_API_KEY_OPENAI_1>",
+            content: "Choice 1: [[SECRET_REDACTED_API_KEY_OPENAI_1]]",
           },
           finish_reason: "stop" as const,
         },
@@ -362,7 +331,7 @@ describe("unredactResponse", () => {
           index: 1,
           message: {
             role: "assistant" as const,
-            content: "Choice 2: <SECRET_REDACTED_API_KEY_OPENAI_1>",
+            content: "Choice 2: [[SECRET_REDACTED_API_KEY_OPENAI_1]]",
           },
           finish_reason: "stop" as const,
         },

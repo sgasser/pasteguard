@@ -58,10 +58,10 @@ Works with OpenAI, Azure, and any OpenAI-compatible API. Just change one URL.
 You send:     "Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)
                about next week's project meeting"
 
-LLM receives: "Write a follow-up email to <PERSON_1> (<EMAIL_ADDRESS_1>)
+LLM receives: "Write a follow-up email to [[PERSON_1]] ([[EMAIL_ADDRESS_1]])
                about next week's project meeting"
 
-LLM responds: "Dear <PERSON_1>, Following up on our discussion..."
+LLM responds: "Dear [[PERSON_1]], Following up on our discussion..."
 
 You receive:  "Dear Dr. Sarah Chen, Following up on our discussion..."
 ```

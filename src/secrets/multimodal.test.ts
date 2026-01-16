@@ -1,25 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { SecretsDetectionConfig } from "../config";
 import type { ChatMessage } from "../services/llm-client";
 import { maskMessages } from "../services/masking";
 import type { PIIEntity } from "../services/pii-detector";
 import type { ContentPart } from "../utils/content";
 
 describe("Multimodal content handling", () => {
-  const _secretsConfig: SecretsDetectionConfig = {
-    enabled: true,
-    action: "redact",
-    entities: ["API_KEY_OPENAI"],
-    max_scan_chars: 200000,
-    redact_placeholder: "<SECRET_REDACTED_{N}>",
-    log_detected_types: true,
-  };
-
-  describe("Secrets redaction with offset tracking", () => {
-    // Note: Secrets are not expected to span across newlines in real scenarios
-    // The offset tracking is implemented to handle PII entities correctly
-  });
-
   describe("PII masking with offset tracking", () => {
     test("masks PII in multimodal array content", () => {
       const messages: ChatMessage[] = [
@@ -51,7 +36,7 @@ describe("Multimodal content handling", () => {
 
       // Part 0 should have email masked
       expect(maskedContent[0].type).toBe("text");
-      expect(maskedContent[0].text).toBe("My email is <EMAIL_ADDRESS_1> and");
+      expect(maskedContent[0].text).toBe("My email is [[EMAIL_ADDRESS_1]] and");
       expect(maskedContent[0].text).not.toContain("john@example.com");
 
       // Part 1 should be unchanged (image)
@@ -60,7 +45,7 @@ describe("Multimodal content handling", () => {
 
       // Part 2 should have phone masked
       expect(maskedContent[2].type).toBe("text");
-      expect(maskedContent[2].text).toBe("my phone is <PHONE_NUMBER_1>");
+      expect(maskedContent[2].text).toBe("my phone is [[PHONE_NUMBER_1]]");
       expect(maskedContent[2].text).not.toContain("555-1234");
     });
 
@@ -89,8 +74,8 @@ describe("Multimodal content handling", () => {
       // Verify the text is actually masked (not the original)
       expect(maskedContent[0].text).not.toContain("Alice");
       expect(maskedContent[0].text).not.toContain("alice@secret.com");
-      expect(maskedContent[0].text).toContain("<PERSON_1>");
-      expect(maskedContent[0].text).toContain("<EMAIL_ADDRESS_1>");
+      expect(maskedContent[0].text).toContain("[[PERSON_1]]");
+      expect(maskedContent[0].text).toContain("[[EMAIL_ADDRESS_1]]");
     });
 
     test("handles entities spanning multiple parts with proper offsets", () => {
@@ -115,8 +100,8 @@ describe("Multimodal content handling", () => {
       const maskedContent = masked[0].content as ContentPart[];
 
       // Both parts should be affected by the email entity
-      // Part 0: "First part with <EMAIL" or similar
-      // Part 1: "ADDRESS_1> in two parts" or similar
+      // Part 0: "First part with [[EMAIL" or similar
+      // Part 1: "ADDRESS_1]] in two parts" or similar
       // The exact split depends on how the masking handles cross-boundary entities
 
       // At minimum, verify that the entity is masked somewhere
@@ -125,7 +110,7 @@ describe("Multimodal content handling", () => {
         .map((p) => p.text)
         .join("\n");
 
-      expect(fullMasked).toContain("<EMAIL_ADDRESS_");
+      expect(fullMasked).toContain("[[EMAIL_ADDRESS_");
       expect(fullMasked).not.toContain("email@example.com");
     });
   });

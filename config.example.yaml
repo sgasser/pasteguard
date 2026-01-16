@@ -139,10 +139,6 @@ secrets_detection:
   # The 200KB default covers typical use cases
   max_scan_chars: 200000
 
-  # Placeholder format for redaction (only used if action: redact)
-  # {N} will be replaced with type and sequential number (e.g., API_KEY_OPENAI_1)
-  redact_placeholder: "<SECRET_REDACTED_{N}>"
-
   # Log detected secret types (never logs secret content)
   # Even if logging.log_content is true, secret content is never logged
   log_detected_types: true

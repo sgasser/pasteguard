@@ -8,7 +8,6 @@ const defaultConfig: SecretsDetectionConfig = {
   action: "block",
   entities: ["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY"],
   max_scan_chars: 200000,
-  redact_placeholder: "<SECRET_REDACTED_{N}>",
   log_detected_types: true,
 };
 

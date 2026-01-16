@@ -47,9 +47,9 @@ async function consumeStream(stream: ReadableStream<Uint8Array>): Promise<string
 describe("createUnmaskingStream", () => {
   test("unmasks complete placeholder in single chunk", async () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
 
-    const sseData = `data: {"choices":[{"delta":{"content":"Hello <EMAIL_ADDRESS_1>!"}}]}\n\n`;
+    const sseData = `data: {"choices":[{"delta":{"content":"Hello [[EMAIL_ADDRESS_1]]!"}}]}\n\n`;
     const source = createSSEStream([sseData]);
 
     const unmaskedStream = createUnmaskingStream(source, context, defaultConfig);
@@ -84,12 +84,12 @@ describe("createUnmaskingStream", () => {
 
   test("buffers partial placeholder across chunks", async () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "a@b.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "a@b.com";
 
     // Split placeholder across chunks
     const chunks = [
-      `data: {"choices":[{"delta":{"content":"Hello <EMAIL_"}}]}\n\n`,
-      `data: {"choices":[{"delta":{"content":"ADDRESS_1> world"}}]}\n\n`,
+      `data: {"choices":[{"delta":{"content":"Hello [[EMAIL_"}}]}\n\n`,
+      `data: {"choices":[{"delta":{"content":"ADDRESS_1]] world"}}]}\n\n`,
     ];
     const source = createSSEStream(chunks);
 
@@ -102,10 +102,10 @@ describe("createUnmaskingStream", () => {
 
   test("flushes remaining buffer on stream end", async () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
 
     // Partial placeholder that completes only on flush
-    const chunks = [`data: {"choices":[{"delta":{"content":"Contact <EMAIL_ADDRESS_1>"}}]}\n\n`];
+    const chunks = [`data: {"choices":[{"delta":{"content":"Contact [[EMAIL_ADDRESS_1]]"}}]}\n\n`];
     const source = createSSEStream(chunks);
 
     const unmaskedStream = createUnmaskingStream(source, context, defaultConfig);
@@ -116,10 +116,10 @@ describe("createUnmaskingStream", () => {
 
   test("handles multiple placeholders in stream", async () => {
     const context = createMaskingContext();
-    context.mapping["<PERSON_1>"] = "John";
-    context.mapping["<EMAIL_ADDRESS_1>"] = "john@test.com";
+    context.mapping["[[PERSON_1]]"] = "John";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "john@test.com";
 
-    const sseData = `data: {"choices":[{"delta":{"content":"<PERSON_1>: <EMAIL_ADDRESS_1>"}}]}\n\n`;
+    const sseData = `data: {"choices":[{"delta":{"content":"[[PERSON_1]]: [[EMAIL_ADDRESS_1]]"}}]}\n\n`;
     const source = createSSEStream([sseData]);
 
     const unmaskedStream = createUnmaskingStream(source, context, defaultConfig);

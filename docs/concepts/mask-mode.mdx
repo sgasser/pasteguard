@@ -17,10 +17,10 @@ Mask mode replaces PII with placeholders before sending to your LLM provider. Th
     PasteGuard finds: `Dr. Sarah Chen` (PERSON), `sarah.chen@hospital.org` (EMAIL)
   </Step>
   <Step title="Masked request sent">
-    Provider receives: `"Write a follow-up email to <PERSON_1> (<EMAIL_ADDRESS_1>)"`
+    Provider receives: `"Write a follow-up email to [[PERSON_1]] ([[EMAIL_ADDRESS_1]])"`
   </Step>
   <Step title="Response masked">
-    Provider responds: `"Dear <PERSON_1>, Following up on our discussion..."`
+    Provider responds: `"Dear [[PERSON_1]], Following up on our discussion..."`
   </Step>
   <Step title="Response unmasked">
     You receive: `"Dear Dr. Sarah Chen, Following up on our discussion..."`

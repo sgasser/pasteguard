@@ -1,4 +1,4 @@
-import type { SecretsDetectionConfig } from "../config";
+import { findPartialPlaceholderStart, generateSecretPlaceholder } from "../constants/placeholders";
 import type { ChatCompletionResponse, ChatMessage } from "../services/llm-client";
 import { extractTextContent } from "../utils/content";
 import type { SecretsRedaction } from "./detect";
@@ -33,22 +33,15 @@ export function createRedactionContext(): RedactionContext {
 }
 
 /**
- * Generates a placeholder for a secret type using configured format
+ * Generates a placeholder for a secret type
  *
- * Format: configurable via `redact_placeholder`, default "<SECRET_REDACTED_{N}>"
- * {N} is replaced with sequential number
+ * Format: [[SECRET_REDACTED_{TYPE}_{N}]] e.g. [[SECRET_REDACTED_API_KEY_OPENAI_1]]
  */
-function generatePlaceholder(
-  secretType: string,
-  context: RedactionContext,
-  config: SecretsDetectionConfig,
-): string {
+function generatePlaceholder(secretType: string, context: RedactionContext): string {
   const count = (context.counters[secretType] || 0) + 1;
   context.counters[secretType] = count;
 
-  // Use configured placeholder format, replace {N} with count
-  // Include type in the placeholder to make it unique per type
-  return config.redact_placeholder.replace("{N}", `${secretType}_${count}`);
+  return generateSecretPlaceholder(secretType, count);
 }
 
 /**
@@ -59,13 +52,11 @@ function generatePlaceholder(
  *
  * @param text - The text to redact secrets from
  * @param redactions - Array of redaction positions (sorted by start position descending)
- * @param config - Secrets detection configuration
  * @param context - Optional existing context to reuse (for multiple messages)
  */
 export function redactSecrets(
   text: string,
   redactions: SecretsRedaction[],
-  config: SecretsDetectionConfig,
   context?: RedactionContext,
 ): RedactionResult {
   const ctx = context || createRedactionContext();
@@ -86,7 +77,7 @@ export function redactSecrets(
     let placeholder = ctx.reverseMapping[originalValue];
 
     if (!placeholder) {
-      placeholder = generatePlaceholder(redaction.type, ctx, config);
+      placeholder = generatePlaceholder(redaction.type, ctx);
       ctx.mapping[placeholder] = originalValue;
       ctx.reverseMapping[originalValue] = placeholder;
     }
@@ -133,19 +124,17 @@ export function unredactSecrets(text: string, context: RedactionContext): string
  *
  * @param messages - Chat messages to redact
  * @param redactionsByMessage - Redactions for each message (indexed by message position)
- * @param config - Secrets detection configuration
  */
 export function redactMessagesSecrets(
   messages: ChatMessage[],
   redactionsByMessage: SecretsRedaction[][],
-  config: SecretsDetectionConfig,
 ): { redacted: ChatMessage[]; context: RedactionContext } {
   const context = createRedactionContext();
 
   const redacted = messages.map((msg, i) => {
     const redactions = redactionsByMessage[i] || [];
     const text = extractTextContent(msg.content);
-    const { redacted: redactedContent } = redactSecrets(text, redactions, config, context);
+    const { redacted: redactedContent } = redactSecrets(text, redactions, context);
 
     // If original content was a string, return redacted string
     // Otherwise return original content (arrays are handled in proxy.ts)
@@ -168,24 +157,10 @@ export function unredactStreamChunk(
 ): { output: string; remainingBuffer: string } {
   const combined = buffer + newChunk;
 
-  // Find the last safe position to unredact (before any potential partial placeholder)
-  // Look for the start of any potential placeholder pattern
-  const placeholderStart = combined.lastIndexOf("<");
+  const partialStart = findPartialPlaceholderStart(combined);
 
-  if (placeholderStart === -1) {
-    // No potential placeholder, safe to unredact everything
-    return {
-      output: unredactSecrets(combined, context),
-      remainingBuffer: "",
-    };
-  }
-
-  // Check if there's a complete placeholder after the last <
-  const afterStart = combined.slice(placeholderStart);
-  const hasCompletePlaceholder = afterStart.includes(">");
-
-  if (hasCompletePlaceholder) {
-    // The placeholder is complete, safe to unredact everything
+  if (partialStart === -1) {
+    // No partial placeholder, safe to unredact everything
     return {
       output: unredactSecrets(combined, context),
       remainingBuffer: "",
@@ -193,8 +168,8 @@ export function unredactStreamChunk(
   }
 
   // Partial placeholder detected, buffer it
-  const safeToProcess = combined.slice(0, placeholderStart);
-  const toBuffer = combined.slice(placeholderStart);
+  const safeToProcess = combined.slice(0, partialStart);
+  const toBuffer = combined.slice(partialStart);
 
   return {
     output: unredactSecrets(safeToProcess, context),

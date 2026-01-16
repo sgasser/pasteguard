@@ -111,7 +111,6 @@ const SecretsDetectionSchema = z.object({
   action: z.enum(["block", "redact", "route_local"]).default("redact"),
   entities: z.array(z.enum(SecretEntityTypes)).default(["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY"]),
   max_scan_chars: z.coerce.number().int().min(0).default(200000),
-  redact_placeholder: z.string().default("<SECRET_REDACTED_{N}>"),
   log_detected_types: z.boolean().default(true),
 });
 

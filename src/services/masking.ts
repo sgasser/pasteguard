@@ -1,4 +1,9 @@
 import type { MaskingConfig } from "../config";
+import {
+  findPartialPlaceholderStart,
+  generatePlaceholder as generatePlaceholderFromFormat,
+  PII_PLACEHOLDER_FORMAT,
+} from "../constants/placeholders";
 import { extractTextContent } from "../utils/content";
 import type { ChatCompletionResponse, ChatMessage } from "./llm-client";
 import type { PIIEntity } from "./pii-detector";
@@ -25,8 +30,6 @@ export function createMaskingContext(): MaskingContext {
   };
 }
 
-const PLACEHOLDER_FORMAT = "<{TYPE}_{N}>";
-
 /**
  * Generates a placeholder for a PII entity type
  */
@@ -34,7 +37,7 @@ function generatePlaceholder(entityType: string, context: MaskingContext): strin
   const count = (context.counters[entityType] || 0) + 1;
   context.counters[entityType] = count;
 
-  return PLACEHOLDER_FORMAT.replace("{TYPE}", entityType).replace("{N}", String(count));
+  return generatePlaceholderFromFormat(PII_PLACEHOLDER_FORMAT, entityType, count);
 }
 
 /**
@@ -183,24 +186,10 @@ export function unmaskStreamChunk(
 ): { output: string; remainingBuffer: string } {
   const combined = buffer + newChunk;
 
-  // Find the last safe position to unmask (before any potential partial placeholder)
-  // Look for the start of any potential placeholder pattern
-  const placeholderStart = combined.lastIndexOf("<");
+  const partialStart = findPartialPlaceholderStart(combined);
 
-  if (placeholderStart === -1) {
-    // No potential placeholder, safe to unmask everything
-    return {
-      output: unmask(combined, context, config),
-      remainingBuffer: "",
-    };
-  }
-
-  // Check if there's a complete placeholder after the last <
-  const afterStart = combined.slice(placeholderStart);
-  const hasCompletePlaceholder = afterStart.includes(">");
-
-  if (hasCompletePlaceholder) {
-    // The placeholder is complete, safe to unmask everything
+  if (partialStart === -1) {
+    // No partial placeholder, safe to unmask everything
     return {
       output: unmask(combined, context, config),
       remainingBuffer: "",
@@ -208,8 +197,8 @@ export function unmaskStreamChunk(
   }
 
   // Partial placeholder detected, buffer it
-  const safeToProcess = combined.slice(0, placeholderStart);
-  const toBuffer = combined.slice(placeholderStart);
+  const safeToProcess = combined.slice(0, partialStart);
+  const toBuffer = combined.slice(partialStart);
 
   return {
     output: unmask(safeToProcess, context, config),

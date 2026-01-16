@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { proxy } from "hono/proxy";
 import { z } from "zod";
-import { getConfig, type MaskingConfig, type SecretsDetectionConfig } from "../config";
+import { getConfig, type MaskingConfig } from "../config";
 import {
   detectSecrets,
   extractTextFromRequest,
@@ -138,11 +138,7 @@ proxyRoutes.post(
 
         // Redact action - replace secrets with placeholders and continue
         if (config.secrets_detection.action === "redact") {
-          const redactedMessages = redactMessagesWithSecrets(
-            body.messages,
-            secretsResult,
-            config.secrets_detection,
-          );
+          const redactedMessages = redactMessagesWithSecrets(body.messages, secretsResult);
           body = { ...body, messages: redactedMessages.messages };
           redactionContext = redactedMessages.context;
           secretsRedacted = true;
@@ -180,7 +176,6 @@ proxyRoutes.post(
 function redactMessagesWithSecrets(
   messages: ChatMessage[],
   secretsResult: SecretsDetectionResult,
-  config: SecretsDetectionConfig,
 ): { messages: ChatMessage[]; context: RedactionContext } {
   // Build a map of message content to redactions
   // Since we concatenated all messages with \n, we need to track positions per message
@@ -247,7 +242,6 @@ function redactMessagesWithSecrets(
             const { redacted, context: updatedContext } = redactSecrets(
               part.text,
               partRedactions,
-              config,
               context,
             );
             context = updatedContext;
@@ -287,7 +281,6 @@ function redactMessagesWithSecrets(
     const { redacted, context: updatedContext } = redactSecrets(
       msg.content,
       messageRedactions,
-      config,
       context,
     );
     context = updatedContext;

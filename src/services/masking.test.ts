@@ -36,8 +36,8 @@ describe("mask", () => {
 
     const result = mask("Contact: john@example.com please", entities);
 
-    expect(result.masked).toBe("Contact: <EMAIL_ADDRESS_1> please");
-    expect(result.context.mapping["<EMAIL_ADDRESS_1>"]).toBe("john@example.com");
+    expect(result.masked).toBe("Contact: [[EMAIL_ADDRESS_1]] please");
+    expect(result.context.mapping["[[EMAIL_ADDRESS_1]]"]).toBe("john@example.com");
   });
 
   test("masks multiple entities of same type", () => {
@@ -49,9 +49,9 @@ describe("mask", () => {
 
     const result = mask(text, entities);
 
-    expect(result.masked).toBe("Emails: <EMAIL_ADDRESS_1> and <EMAIL_ADDRESS_2>");
-    expect(result.context.mapping["<EMAIL_ADDRESS_1>"]).toBe("a@b.com");
-    expect(result.context.mapping["<EMAIL_ADDRESS_2>"]).toBe("c@d.com");
+    expect(result.masked).toBe("Emails: [[EMAIL_ADDRESS_1]] and [[EMAIL_ADDRESS_2]]");
+    expect(result.context.mapping["[[EMAIL_ADDRESS_1]]"]).toBe("a@b.com");
+    expect(result.context.mapping["[[EMAIL_ADDRESS_2]]"]).toBe("c@d.com");
   });
 
   test("masks multiple entity types", () => {
@@ -63,9 +63,9 @@ describe("mask", () => {
 
     const result = mask(text, entities);
 
-    expect(result.masked).toBe("<PERSON_1>: <EMAIL_ADDRESS_1>");
-    expect(result.context.mapping["<PERSON_1>"]).toBe("Hans Müller");
-    expect(result.context.mapping["<EMAIL_ADDRESS_1>"]).toBe("hans@firma.de");
+    expect(result.masked).toBe("[[PERSON_1]]: [[EMAIL_ADDRESS_1]]");
+    expect(result.context.mapping["[[PERSON_1]]"]).toBe("Hans Müller");
+    expect(result.context.mapping["[[EMAIL_ADDRESS_1]]"]).toBe("hans@firma.de");
   });
 
   test("reuses placeholder for duplicate values", () => {
@@ -78,7 +78,7 @@ describe("mask", () => {
     const result = mask(text, entities);
 
     // Same value should get same placeholder
-    expect(result.masked).toBe("<EMAIL_ADDRESS_1> and again <EMAIL_ADDRESS_1>");
+    expect(result.masked).toBe("[[EMAIL_ADDRESS_1]] and again [[EMAIL_ADDRESS_1]]");
     expect(Object.keys(result.context.mapping)).toHaveLength(1);
   });
 
@@ -91,7 +91,7 @@ describe("mask", () => {
 
     const result = mask(text, entities);
 
-    expect(result.masked).toBe("<PERSON_1><PERSON_2>");
+    expect(result.masked).toBe("[[PERSON_1]][[PERSON_2]]");
   });
 
   test("preserves context across calls", () => {
@@ -103,7 +103,7 @@ describe("mask", () => {
       context,
     );
 
-    expect(result1.masked).toBe("Email: <EMAIL_ADDRESS_1>");
+    expect(result1.masked).toBe("Email: [[EMAIL_ADDRESS_1]]");
 
     const result2 = mask(
       "Another: c@d.com",
@@ -112,9 +112,9 @@ describe("mask", () => {
     );
 
     // Should continue numbering
-    expect(result2.masked).toBe("Another: <EMAIL_ADDRESS_2>");
-    expect(context.mapping["<EMAIL_ADDRESS_1>"]).toBe("a@b.com");
-    expect(context.mapping["<EMAIL_ADDRESS_2>"]).toBe("c@d.com");
+    expect(result2.masked).toBe("Another: [[EMAIL_ADDRESS_2]]");
+    expect(context.mapping["[[EMAIL_ADDRESS_1]]"]).toBe("a@b.com");
+    expect(context.mapping["[[EMAIL_ADDRESS_2]]"]).toBe("c@d.com");
   });
 });
 
@@ -127,19 +127,19 @@ describe("unmask", () => {
 
   test("restores single placeholder", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "john@example.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "john@example.com";
 
-    const result = unmask("Reply to <EMAIL_ADDRESS_1>", context, defaultConfig);
+    const result = unmask("Reply to [[EMAIL_ADDRESS_1]]", context, defaultConfig);
     expect(result).toBe("Reply to john@example.com");
   });
 
   test("restores multiple placeholders", () => {
     const context = createMaskingContext();
-    context.mapping["<PERSON_1>"] = "Hans Müller";
-    context.mapping["<EMAIL_ADDRESS_1>"] = "hans@firma.de";
+    context.mapping["[[PERSON_1]]"] = "Hans Müller";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "hans@firma.de";
 
     const result = unmask(
-      "Hello <PERSON_1>, your email <EMAIL_ADDRESS_1> is confirmed",
+      "Hello [[PERSON_1]], your email [[EMAIL_ADDRESS_1]] is confirmed",
       context,
       defaultConfig,
     );
@@ -148,26 +148,26 @@ describe("unmask", () => {
 
   test("restores repeated placeholders", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
 
-    const result = unmask("<EMAIL_ADDRESS_1> and <EMAIL_ADDRESS_1>", context, defaultConfig);
+    const result = unmask("[[EMAIL_ADDRESS_1]] and [[EMAIL_ADDRESS_1]]", context, defaultConfig);
     expect(result).toBe("test@test.com and test@test.com");
   });
 
   test("adds markers when configured", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "john@example.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "john@example.com";
 
-    const result = unmask("Email: <EMAIL_ADDRESS_1>", context, configWithMarkers);
+    const result = unmask("Email: [[EMAIL_ADDRESS_1]]", context, configWithMarkers);
     expect(result).toBe("Email: [protected]john@example.com");
   });
 
   test("handles partial placeholder (no match)", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
 
-    const result = unmask("Text with <EMAIL_ADDRESS_2>", context, defaultConfig);
-    expect(result).toBe("Text with <EMAIL_ADDRESS_2>"); // No match, unchanged
+    const result = unmask("Text with [[EMAIL_ADDRESS_2]]", context, defaultConfig);
+    expect(result).toBe("Text with [[EMAIL_ADDRESS_2]]"); // No match, unchanged
   });
 });
 
@@ -188,7 +188,7 @@ describe("mask -> unmask roundtrip", () => {
     expect(masked).not.toContain("+49123456789");
 
     // Simulate LLM response that echoes placeholders
-    const llmResponse = `I see your contact info: ${masked.match(/<PERSON_1>/)?.[0]}, email ${masked.match(/<EMAIL_ADDRESS_1>/)?.[0]}`;
+    const llmResponse = `I see your contact info: ${masked.match(/\[\[PERSON_1\]\]/)?.[0]}, email ${masked.match(/\[\[EMAIL_ADDRESS_1\]\]/)?.[0]}`;
 
     const unmasked = unmask(llmResponse, context, defaultConfig);
 
@@ -221,12 +221,12 @@ describe("maskMessages", () => {
 
     const { masked, context } = maskMessages(messages, entitiesByMessage);
 
-    expect(masked[0].content).toBe("My email is <EMAIL_ADDRESS_1>");
+    expect(masked[0].content).toBe("My email is [[EMAIL_ADDRESS_1]]");
     expect(masked[1].content).toBe("Got it");
-    expect(masked[2].content).toBe("Also <EMAIL_ADDRESS_2>");
+    expect(masked[2].content).toBe("Also [[EMAIL_ADDRESS_2]]");
 
-    expect(context.mapping["<EMAIL_ADDRESS_1>"]).toBe("test@example.com");
-    expect(context.mapping["<EMAIL_ADDRESS_2>"]).toBe("john@test.com");
+    expect(context.mapping["[[EMAIL_ADDRESS_1]]"]).toBe("test@example.com");
+    expect(context.mapping["[[EMAIL_ADDRESS_2]]"]).toBe("john@test.com");
   });
 
   test("preserves message roles", () => {
@@ -245,11 +245,11 @@ describe("maskMessages", () => {
 describe("streaming unmask", () => {
   test("unmasks complete placeholder in chunk", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
 
     const { output, remainingBuffer } = unmaskStreamChunk(
       "",
-      "Hello <EMAIL_ADDRESS_1>!",
+      "Hello [[EMAIL_ADDRESS_1]]!",
       context,
       defaultConfig,
     );
@@ -260,26 +260,26 @@ describe("streaming unmask", () => {
 
   test("buffers partial placeholder", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
 
     const { output, remainingBuffer } = unmaskStreamChunk(
       "",
-      "Hello <EMAIL_ADD",
+      "Hello [[EMAIL_ADD",
       context,
       defaultConfig,
     );
 
     expect(output).toBe("Hello ");
-    expect(remainingBuffer).toBe("<EMAIL_ADD");
+    expect(remainingBuffer).toBe("[[EMAIL_ADD");
   });
 
   test("completes buffered placeholder", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
 
     const { output, remainingBuffer } = unmaskStreamChunk(
-      "<EMAIL_ADD",
-      "RESS_1> there",
+      "[[EMAIL_ADD",
+      "RESS_1]] there",
       context,
       defaultConfig,
     );
@@ -304,21 +304,21 @@ describe("streaming unmask", () => {
 
   test("flushes remaining buffer", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
 
     // Partial that never completes
-    const flushed = flushStreamBuffer("<EMAIL_ADD", context, defaultConfig);
+    const flushed = flushStreamBuffer("[[EMAIL_ADD", context, defaultConfig);
 
     // Should return as-is since no complete placeholder
-    expect(flushed).toBe("<EMAIL_ADD");
+    expect(flushed).toBe("[[EMAIL_ADD");
   });
 });
 
 describe("unmaskResponse", () => {
   test("unmasks all choices in response", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
-    context.mapping["<PERSON_1>"] = "John Doe";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
+    context.mapping["[[PERSON_1]]"] = "John Doe";
 
     const response = {
       id: "chatcmpl-123",
@@ -330,7 +330,7 @@ describe("unmaskResponse", () => {
           index: 0,
           message: {
             role: "assistant" as const,
-            content: "Contact <PERSON_1> at <EMAIL_ADDRESS_1>",
+            content: "Contact [[PERSON_1]] at [[EMAIL_ADDRESS_1]]",
           },
           finish_reason: "stop" as const,
         },
@@ -351,7 +351,7 @@ describe("unmaskResponse", () => {
 
   test("handles multiple choices", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "a@b.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "a@b.com";
 
     const response = {
       id: "chatcmpl-456",
@@ -361,12 +361,12 @@ describe("unmaskResponse", () => {
       choices: [
         {
           index: 0,
-          message: { role: "assistant" as const, content: "First: <EMAIL_ADDRESS_1>" },
+          message: { role: "assistant" as const, content: "First: [[EMAIL_ADDRESS_1]]" },
           finish_reason: "stop" as const,
         },
         {
           index: 1,
-          message: { role: "assistant" as const, content: "Second: <EMAIL_ADDRESS_1>" },
+          message: { role: "assistant" as const, content: "Second: [[EMAIL_ADDRESS_1]]" },
           finish_reason: "stop" as const,
         },
       ],
@@ -411,7 +411,7 @@ describe("edge cases", () => {
     const entities: PIIEntity[] = [{ entity_type: "PERSON", start: 9, end: 24, score: 0.9 }];
 
     const { masked, context } = mask(text, entities);
-    expect(masked).toBe("Kontakt: <PERSON_1>");
+    expect(masked).toBe("Kontakt: [[PERSON_1]]");
 
     const unmasked = unmask(masked, context, defaultConfig);
     expect(unmasked).toBe("Kontakt: François Müller");
@@ -425,9 +425,145 @@ describe("edge cases", () => {
 
   test("handles placeholder-like text that is not a real placeholder", () => {
     const context = createMaskingContext();
-    context.mapping["<EMAIL_ADDRESS_1>"] = "test@test.com";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
 
-    const result = unmask("Use <UNKNOWN_1> format", context, defaultConfig);
-    expect(result).toBe("Use <UNKNOWN_1> format");
+    const result = unmask("Use [[UNKNOWN_1]] format", context, defaultConfig);
+    expect(result).toBe("Use [[UNKNOWN_1]] format");
+  });
+});
+
+describe("HTML context handling (issue #36)", () => {
+  test("unmasks placeholders in HTML without encoding issues", () => {
+    // With [[]] format, placeholders are not affected by HTML encoding
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Dr. Sarah Chen";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "sarah.chen@hospital.org";
+
+    // [[]] brackets don't get HTML-encoded, so they work directly
+    const htmlResponse = `<p>Contact [[PERSON_1]] at [[EMAIL_ADDRESS_1]]</p>`;
+
+    const result = unmask(htmlResponse, context, defaultConfig);
+
+    expect(result).toBe("<p>Contact Dr. Sarah Chen at sarah.chen@hospital.org</p>");
+  });
+
+  test("unmasks placeholders in HTML title attributes", () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Jane Smith";
+
+    // [[]] works in HTML attributes without encoding
+    const htmlWithAttr = `<span title="Contact [[PERSON_1]]">Click here</span>`;
+
+    const result = unmask(htmlWithAttr, context, defaultConfig);
+
+    expect(result).toBe(`<span title="Contact Jane Smith">Click here</span>`);
+  });
+
+  test("unmasks placeholders in mailto links", () => {
+    const context = createMaskingContext();
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@example.com";
+
+    const mailtoHtml = `<a href="mailto:[[EMAIL_ADDRESS_1]]">Send email</a>`;
+
+    const result = unmask(mailtoHtml, context, defaultConfig);
+
+    expect(result).toBe(`<a href="mailto:test@example.com">Send email</a>`);
+  });
+
+  test("handles multiple occurrences of same placeholder in HTML", () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Alice";
+
+    const response = `<p>[[PERSON_1]] said hello.</p><p>[[PERSON_1]] waved goodbye.</p>`;
+
+    const result = unmask(response, context, defaultConfig);
+
+    expect(result).toBe("<p>Alice said hello.</p><p>Alice waved goodbye.</p>");
+  });
+
+  test("works with complex HTML structures", () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Dr. Sarah Chen";
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "sarah@hospital.org";
+    context.mapping["[[PHONE_NUMBER_1]]"] = "+1-555-0123";
+
+    const complexHtml = `
+      <div class="profile">
+        <h1>[[PERSON_1]]</h1>
+        <a href="mailto:[[EMAIL_ADDRESS_1]]">[[EMAIL_ADDRESS_1]]</a>
+        <span data-phone="[[PHONE_NUMBER_1]]">Call: [[PHONE_NUMBER_1]]</span>
+      </div>
+    `;
+
+    const result = unmask(complexHtml, context, defaultConfig);
+
+    expect(result).toContain("Dr. Sarah Chen");
+    expect(result).toContain("sarah@hospital.org");
+    expect(result).toContain("+1-555-0123");
+    expect(result).not.toContain("[[");
+    expect(result).not.toContain("]]");
+  });
+});
+
+describe("streaming with [[]] placeholders (issue #36)", () => {
+  test("handles complete placeholder in chunk", () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "John Doe";
+
+    const { output, remainingBuffer } = unmaskStreamChunk(
+      "",
+      "Hello [[PERSON_1]]!",
+      context,
+      defaultConfig,
+    );
+
+    expect(output).toBe("Hello John Doe!");
+    expect(remainingBuffer).toBe("");
+  });
+
+  test("buffers partial placeholder at end of chunk", () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "John Doe";
+
+    // Partial placeholder at end: [[PERS
+    const { output, remainingBuffer } = unmaskStreamChunk(
+      "",
+      "Hello [[PERS",
+      context,
+      defaultConfig,
+    );
+
+    expect(output).toBe("Hello ");
+    expect(remainingBuffer).toBe("[[PERS");
+  });
+
+  test("completes buffered placeholder across chunks", () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "John Doe";
+
+    const { output, remainingBuffer } = unmaskStreamChunk(
+      "[[PERS",
+      "ON_1]] there",
+      context,
+      defaultConfig,
+    );
+
+    expect(output).toBe("John Doe there");
+    expect(remainingBuffer).toBe("");
+  });
+
+  test("handles placeholder split at closing brackets", () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "John Doe";
+
+    // First chunk ends with incomplete closing
+    const result1 = unmaskStreamChunk("", "Hello [[PERSON_1]", context, defaultConfig);
+    expect(result1.output).toBe("Hello ");
+    expect(result1.remainingBuffer).toBe("[[PERSON_1]");
+
+    // Second chunk completes it
+    const result2 = unmaskStreamChunk(result1.remainingBuffer, "] world", context, defaultConfig);
+    expect(result2.output).toBe("John Doe world");
+    expect(result2.remainingBuffer).toBe("");
   });
 });
