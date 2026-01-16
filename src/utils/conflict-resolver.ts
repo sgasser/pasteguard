@@ -59,20 +59,17 @@ function removeConflicting<T extends EntityWithScore>(entities: T[]): T[] {
   if (entities.length <= 1) return [...entities];
 
   const sorted = [...entities].sort((a, b) => {
-    if (a.start !== b.start) return a.start - b.start;
-    if (a.end !== b.end) return a.end - b.end;
-    return b.score - a.score;
+    if (a.score !== b.score) return b.score - a.score;
+    const aLen = a.end - a.start;
+    const bLen = b.end - b.start;
+    if (aLen !== bLen) return bLen - aLen;
+    return a.start - b.start;
   });
 
   const result: T[] = [];
 
   for (const entity of sorted) {
-    const hasConflict = result.some((kept) => {
-      if (entity.start === kept.start && entity.end === kept.end) {
-        return true;
-      }
-      return isContainedIn(entity, kept);
-    });
+    const hasConflict = result.some((kept) => overlaps(entity, kept));
 
     if (!hasConflict) {
       result.push(entity);

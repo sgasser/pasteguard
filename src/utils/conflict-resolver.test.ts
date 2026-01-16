@@ -45,20 +45,30 @@ describe("resolveConflicts", () => {
     expect(result[0].score).toBe(0.85);
   });
 
-  test("different type contained removed", () => {
+  test("different type overlapping higher score wins", () => {
     const entities = [
       { start: 0, end: 10, score: 0.7, entity_type: "PHONE_NUMBER" },
       { start: 2, end: 8, score: 0.9, entity_type: "US_SSN" },
     ];
     const result = resolveConflicts(entities);
     expect(result).toHaveLength(1);
-    expect(result[0].entity_type).toBe("PHONE_NUMBER");
+    expect(result[0].entity_type).toBe("US_SSN");
   });
 
   test("same indices different types higher score wins", () => {
     const entities = [
       { start: 0, end: 10, score: 0.6, entity_type: "URL" },
       { start: 0, end: 10, score: 0.9, entity_type: "EMAIL_ADDRESS" },
+    ];
+    const result = resolveConflicts(entities);
+    expect(result).toHaveLength(1);
+    expect(result[0].entity_type).toBe("EMAIL_ADDRESS");
+  });
+
+  test("partial overlap different types higher score wins", () => {
+    const entities = [
+      { start: 0, end: 10, score: 0.7, entity_type: "PHONE_NUMBER" },
+      { start: 5, end: 15, score: 0.9, entity_type: "EMAIL_ADDRESS" },
     ];
     const result = resolveConflicts(entities);
     expect(result).toHaveLength(1);
