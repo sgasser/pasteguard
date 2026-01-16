@@ -4,6 +4,7 @@ import {
   generatePlaceholder as generatePlaceholderFromFormat,
   PII_PLACEHOLDER_FORMAT,
 } from "../constants/placeholders";
+import { resolveConflicts } from "../utils/conflict-resolver";
 import { extractTextContent } from "../utils/content";
 import type { ChatCompletionResponse, ChatMessage } from "./llm-client";
 import type { PIIEntity } from "./pii-detector";
@@ -53,8 +54,12 @@ export function mask(text: string, entities: PIIEntity[], context?: MaskingConte
     return { masked: text, context: ctx };
   }
 
+  // Resolve conflicts between overlapping entities using Presidio's algorithm
+  // Presidio can return overlapping entities (e.g., "Eric" and "Eric's")
+  const resolved = resolveConflicts(entities);
+
   // First pass: sort by start position ascending to assign placeholders in order
-  const sortedByStart = [...entities].sort((a, b) => a.start - b.start);
+  const sortedByStart = [...resolved].sort((a, b) => a.start - b.start);
 
   // Assign placeholders in order of appearance
   const entityPlaceholders = new Map<PIIEntity, string>();
@@ -75,7 +80,7 @@ export function mask(text: string, entities: PIIEntity[], context?: MaskingConte
 
   // Second pass: sort by start position descending for replacement
   // This ensures string indices remain valid as we replace
-  const sortedByEnd = [...entities].sort((a, b) => b.start - a.start);
+  const sortedByEnd = [...resolved].sort((a, b) => b.start - a.start);
 
   let result = text;
   for (const entity of sortedByEnd) {

@@ -1,5 +1,6 @@
 import { findPartialPlaceholderStart, generateSecretPlaceholder } from "../constants/placeholders";
 import type { ChatCompletionResponse, ChatMessage } from "../services/llm-client";
+import { resolveOverlaps } from "../utils/conflict-resolver";
 import { extractTextContent } from "../utils/content";
 import type { SecretsRedaction } from "./detect";
 
@@ -65,8 +66,11 @@ export function redactSecrets(
     return { redacted: text, context: ctx };
   }
 
+  // Resolve conflicts between overlapping redactions
+  const resolved = resolveOverlaps(redactions);
+
   // First pass: sort by start position ascending to assign placeholders in order of appearance
-  const sortedByStart = [...redactions].sort((a, b) => a.start - b.start);
+  const sortedByStart = [...resolved].sort((a, b) => a.start - b.start);
 
   // Assign placeholders in order of appearance
   const redactionPlaceholders = new Map<SecretsRedaction, string>();
@@ -86,8 +90,7 @@ export function redactSecrets(
   }
 
   // Second pass: replace from end to start to maintain correct string positions
-  // Redactions should already be sorted by start descending, but re-sort to be safe
-  const sortedByEnd = [...redactions].sort((a, b) => b.start - a.start);
+  const sortedByEnd = [...resolved].sort((a, b) => b.start - a.start);
 
   let result = text;
   for (const redaction of sortedByEnd) {

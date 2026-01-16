@@ -567,3 +567,90 @@ describe("streaming with [[]] placeholders (issue #36)", () => {
     expect(result2.remainingBuffer).toBe("");
   });
 });
+
+describe("overlapping entities (issue #33)", () => {
+  test("handles overlapping entities with same start - keeps longer", () => {
+    // Bug: Presidio returns both "Eric" and "Eric's" as separate PERSON entities
+    const text = "Given Eric's feedback";
+    const entities: PIIEntity[] = [
+      { entity_type: "PERSON", start: 6, end: 10, score: 0.85 }, // "Eric"
+      { entity_type: "PERSON", start: 6, end: 12, score: 0.8 }, // "Eric's"
+    ];
+
+    const { masked, context } = mask(text, entities);
+
+    // Longer span wins when same start position
+    expect(masked).toBe("Given [[PERSON_1]] feedback");
+    expect(context.mapping["[[PERSON_1]]"]).toBe("Eric's");
+  });
+
+  test("handles partially overlapping entities of same type - merges them", () => {
+    const text = "Contact John Smith Jones please";
+    const entities: PIIEntity[] = [
+      { entity_type: "PERSON", start: 8, end: 18, score: 0.9 }, // "John Smith"
+      { entity_type: "PERSON", start: 13, end: 25, score: 0.7 }, // "Smith Jones"
+    ];
+
+    const { masked } = mask(text, entities);
+
+    // Presidio behavior: same-type overlapping entities are MERGED
+    // Merged entity spans 8-25 ("John Smith Jones"), keeps highest score
+    expect(masked).toBe("Contact [[PERSON_1]]please");
+  });
+
+  test("handles nested entities - keeps outer (starts first)", () => {
+    const text = "Dr. John Smith is here";
+    const entities: PIIEntity[] = [
+      { entity_type: "PERSON", start: 0, end: 14, score: 0.9 }, // "Dr. John Smith"
+      { entity_type: "PERSON", start: 4, end: 8, score: 0.85 }, // "John"
+    ];
+
+    const { masked } = mask(text, entities);
+
+    expect(masked).toBe("[[PERSON_1]] is here");
+  });
+
+  test("keeps adjacent non-overlapping entities", () => {
+    const text = "HansMüller";
+    const entities: PIIEntity[] = [
+      { entity_type: "PERSON", start: 0, end: 4, score: 0.9 }, // "Hans"
+      { entity_type: "PERSON", start: 4, end: 10, score: 0.9 }, // "Müller"
+    ];
+
+    const { masked } = mask(text, entities);
+
+    expect(masked).toBe("[[PERSON_1]][[PERSON_2]]");
+  });
+
+  test("handles multiple independent overlap groups", () => {
+    const text = "Laura Smith met Eric's friend Bob Jones Jr";
+    const entities: PIIEntity[] = [
+      // Group 1: same start - longer wins
+      { entity_type: "PERSON", start: 0, end: 5, score: 0.85 }, // "Laura"
+      { entity_type: "PERSON", start: 0, end: 11, score: 0.9 }, // "Laura Smith"
+      // Group 2: same start - longer wins
+      { entity_type: "PERSON", start: 16, end: 20, score: 0.85 }, // "Eric"
+      { entity_type: "PERSON", start: 16, end: 22, score: 0.8 }, // "Eric's"
+      // Group 3: same start - longer wins
+      { entity_type: "PERSON", start: 30, end: 33, score: 0.7 }, // "Bob"
+      { entity_type: "PERSON", start: 30, end: 42, score: 0.9 }, // "Bob Jones Jr"
+    ];
+
+    const { masked } = mask(text, entities);
+
+    expect(masked).toBe("[[PERSON_1]] met [[PERSON_2]] friend [[PERSON_3]]");
+  });
+
+  test("entity consistency - same value gets same placeholder", () => {
+    const text = "Eric met Eric again";
+    const entities: PIIEntity[] = [
+      { entity_type: "PERSON", start: 0, end: 4, score: 0.9 }, // "Eric"
+      { entity_type: "PERSON", start: 9, end: 13, score: 0.9 }, // "Eric"
+    ];
+
+    const { masked, context } = mask(text, entities);
+
+    expect(masked).toBe("[[PERSON_1]] met [[PERSON_1]] again");
+    expect(Object.keys(context.mapping)).toHaveLength(1);
+  });
+});
