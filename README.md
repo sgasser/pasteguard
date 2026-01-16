@@ -71,10 +71,15 @@ PasteGuard sits between your app and the LLM provider. It's OpenAI-compatible �
 ## Quick Start
 
 ```bash
-git clone https://github.com/sgasser/pasteguard.git
-cd pasteguard
-cp config.example.yaml config.yaml
-docker compose up -d
+docker run -d --name pasteguard -p 3000:3000 \
+  -v pasteguard-data:/app/data \
+  ghcr.io/sgasser/pasteguard:latest
+```
+
+Verify it's running:
+
+```bash
+curl http://localhost:3000/health
 ```
 
 Point your app to `http://localhost:3000/openai/v1` instead of `https://api.openai.com/v1`.
@@ -84,7 +89,34 @@ Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 <img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
 <p><em>Every request logged with masked content preview</em></p>
 
-For multiple languages, configuration options, and more: **[Read the docs →](https://pasteguard.com/docs/quickstart)**
+### Custom Configuration
+
+Download and customize the config:
+
+```bash
+curl -O https://raw.githubusercontent.com/sgasser/pasteguard/main/config.example.yaml
+mv config.example.yaml config.yaml
+# Edit config.yaml as needed
+
+docker run -d --name pasteguard -p 3000:3000 \
+  -v ./config.yaml:/app/config.yaml \
+  -v pasteguard-data:/app/data \
+  ghcr.io/sgasser/pasteguard:latest
+```
+
+### Multiple Languages
+
+Default uses English only. For European languages:
+
+```bash
+docker run -d --name pasteguard -p 3000:3000 \
+  -v pasteguard-data:/app/data \
+  ghcr.io/sgasser/pasteguard:eu
+```
+
+See [Installation docs](https://pasteguard.com/docs/installation) for all 24 languages.
+
+For configuration options and more: **[Read the docs →](https://pasteguard.com/docs/quickstart)**
 
 ## Integrations
 

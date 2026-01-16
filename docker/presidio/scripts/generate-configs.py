@@ -57,11 +57,25 @@ def generate_nlp_config(languages: list[str], registry: dict) -> dict:
         "models": models,
         "ner_model_configuration": {
             "model_to_presidio_entity_mapping": {
+                # Standard labels (most languages)
                 "PER": "PERSON",
                 "PERSON": "PERSON",
                 "LOC": "LOCATION",
                 "GPE": "LOCATION",
                 "ORG": "ORGANIZATION",
+                # Polish (NKJP corpus)
+                "persName": "PERSON",
+                "placeName": "LOCATION",
+                "geogName": "LOCATION",
+                "orgName": "ORGANIZATION",
+                # Korean
+                "PS": "PERSON",
+                "LC": "LOCATION",
+                "OG": "ORGANIZATION",
+                # Swedish
+                "PRS": "PERSON",
+                # Norwegian
+                "GPE_LOC": "LOCATION",
             },
             "low_confidence_score_multiplier": 0.4,
             "low_score_entity_names": ["ORG"],
@@ -148,7 +162,8 @@ def generate_install_script(languages: list[str], registry: dict) -> str:
         model = registry["languages"][lang]["model"]
         url = f"https://github.com/explosion/spacy-models/releases/download/{model}-{version}/{model}-{version}-py3-none-any.whl"
         lines.append(f'echo "Installing {model} for {lang}..."')
-        lines.append(f"pip install --no-cache-dir {url}")
+        # Use poetry run pip to install in the correct virtual environment
+        lines.append(f"poetry run pip install --no-cache-dir {url}")
         lines.append("")
 
     lines.append('echo "All models installed successfully"')

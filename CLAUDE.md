@@ -60,20 +60,31 @@ See @config.example.yaml for full configuration.
 
 ## Setup
 
-**Production:** `docker compose up -d`
-
-**Development:**
+**Production (prebuilt image):**
 ```bash
-cp config.example.yaml config.yaml
-docker compose up presidio-analyzer -d
-bun install && bun run dev
+docker run -d --name pasteguard -p 3000:3000 \
+  -v pasteguard-data:/app/data \
+  ghcr.io/sgasser/pasteguard:latest
 ```
 
-**Dependencies:**
-- Presidio (port 5002) - required
-- Ollama (port 11434) - route mode only
+**Development:** Presidio in Docker, Bun locally with hot-reload:
+```bash
+docker compose --profile dev up presidio -d
+bun run dev
+```
 
-**Multi-language PII:** Build with `LANGUAGES=en,de,fr docker compose build`. See @presidio/languages.yaml for 24 available languages.
+**Multi-language:** Use EU image or build custom:
+```bash
+# Prebuilt EU image
+docker run -d --name pasteguard -p 3000:3000 \
+  -v pasteguard-data:/app/data \
+  ghcr.io/sgasser/pasteguard:eu
+
+# Custom build
+LANGUAGES=en,de,ja docker compose up -d --build
+```
+
+See @docker/presidio/languages.yaml for 24 available languages.
 
 ## Testing
 

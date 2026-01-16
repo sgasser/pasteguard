@@ -1,10 +1,7 @@
 # PasteGuard Language Registry
-# All 24 spaCy languages with trained pipelines
+# 24 spaCy languages with large models for accurate PII detection
 #
-# Usage: Set LANGUAGES build arg to select which to install
-#   LANGUAGES=en,de docker-compose build
-#
-# To add a custom language, add an entry here with model name
+# Usage: LANGUAGES=en,de docker compose build
 
 spacy_version: "3.8.0"
 
@@ -16,31 +13,31 @@ languages:
   # Catalan
   ca:
     name: Catalan
-    model: ca_core_news_md
+    model: ca_core_news_lg
     phone_context: [telèfon, número, mòbil, trucada, trucar]
 
   # Chinese
   zh:
     name: Chinese
-    model: zh_core_web_md
+    model: zh_core_web_lg
     phone_context: [电话, 手机, 号码, 打电话, 电话号码, 手机号码]
 
   # Croatian
   hr:
     name: Croatian
-    model: hr_core_news_md
+    model: hr_core_news_lg
     phone_context: [telefon, broj, mobitel, poziv, nazovi, zvati]
 
   # Danish
   da:
     name: Danish
-    model: da_core_news_md
+    model: da_core_news_lg
     phone_context: [telefon, nummer, mobil, mobiltelefon, opkald, ringe]
 
   # Dutch
   nl:
     name: Dutch
-    model: nl_core_news_md
+    model: nl_core_news_lg
     phone_context: [telefoon, nummer, mobiel, mobieltje, GSM, bellen]
 
   # English (Presidio defaults)
@@ -52,13 +49,13 @@ languages:
   # Finnish
   fi:
     name: Finnish
-    model: fi_core_news_md
+    model: fi_core_news_lg
     phone_context: [puhelin, numero, kännykkä, matkapuhelin, soittaa, puhelinnumero]
 
   # French
   fr:
     name: French
-    model: fr_core_news_md
+    model: fr_core_news_lg
     phone_context: [téléphone, numéro, portable, mobile, appeler, tél]
 
   # German
@@ -70,89 +67,89 @@ languages:
   # Greek
   el:
     name: Greek
-    model: el_core_news_md
+    model: el_core_news_lg
     phone_context: [τηλέφωνο, αριθμός, κινητό, κλήση, τηλεφωνώ, καλώ]
 
   # Italian
   it:
     name: Italian
-    model: it_core_news_md
+    model: it_core_news_lg
     phone_context: [telefono, numero, cellulare, telefonino, chiamare, chiamata]
 
   # Japanese
   ja:
     name: Japanese
-    model: ja_core_news_md
+    model: ja_core_news_lg
     phone_context: [電話, 携帯, 番号, スマホ, ケータイ, 電話番号]
 
   # Korean
   ko:
     name: Korean
-    model: ko_core_news_md
+    model: ko_core_news_lg
     phone_context: [전화, 휴대폰, 핸드폰, 번호, 전화번호, 통화]
 
   # Lithuanian
   lt:
     name: Lithuanian
-    model: lt_core_news_md
+    model: lt_core_news_lg
     phone_context: [telefonas, numeris, mobilusis, skambutis, skambinti]
 
   # Macedonian
   mk:
     name: Macedonian
-    model: mk_core_news_md
+    model: mk_core_news_lg
     phone_context: [телефон, број, мобилен, повик, звони]
 
   # Norwegian Bokmål
   nb:
     name: Norwegian
-    model: nb_core_news_md
+    model: nb_core_news_lg
     phone_context: [telefon, nummer, mobil, mobiltelefon, samtale, ringe]
 
   # Polish
   pl:
     name: Polish
-    model: pl_core_news_md
+    model: pl_core_news_lg
     phone_context: [telefon, numer, komórka, komórkowy, dzwoń, zadzwoń]
 
   # Portuguese
   pt:
     name: Portuguese
-    model: pt_core_news_md
+    model: pt_core_news_lg
     phone_context: [telefone, número, celular, telemóvel, ligar, telefonar]
 
   # Romanian
   ro:
     name: Romanian
-    model: ro_core_news_md
+    model: ro_core_news_lg
     phone_context: [telefon, număr, mobil, apel, suna]
 
   # Russian
   ru:
     name: Russian
-    model: ru_core_news_md
+    model: ru_core_news_lg
     phone_context: [телефон, номер, мобильник, мобила, сотовый, звонок]
 
   # Slovenian
   sl:
     name: Slovenian
-    model: sl_core_news_md
+    model: sl_core_news_lg
     phone_context: [telefon, številka, mobilnik, mobilec, klic, pokliči]
 
   # Spanish
   es:
     name: Spanish
-    model: es_core_news_md
+    model: es_core_news_lg
     phone_context: [teléfono, número, móvil, celular, llamar, llamada]
 
   # Swedish
   sv:
     name: Swedish
-    model: sv_core_news_md
+    model: sv_core_news_lg
     phone_context: [telefon, nummer, mobil, mobiltelefon, samtal, ringa]
 
   # Ukrainian
   uk:
     name: Ukrainian
-    model: uk_core_news_md
+    model: uk_core_news_lg
     phone_context: [телефон, номер, мобільний, мобілка, дзвінок, дзвони]

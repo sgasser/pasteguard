@@ -52,19 +52,28 @@ pii_detection:
   # Supported languages for PII detection
   # Auto-detects language from input text and uses appropriate model
   #
-  # Languages must match what was installed during docker build:
-  #   LANGUAGES=en,de docker-compose build
+  # Languages are determined by Docker image:
+  #   - latest/en: English only
+  #   - eu: en, de, es, fr, it, nl, pl, pt, ro
+  #   - Custom build: LANGUAGES=en,de,ja docker compose up -d --build
+  #
+  # Runtime restriction (can only restrict, not add):
+  #   docker run -e PASTEGUARD_LANGUAGES=en,de ... ghcr.io/sgasser/pasteguard:eu
   #
   # Available (24 languages): ca, zh, hr, da, nl, en, fi, fr, de, el,
   #   it, ja, ko, lt, mk, nb, pl, pt, ro, ru, sl, es, sv, uk
-  # See presidio/languages.yaml for full list with details
+  # See docker/presidio/languages.yaml for full list with details
   languages:
     - en
-    # Add more languages to match your Docker build:
+    # EU image has these enabled by default:
     # - de
-    # - fr
     # - es
+    # - fr
     # - it
+    # - nl
+    # - pl
+    # - pt
+    # - ro
 
   # Fallback language if detected language is not in the list above
   fallback_language: en
