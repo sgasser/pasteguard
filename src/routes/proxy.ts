@@ -1,7 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Context } from "hono";
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { proxy } from "hono/proxy";
 import { z } from "zod";
 import { getConfig, type MaskingConfig } from "../config";
@@ -12,11 +11,12 @@ import {
 } from "../secrets/detect";
 import { type RedactionContext, redactSecrets, unredactResponse } from "../secrets/redact";
 import { getRouter, type MaskDecision, type RoutingDecision } from "../services/decision";
-import type {
-  ChatCompletionRequest,
-  ChatCompletionResponse,
-  ChatMessage,
-  LLMResult,
+import {
+  type ChatCompletionRequest,
+  type ChatCompletionResponse,
+  type ChatMessage,
+  LLMError,
+  type LLMResult,
 } from "../services/llm-client";
 import { logRequest, type RequestLogData } from "../services/logger";
 import { unmaskResponse } from "../services/masking";
@@ -46,6 +46,41 @@ export const proxyRoutes = new Hono();
  */
 function isMaskDecision(decision: RoutingDecision): decision is MaskDecision {
   return decision.mode === "mask";
+}
+
+/**
+ * Create log data for error responses
+ */
+function createErrorLogData(
+  body: ChatCompletionRequest,
+  startTime: number,
+  statusCode: number,
+  errorMessage: string,
+  decision?: RoutingDecision,
+  secretsResult?: SecretsDetectionResult,
+  maskedContent?: string,
+): RequestLogData {
+  const config = getConfig();
+  return {
+    timestamp: new Date().toISOString(),
+    mode: decision?.mode ?? config.mode,
+    provider: decision?.provider ?? "upstream",
+    model: body.model || "unknown",
+    piiDetected: decision?.piiResult.hasPII ?? false,
+    entities: decision
+      ? [...new Set(decision.piiResult.newEntities.map((e) => e.entity_type))]
+      : [],
+    latencyMs: Date.now() - startTime,
+    scanTimeMs: decision?.piiResult.scanTimeMs ?? 0,
+    language: decision?.piiResult.language ?? config.pii_detection.fallback_language,
+    languageFallback: decision?.piiResult.languageFallback ?? false,
+    detectedLanguage: decision?.piiResult.detectedLanguage,
+    maskedContent,
+    secretsDetected: secretsResult?.detected,
+    secretsTypes: secretsResult?.matches.map((m) => m.type),
+    statusCode,
+    errorMessage,
+  };
 }
 
 proxyRoutes.get("/models", (c) => {
@@ -153,7 +188,23 @@ proxyRoutes.post(
       decision = await router.decide(body.messages, secretsResult);
     } catch (error) {
       console.error("PII detection error:", error);
-      throw new HTTPException(503, { message: "PII detection service unavailable" });
+      const errorMessage = "PII detection service unavailable";
+      logRequest(
+        createErrorLogData(body, startTime, 503, errorMessage, undefined, secretsResult),
+        c.req.header("User-Agent") || null,
+      );
+
+      return c.json(
+        {
+          error: {
+            message: errorMessage,
+            type: "server_error",
+            param: null,
+            code: "service_unavailable",
+          },
+        },
+        503,
+      );
     }
 
     return handleCompletion(
@@ -317,14 +368,31 @@ async function handleCompletion(
     maskedContent = formatMessagesForLog(decision.maskedMessages);
   }
 
+  // Determine secrets state
+  const secretsDetected = secretsResult?.detected ?? false;
+  const secretsTypes = secretsResult?.matches.map((m) => m.type) ?? [];
+
+  // Set response headers (included automatically by c.json/c.body)
+  c.header("X-PasteGuard-Mode", decision.mode);
+  c.header("X-PasteGuard-Provider", decision.provider);
+  c.header("X-PasteGuard-PII-Detected", decision.piiResult.hasPII.toString());
+  c.header("X-PasteGuard-Language", decision.piiResult.language);
+  if (decision.piiResult.languageFallback) {
+    c.header("X-PasteGuard-Language-Fallback", "true");
+  }
+  if (decision.mode === "mask") {
+    c.header("X-PasteGuard-PII-Masked", decision.piiResult.hasPII.toString());
+  }
+  if (secretsDetected && secretsTypes.length > 0) {
+    c.header("X-PasteGuard-Secrets-Detected", "true");
+    c.header("X-PasteGuard-Secrets-Types", secretsTypes.join(","));
+  }
+  if (secretsRedacted) {
+    c.header("X-PasteGuard-Secrets-Redacted", "true");
+  }
+
   try {
     const result = await client.chatCompletion(request, authHeader);
-
-    // Determine secrets state from passed result
-    const secretsDetected = secretsResult?.detected ?? false;
-    const secretsTypes = secretsResult?.matches.map((m) => m.type) ?? [];
-
-    setPasteGuardHeaders(c, decision, secretsDetected, secretsTypes, secretsRedacted);
 
     if (result.isStreaming) {
       return handleStreamingResponse(
@@ -353,37 +421,56 @@ async function handleCompletion(
     );
   } catch (error) {
     console.error("LLM request error:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
-    throw new HTTPException(502, { message: `LLM provider error: ${message}` });
-  }
-}
 
-/**
- * Set X-PasteGuard response headers
- */
-function setPasteGuardHeaders(
-  c: Context,
-  decision: RoutingDecision,
-  secretsDetected?: boolean,
-  secretsTypes?: string[],
-  secretsRedacted?: boolean,
-) {
-  c.header("X-PasteGuard-Mode", decision.mode);
-  c.header("X-PasteGuard-Provider", decision.provider);
-  c.header("X-PasteGuard-PII-Detected", decision.piiResult.hasPII.toString());
-  c.header("X-PasteGuard-Language", decision.piiResult.language);
-  if (decision.piiResult.languageFallback) {
-    c.header("X-PasteGuard-Language-Fallback", "true");
-  }
-  if (decision.mode === "mask") {
-    c.header("X-PasteGuard-PII-Masked", decision.piiResult.hasPII.toString());
-  }
-  if (secretsDetected && secretsTypes && secretsTypes.length > 0) {
-    c.header("X-PasteGuard-Secrets-Detected", "true");
-    c.header("X-PasteGuard-Secrets-Types", secretsTypes.join(","));
-  }
-  if (secretsRedacted) {
-    c.header("X-PasteGuard-Secrets-Redacted", "true");
+    // Pass through upstream LLM errors with original status code
+    if (error instanceof LLMError) {
+      logRequest(
+        createErrorLogData(
+          body,
+          startTime,
+          error.status,
+          error.message,
+          decision,
+          secretsResult,
+          maskedContent,
+        ),
+        c.req.header("User-Agent") || null,
+      );
+
+      // Pass through upstream error - must use Response for dynamic status code
+      return new Response(error.body, {
+        status: error.status,
+        headers: c.res.headers,
+      });
+    }
+
+    // For other errors (network, timeout, etc.), return 502 in OpenAI-compatible format
+    const message = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = `Provider error: ${message}`;
+    logRequest(
+      createErrorLogData(
+        body,
+        startTime,
+        502,
+        errorMessage,
+        decision,
+        secretsResult,
+        maskedContent,
+      ),
+      c.req.header("User-Agent") || null,
+    );
+
+    return c.json(
+      {
+        error: {
+          message: errorMessage,
+          type: "server_error",
+          param: null,
+          code: "upstream_error",
+        },
+      },
+      502,
+    );
   }
 }
 

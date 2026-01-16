@@ -59,6 +59,20 @@ export type LLMResult =
     };
 
 /**
+ * Error from upstream LLM provider with original status code and response
+ */
+export class LLMError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly statusText: string,
+    public readonly body: string,
+  ) {
+    super(`API error: ${status} ${statusText}`);
+    this.name = "LLMError";
+  }
+}
+
+/**
  * LLM Client for OpenAI-compatible APIs (OpenAI, Ollama, etc.)
  */
 export class LLMClient {
@@ -134,7 +148,7 @@ export class LLMClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`LLM API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new LLMError(response.status, response.statusText, errorText);
     }
 
     if (isStreaming) {

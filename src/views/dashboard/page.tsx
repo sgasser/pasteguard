@@ -373,6 +373,9 @@ const LogsSection: FC = () => (
 							<th class="bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
 								Time
 							</th>
+							<th class="bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
+								Status
+							</th>
 							<th class="route-only bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
 								Provider
 							</th>
@@ -395,7 +398,7 @@ const LogsSection: FC = () => (
 					</thead>
 					<tbody id="logs-body">
 						<tr>
-							<td colSpan={7}>
+							<td colSpan={8}>
 								<div class="flex flex-col justify-center items-center p-10 gap-3">
 									<div class="loader-bars">
 										<div class="loader-bar" />
@@ -554,7 +557,7 @@ async function fetchLogs() {
     const tbody = document.getElementById('logs-body');
 
     if (data.logs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7"><div class="text-center py-10 text-text-muted"><div class="text-2xl mb-3 opacity-40">📋</div><div class="text-sm">No requests yet</div></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8"><div class="text-center py-10 text-text-muted"><div class="text-2xl mb-3 opacity-40">📋</div><div class="text-sm">No requests yet</div></div></td></tr>';
       return;
     }
 
@@ -563,6 +566,7 @@ async function fetchLogs() {
       const entities = log.entities ? log.entities.split(',').filter(e => e.trim()) : [];
       const secretsTypes = log.secrets_types ? log.secrets_types.split(',').filter(s => s.trim()) : [];
       const secretsDetected = log.secrets_detected === 1;
+      const isError = log.status_code && log.status_code >= 400;
       const lang = log.language || 'en';
       const detectedLang = log.detected_language;
 
@@ -575,12 +579,17 @@ async function fetchLogs() {
       const logId = log.id || index;
       const isExpanded = expandedRowId === logId;
 
+      const statusBadge = isError
+        ? '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide bg-error/10 text-error">' + log.status_code + '</span>'
+        : '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide bg-success/10 text-success">OK</span>';
+
       const mainRow =
         '<tr id="log-' + logId + '" class="cursor-pointer transition-colors hover:bg-elevated ' + (isExpanded ? 'log-row-expanded bg-elevated' : '') + '" onclick="toggleRow(' + logId + ')">' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
             '<span id="arrow-' + logId + '" class="arrow-icon inline-flex items-center justify-center w-[18px] h-[18px] mr-2 rounded-sm bg-elevated text-text-muted text-[0.65rem] transition-transform ' + (isExpanded ? 'rotate-90 bg-accent/10 text-accent' : '') + '">▶</span>' +
             '<span class="font-mono text-[0.7rem] text-text-secondary">' + time + '</span>' +
           '</td>' +
+          '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' + statusBadge + '</td>' +
           '<td class="route-only text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
             '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide ' +
               (log.provider === 'upstream' ? 'bg-info/10 text-info' : 'bg-success/10 text-success') + '">' + log.provider + '</span>' +
@@ -600,12 +609,14 @@ async function fetchLogs() {
           '<td class="font-mono text-[0.7rem] text-teal px-4 py-3 border-b border-border-subtle align-middle">' + log.scan_time_ms + 'ms</td>' +
         '</tr>';
 
+      const detailContent = isError && log.error_message
+        ? '<div class="font-mono text-xs leading-relaxed text-error bg-error/10 border border-error/20 rounded-lg p-3 whitespace-pre-wrap break-words">' + log.error_message.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>'
+        : '<div class="font-mono text-xs leading-relaxed text-text-secondary bg-surface border border-border-subtle rounded-lg p-3 whitespace-pre-wrap break-words">' + formatMaskedPreview(log.masked_content, entities) + '</div>';
+
       const detailRow =
         '<tr id="detail-' + logId + '" class="' + (isExpanded ? 'detail-row-visible' : 'hidden') + '">' +
-          '<td colspan="7" class="p-0 bg-detail border-b border-border-subtle">' +
-            '<div class="p-4 px-5 animate-slide-down">' +
-              '<div class="font-mono text-xs leading-relaxed text-text-secondary bg-surface border border-border-subtle rounded-lg p-3 whitespace-pre-wrap break-words">' + formatMaskedPreview(log.masked_content, entities) + '</div>' +
-            '</div>' +
+          '<td colspan="8" class="p-0 bg-detail border-b border-border-subtle">' +
+            '<div class="p-4 px-5 animate-slide-down">' + detailContent + '</div>' +
           '</td>' +
         '</tr>';
 

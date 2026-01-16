@@ -21,6 +21,8 @@ export interface RequestLog {
   masked_content: string | null;
   secrets_detected: number | null;
   secrets_types: string | null;
+  status_code: number | null;
+  error_message: string | null;
 }
 
 /**
@@ -84,13 +86,17 @@ export class Logger {
       )
     `);
 
-    // Migrate existing databases: add secrets columns if missing
+    // Migrate existing databases: add missing columns
     const columns = this.db.prepare("PRAGMA table_info(request_logs)").all() as Array<{
       name: string;
     }>;
     if (!columns.find((c) => c.name === "secrets_detected")) {
       this.db.run("ALTER TABLE request_logs ADD COLUMN secrets_detected INTEGER");
       this.db.run("ALTER TABLE request_logs ADD COLUMN secrets_types TEXT");
+    }
+    if (!columns.find((c) => c.name === "status_code")) {
+      this.db.run("ALTER TABLE request_logs ADD COLUMN status_code INTEGER");
+      this.db.run("ALTER TABLE request_logs ADD COLUMN error_message TEXT");
     }
 
     // Create indexes for performance
@@ -108,9 +114,9 @@ export class Logger {
   log(entry: Omit<RequestLog, "id">): void {
     const stmt = this.db.prepare(`
       INSERT INTO request_logs
-        (timestamp, mode, provider, model, pii_detected, entities, latency_ms, scan_time_ms, prompt_tokens, completion_tokens, user_agent, language, language_fallback, detected_language, masked_content, secrets_detected, secrets_types)
+        (timestamp, mode, provider, model, pii_detected, entities, latency_ms, scan_time_ms, prompt_tokens, completion_tokens, user_agent, language, language_fallback, detected_language, masked_content, secrets_detected, secrets_types, status_code, error_message)
       VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -131,6 +137,8 @@ export class Logger {
       entry.masked_content,
       entry.secrets_detected ?? null,
       entry.secrets_types ?? null,
+      entry.status_code ?? null,
+      entry.error_message ?? null,
     );
   }
 
@@ -288,6 +296,8 @@ export interface RequestLogData {
   maskedContent?: string;
   secretsDetected?: boolean;
   secretsTypes?: string[];
+  statusCode?: number;
+  errorMessage?: string;
 }
 
 export function logRequest(data: RequestLogData, userAgent: string | null): void {
@@ -321,6 +331,8 @@ export function logRequest(data: RequestLogData, userAgent: string | null): void
       masked_content: shouldLogContent ? (data.maskedContent ?? null) : null,
       secrets_detected: data.secretsDetected !== undefined ? (data.secretsDetected ? 1 : 0) : null,
       secrets_types: shouldLogSecretTypes ? data.secretsTypes!.join(",") : null,
+      status_code: data.statusCode ?? null,
+      error_message: data.errorMessage ?? null,
     });
   } catch (error) {
     console.error("Failed to log request:", error);
