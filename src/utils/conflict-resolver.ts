@@ -17,10 +17,6 @@ function overlaps(a: Interval, b: Interval): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
-function isContainedIn(a: Interval, b: Interval): boolean {
-  return b.start <= a.start && b.end >= a.end;
-}
-
 function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
   const groups = new Map<string, T[]>();
   for (const item of items) {
@@ -32,10 +28,7 @@ function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
   return groups;
 }
 
-function mergeOverlapping<T extends Interval>(
-  intervals: T[],
-  merge: (a: T, b: T) => T,
-): T[] {
+function mergeOverlapping<T extends Interval>(intervals: T[], merge: (a: T, b: T) => T): T[] {
   if (intervals.length <= 1) return [...intervals];
 
   const sorted = [...intervals].sort((a, b) => a.start - b.start);

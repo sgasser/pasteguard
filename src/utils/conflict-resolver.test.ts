@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  type EntityWithScore,
-  resolveConflicts,
-  resolveOverlaps,
-} from "./conflict-resolver";
+import { type EntityWithScore, resolveConflicts, resolveOverlaps } from "./conflict-resolver";
 
 describe("resolveConflicts", () => {
   test("empty input returns empty array", () => {
