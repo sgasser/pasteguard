@@ -1,0 +1,130 @@
+---
+title: Installation
+description: Docker images and deployment options
+---
+
+# Installation
+
+PasteGuard runs as a single all-in-one Docker container that includes both the proxy and PII detection.
+
+## Quick Start
+
+```bash
+docker run -d --name pasteguard -p 3000:3000 \
+  -v pasteguard-data:/app/data \
+  ghcr.io/sgasser/pasteguard:latest
+```
+
+Verify: `curl http://localhost:3000/health`
+
+Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
+
+## Prebuilt Images
+
+| Tag | Languages | Use Case |
+|-----|-----------|----------|
+| `latest` / `en` | English | English-only teams |
+| `eu` | en, de, es, fr, it, nl, pl, pt, ro | European businesses |
+
+## European Languages
+
+The `eu` image includes all European languages enabled by default:
+
+```bash
+docker run -d --name pasteguard -p 3000:3000 \
+  -v pasteguard-data:/app/data \
+  ghcr.io/sgasser/pasteguard:eu
+```
+
+Works out of the box — no configuration needed.
+
+## Custom Configuration
+
+For advanced settings, mount a config file:
+
+```bash
+curl -O https://raw.githubusercontent.com/sgasser/pasteguard/main/config.example.yaml
+mv config.example.yaml config.yaml
+# Edit config.yaml
+
+docker run -d --name pasteguard -p 3000:3000 \
+  -v ./config.yaml:/app/config.yaml \
+  -v pasteguard-data:/app/data \
+  ghcr.io/sgasser/pasteguard:latest
+```
+
+See [Configuration](/configuration/overview) for all options.
+
+### Restrict Languages at Runtime
+
+Use the `PASTEGUARD_LANGUAGES` environment variable to restrict which installed languages are used:
+
+```bash
+# EU image has 9 languages, but only use English and German
+docker run -d --name pasteguard -p 3000:3000 \
+  -e PASTEGUARD_LANGUAGES=en,de \
+  -v pasteguard-data:/app/data \
+  ghcr.io/sgasser/pasteguard:eu
+```
+
+<Warning>
+This can only restrict to languages already installed in the image. To add languages not in the image, use a [custom build](#custom-language-builds).
+</Warning>
+
+## Docker Compose
+
+```yaml
+services:
+  pasteguard:
+    image: ghcr.io/sgasser/pasteguard:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - pasteguard-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  pasteguard-data:
+```
+
+```bash
+docker compose up -d
+```
+
+## Custom Language Builds
+
+For languages not in prebuilt images (Nordic, Asian, Eastern European):
+
+```bash
+git clone https://github.com/sgasser/pasteguard.git
+cd pasteguard
+LANGUAGES=en,de,ja docker compose up -d --build
+```
+
+### Available Languages (24)
+
+| Code | Language | Code | Language |
+|------|----------|------|----------|
+| `en` | English | `ja` | Japanese |
+| `de` | German | `ko` | Korean |
+| `fr` | French | `zh` | Chinese |
+| `es` | Spanish | `sv` | Swedish |
+| `it` | Italian | `da` | Danish |
+| `nl` | Dutch | `nb` | Norwegian |
+| `pt` | Portuguese | `fi` | Finnish |
+| `pl` | Polish | `el` | Greek |
+| `ru` | Russian | `ro` | Romanian |
+| `uk` | Ukrainian | `hr` | Croatian |
+| `ca` | Catalan | `sl` | Slovenian |
+| `lt` | Lithuanian | `mk` | Macedonian |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Make your first request
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Customize PasteGuard
+  </Card>
+</CardGroup>
