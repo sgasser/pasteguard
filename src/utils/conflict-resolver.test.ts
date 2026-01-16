@@ -5,17 +5,19 @@ import {
   resolveOverlaps,
 } from "./conflict-resolver";
 
-describe("resolveConflicts (Presidio-style)", () => {
-  test("returns empty array for empty input", () => {
+describe("resolveConflicts", () => {
+  test("empty input returns empty array", () => {
     expect(resolveConflicts([])).toEqual([]);
   });
 
-  test("returns single entity unchanged", () => {
+  test("single entity unchanged", () => {
     const entities = [{ start: 0, end: 5, score: 0.9, entity_type: "PERSON" }];
-    expect(resolveConflicts(entities)).toEqual(entities);
+    const result = resolveConflicts(entities);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(entities[0]);
   });
 
-  test("keeps non-overlapping entities", () => {
+  test("non-overlapping entities kept", () => {
     const entities = [
       { start: 0, end: 5, score: 0.9, entity_type: "PERSON" },
       { start: 10, end: 15, score: 0.8, entity_type: "PERSON" },
@@ -23,7 +25,7 @@ describe("resolveConflicts (Presidio-style)", () => {
     expect(resolveConflicts(entities)).toHaveLength(2);
   });
 
-  test("keeps adjacent entities (not overlapping)", () => {
+  test("adjacent entities kept", () => {
     const entities = [
       { start: 0, end: 4, score: 0.9, entity_type: "PERSON" },
       { start: 4, end: 9, score: 0.8, entity_type: "PERSON" },
@@ -31,9 +33,7 @@ describe("resolveConflicts (Presidio-style)", () => {
     expect(resolveConflicts(entities)).toHaveLength(2);
   });
 
-  // Presidio behavior: same type overlapping -> merge
-  test("merges overlapping entities of SAME type", () => {
-    // "Eric" (0-4) and "Eric's" (0-6) both PERSON -> merge to (0-6)
+  test("same type overlapping merged", () => {
     const entities = [
       { start: 0, end: 4, score: 0.85, entity_type: "PERSON" },
       { start: 0, end: 6, score: 0.8, entity_type: "PERSON" },
@@ -42,12 +42,10 @@ describe("resolveConflicts (Presidio-style)", () => {
     expect(result).toHaveLength(1);
     expect(result[0].start).toBe(0);
     expect(result[0].end).toBe(6);
-    expect(result[0].score).toBe(0.85); // keeps highest score
+    expect(result[0].score).toBe(0.85);
   });
 
-  // Presidio behavior: different type, one contained -> remove contained
-  test("removes contained entity of DIFFERENT type (keeps larger)", () => {
-    // "123" detected as PHONE (0-10) and SSN (2-8) -> keep larger
+  test("different type contained removed", () => {
     const entities = [
       { start: 0, end: 10, score: 0.7, entity_type: "PHONE_NUMBER" },
       { start: 2, end: 8, score: 0.9, entity_type: "US_SSN" },
@@ -57,8 +55,7 @@ describe("resolveConflicts (Presidio-style)", () => {
     expect(result[0].entity_type).toBe("PHONE_NUMBER");
   });
 
-  // Presidio behavior: same indices, different type -> higher score wins
-  test("keeps higher score when same indices different types", () => {
+  test("same indices different types higher score wins", () => {
     const entities = [
       { start: 0, end: 10, score: 0.6, entity_type: "URL" },
       { start: 0, end: 10, score: 0.9, entity_type: "EMAIL_ADDRESS" },
@@ -68,34 +65,30 @@ describe("resolveConflicts (Presidio-style)", () => {
     expect(result[0].entity_type).toBe("EMAIL_ADDRESS");
   });
 
-  // The original bug case: "Eric" vs "Eric's"
-  test("handles Eric vs Eric's case correctly", () => {
-    // Given Eric's feedback -> Presidio returns both "Eric" and "Eric's"
+  test("Eric vs Eric's merged correctly", () => {
     const entities = [
-      { start: 6, end: 10, score: 0.85, entity_type: "PERSON" }, // "Eric"
-      { start: 6, end: 12, score: 0.8, entity_type: "PERSON" }, // "Eric's"
+      { start: 6, end: 10, score: 0.85, entity_type: "PERSON" },
+      { start: 6, end: 12, score: 0.8, entity_type: "PERSON" },
     ];
     const result = resolveConflicts(entities);
     expect(result).toHaveLength(1);
-    // Should merge to cover full span with highest score
     expect(result[0].start).toBe(6);
     expect(result[0].end).toBe(12);
     expect(result[0].score).toBe(0.85);
   });
 
-  test("handles multiple overlap groups", () => {
+  test("multiple overlap groups", () => {
     const entities = [
       { start: 0, end: 5, score: 0.9, entity_type: "PERSON" },
-      { start: 2, end: 7, score: 0.8, entity_type: "PERSON" }, // overlaps with first
+      { start: 2, end: 7, score: 0.8, entity_type: "PERSON" },
       { start: 20, end: 25, score: 0.9, entity_type: "PERSON" },
-      { start: 22, end: 28, score: 0.85, entity_type: "PERSON" }, // overlaps with third
+      { start: 22, end: 28, score: 0.85, entity_type: "PERSON" },
     ];
     const result = resolveConflicts(entities);
-    // Each group should merge into one
     expect(result).toHaveLength(2);
   });
 
-  test("preserves additional entity properties", () => {
+  test("preserves extra properties", () => {
     interface ExtendedEntity extends EntityWithScore {
       extra: string;
     }
@@ -106,51 +99,46 @@ describe("resolveConflicts (Presidio-style)", () => {
     expect(result[0].extra).toBe("data");
   });
 
-  test("does not mutate input entities", () => {
+  test("does not mutate input", () => {
     const entities = [
       { start: 0, end: 4, score: 0.85, entity_type: "PERSON" },
       { start: 0, end: 6, score: 0.8, entity_type: "PERSON" },
     ];
-    // Save original values
-    const originalStart = entities[0].start;
-    const originalEnd = entities[0].end;
-
+    const copy = JSON.parse(JSON.stringify(entities));
     resolveConflicts(entities);
-
-    // Original should be unchanged
-    expect(entities[0].start).toBe(originalStart);
-    expect(entities[0].end).toBe(originalEnd);
-    expect(entities).toHaveLength(2); // Array not modified
+    expect(entities).toEqual(copy);
   });
 });
 
-describe("resolveOverlaps (for secrets without scores)", () => {
-  test("returns empty array for empty input", () => {
+describe("resolveOverlaps", () => {
+  test("empty input returns empty array", () => {
     expect(resolveOverlaps([])).toEqual([]);
   });
 
-  test("returns single entity unchanged", () => {
+  test("single entity unchanged", () => {
     const entities = [{ start: 0, end: 5 }];
-    expect(resolveOverlaps(entities)).toEqual(entities);
+    const result = resolveOverlaps(entities);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(entities[0]);
   });
 
-  test("keeps non-overlapping entities", () => {
+  test("non-overlapping entities kept", () => {
     const entities = [
       { start: 0, end: 5 },
       { start: 10, end: 15 },
     ];
-    expect(resolveOverlaps(entities)).toEqual(entities);
+    expect(resolveOverlaps(entities)).toHaveLength(2);
   });
 
-  test("keeps adjacent entities", () => {
+  test("adjacent entities kept", () => {
     const entities = [
       { start: 0, end: 4 },
       { start: 4, end: 9 },
     ];
-    expect(resolveOverlaps(entities)).toEqual(entities);
+    expect(resolveOverlaps(entities)).toHaveLength(2);
   });
 
-  test("keeps longer when same start position", () => {
+  test("same start longer wins", () => {
     const entities = [
       { start: 6, end: 10 },
       { start: 6, end: 12 },
@@ -160,7 +148,7 @@ describe("resolveOverlaps (for secrets without scores)", () => {
     expect(result[0].end).toBe(12);
   });
 
-  test("removes overlapping entity", () => {
+  test("overlapping keeps first", () => {
     const entities = [
       { start: 0, end: 10 },
       { start: 5, end: 15 },
@@ -168,9 +156,10 @@ describe("resolveOverlaps (for secrets without scores)", () => {
     const result = resolveOverlaps(entities);
     expect(result).toHaveLength(1);
     expect(result[0].start).toBe(0);
+    expect(result[0].end).toBe(10);
   });
 
-  test("removes nested entity", () => {
+  test("nested entity removed", () => {
     const entities = [
       { start: 0, end: 14 },
       { start: 4, end: 8 },
@@ -178,5 +167,15 @@ describe("resolveOverlaps (for secrets without scores)", () => {
     const result = resolveOverlaps(entities);
     expect(result).toHaveLength(1);
     expect(result[0].end).toBe(14);
+  });
+
+  test("does not mutate input", () => {
+    const entities = [
+      { start: 0, end: 10 },
+      { start: 5, end: 15 },
+    ];
+    const copy = JSON.parse(JSON.stringify(entities));
+    resolveOverlaps(entities);
+    expect(entities).toEqual(copy);
   });
 });
