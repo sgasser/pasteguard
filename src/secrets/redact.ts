@@ -1,6 +1,6 @@
 import { findPartialPlaceholderStart, generateSecretPlaceholder } from "../constants/placeholders";
 import type { ChatCompletionResponse, ChatMessage } from "../services/llm-client";
-import { resolveConflictsSimple } from "../utils/conflict-resolver";
+import { resolveOverlaps } from "../utils/conflict-resolver";
 import { extractTextContent } from "../utils/content";
 import type { SecretsRedaction } from "./detect";
 
@@ -67,7 +67,7 @@ export function redactSecrets(
   }
 
   // Resolve conflicts between overlapping redactions
-  const resolved = resolveConflictsSimple(redactions);
+  const resolved = resolveOverlaps(redactions);
 
   // First pass: sort by start position ascending to assign placeholders in order of appearance
   const sortedByStart = [...resolved].sort((a, b) => a.start - b.start);

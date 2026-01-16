@@ -1,9 +1,5 @@
-/**
- * Conflict resolution for overlapping entities
- *
- * Based on Microsoft Presidio's conflict resolution logic:
- * https://github.com/microsoft/presidio/blob/main/presidio-anonymizer/presidio_anonymizer/anonymizer_engine.py
- */
+// Conflict resolution based on Microsoft Presidio's logic
+// https://github.com/microsoft/presidio/blob/main/presidio-anonymizer/presidio_anonymizer/anonymizer_engine.py
 
 export interface EntityWithScore {
   start: number;
@@ -36,9 +32,6 @@ function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
   return groups;
 }
 
-/**
- * Merge overlapping intervals. Returns new array (does not mutate input).
- */
 function mergeOverlapping<T extends Interval>(
   intervals: T[],
   merge: (a: T, b: T) => T,
@@ -53,7 +46,6 @@ function mergeOverlapping<T extends Interval>(
     const last = result[result.length - 1];
 
     if (overlaps(current, last)) {
-      // Replace last with merged interval
       result[result.length - 1] = merge(last, current);
     } else {
       result.push(current);
@@ -63,13 +55,9 @@ function mergeOverlapping<T extends Interval>(
   return result;
 }
 
-/**
- * Remove entities that are contained in another or have same indices with lower score.
- */
 function removeConflicting<T extends EntityWithScore>(entities: T[]): T[] {
   if (entities.length <= 1) return [...entities];
 
-  // Sort by start, then by score descending (higher score first)
   const sorted = [...entities].sort((a, b) => {
     if (a.start !== b.start) return a.start - b.start;
     if (a.end !== b.end) return a.end - b.end;
@@ -94,12 +82,7 @@ function removeConflicting<T extends EntityWithScore>(entities: T[]): T[] {
   return result;
 }
 
-/**
- * Resolve conflicts between overlapping entities using Presidio's algorithm.
- *
- * Phase 1: Merge overlapping entities of the same type (expand boundaries, keep highest score)
- * Phase 2: Remove conflicting entities of different types (contained or same indices with lower score)
- */
+/** For PII entities with scores. Merges same-type overlaps, removes cross-type conflicts. */
 export function resolveConflicts<T extends EntityWithScore>(entities: T[]): T[] {
   if (entities.length <= 1) return [...entities];
 
@@ -119,11 +102,8 @@ export function resolveConflicts<T extends EntityWithScore>(entities: T[]): T[] 
   return removeConflicting(afterMerge);
 }
 
-/**
- * Simple overlap resolution for entities without scores.
- * Uses length as tiebreaker (longer wins). For secrets detection.
- */
-export function resolveConflictsSimple<T extends Interval>(entities: T[]): T[] {
+/** For secrets without scores. Keeps non-overlapping, longer wins ties. */
+export function resolveOverlaps<T extends Interval>(entities: T[]): T[] {
   if (entities.length <= 1) return [...entities];
 
   const sorted = [...entities].sort((a, b) => {

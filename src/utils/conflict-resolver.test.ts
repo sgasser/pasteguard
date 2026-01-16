@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   type EntityWithScore,
   resolveConflicts,
-  resolveConflictsSimple,
+  resolveOverlaps,
 } from "./conflict-resolver";
 
 describe("resolveConflicts (Presidio-style)", () => {
@@ -124,14 +124,14 @@ describe("resolveConflicts (Presidio-style)", () => {
   });
 });
 
-describe("resolveConflictsSimple (for secrets without scores)", () => {
+describe("resolveOverlaps (for secrets without scores)", () => {
   test("returns empty array for empty input", () => {
-    expect(resolveConflictsSimple([])).toEqual([]);
+    expect(resolveOverlaps([])).toEqual([]);
   });
 
   test("returns single entity unchanged", () => {
     const entities = [{ start: 0, end: 5 }];
-    expect(resolveConflictsSimple(entities)).toEqual(entities);
+    expect(resolveOverlaps(entities)).toEqual(entities);
   });
 
   test("keeps non-overlapping entities", () => {
@@ -139,7 +139,7 @@ describe("resolveConflictsSimple (for secrets without scores)", () => {
       { start: 0, end: 5 },
       { start: 10, end: 15 },
     ];
-    expect(resolveConflictsSimple(entities)).toEqual(entities);
+    expect(resolveOverlaps(entities)).toEqual(entities);
   });
 
   test("keeps adjacent entities", () => {
@@ -147,7 +147,7 @@ describe("resolveConflictsSimple (for secrets without scores)", () => {
       { start: 0, end: 4 },
       { start: 4, end: 9 },
     ];
-    expect(resolveConflictsSimple(entities)).toEqual(entities);
+    expect(resolveOverlaps(entities)).toEqual(entities);
   });
 
   test("keeps longer when same start position", () => {
@@ -155,7 +155,7 @@ describe("resolveConflictsSimple (for secrets without scores)", () => {
       { start: 6, end: 10 },
       { start: 6, end: 12 },
     ];
-    const result = resolveConflictsSimple(entities);
+    const result = resolveOverlaps(entities);
     expect(result).toHaveLength(1);
     expect(result[0].end).toBe(12);
   });
@@ -165,7 +165,7 @@ describe("resolveConflictsSimple (for secrets without scores)", () => {
       { start: 0, end: 10 },
       { start: 5, end: 15 },
     ];
-    const result = resolveConflictsSimple(entities);
+    const result = resolveOverlaps(entities);
     expect(result).toHaveLength(1);
     expect(result[0].start).toBe(0);
   });
@@ -175,7 +175,7 @@ describe("resolveConflictsSimple (for secrets without scores)", () => {
       { start: 0, end: 14 },
       { start: 4, end: 8 },
     ];
-    const result = resolveConflictsSimple(entities);
+    const result = resolveOverlaps(entities);
     expect(result).toHaveLength(1);
     expect(result[0].end).toBe(14);
   });
