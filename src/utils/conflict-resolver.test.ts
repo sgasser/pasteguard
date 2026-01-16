@@ -108,6 +108,30 @@ describe("resolveConflicts", () => {
     resolveConflicts(entities);
     expect(entities).toEqual(copy);
   });
+
+  test("handles unsorted input", () => {
+    const entities = [
+      { start: 20, end: 25, score: 0.8, entity_type: "PERSON" },
+      { start: 0, end: 5, score: 0.9, entity_type: "PERSON" },
+      { start: 10, end: 15, score: 0.7, entity_type: "PERSON" },
+    ];
+    const result = resolveConflicts(entities);
+    expect(result).toHaveLength(3);
+    expect(result[0].start).toBeLessThan(result[1].start);
+  });
+
+  test("chain of 3 overlapping same type merges to one", () => {
+    const entities = [
+      { start: 0, end: 5, score: 0.9, entity_type: "PERSON" },
+      { start: 3, end: 8, score: 0.8, entity_type: "PERSON" },
+      { start: 6, end: 12, score: 0.85, entity_type: "PERSON" },
+    ];
+    const result = resolveConflicts(entities);
+    expect(result).toHaveLength(1);
+    expect(result[0].start).toBe(0);
+    expect(result[0].end).toBe(12);
+    expect(result[0].score).toBe(0.9);
+  });
 });
 
 describe("resolveOverlaps", () => {
@@ -177,5 +201,18 @@ describe("resolveOverlaps", () => {
     const copy = JSON.parse(JSON.stringify(entities));
     resolveOverlaps(entities);
     expect(entities).toEqual(copy);
+  });
+
+  test("handles unsorted input", () => {
+    const entities = [
+      { start: 20, end: 25 },
+      { start: 0, end: 5 },
+      { start: 10, end: 15 },
+    ];
+    const result = resolveOverlaps(entities);
+    expect(result).toHaveLength(3);
+    expect(result[0].start).toBe(0);
+    expect(result[1].start).toBe(10);
+    expect(result[2].start).toBe(20);
   });
 });
