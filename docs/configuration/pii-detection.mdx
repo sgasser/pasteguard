@@ -49,7 +49,7 @@ Available languages (24):
 
 ### Override Languages
 
-To override the auto-configured languages:
+For local development or custom setups, override via config:
 
 ```yaml
 pii_detection:
@@ -58,24 +58,18 @@ pii_detection:
     - de
 ```
 
-Or via environment variable:
-
-```bash
-docker run -e PASTEGUARD_LANGUAGES=en,de ghcr.io/sgasser/pasteguard:eu
-```
-
-### Single Language
-
-If only one language is configured, language detection is skipped for better performance.
-
 ### Fallback Language
 
-If the detected language isn't in your list, the fallback is used:
+If the detected language isn't in your configured list, the fallback is used:
 
 ```yaml
 pii_detection:
   fallback_language: en  # Used for unsupported languages
 ```
+
+### Performance
+
+If only one language is configured, language detection is skipped for better performance.
 
 ## Entities
 
