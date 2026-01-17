@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { SecretsDetectionResult, SecretsMatch } from "../secrets/detect";
-import type { PIIDetectionResult } from "./pii-detector";
+import type { PIIDetectionResult } from "../pii/detect";
+import type { MessageSecretsResult, SecretsMatch } from "../secrets/detect";
 
 /**
  * Pure routing logic extracted for testing
@@ -8,8 +8,8 @@ import type { PIIDetectionResult } from "./pii-detector";
  */
 function decideRoute(
   piiResult: PIIDetectionResult,
-  secretsResult?: SecretsDetectionResult,
-  secretsAction?: "block" | "redact" | "route_local",
+  secretsResult?: MessageSecretsResult,
+  secretsAction?: "block" | "mask" | "route_local",
 ): { provider: "openai" | "local"; reason: string } {
   // Check for secrets route_local action first (takes precedence)
   if (secretsResult?.detected && secretsAction === "route_local") {
@@ -21,7 +21,7 @@ function decideRoute(
   }
 
   if (piiResult.hasPII) {
-    const entityTypes = [...new Set(piiResult.newEntities.map((e) => e.entity_type))];
+    const entityTypes = [...new Set(piiResult.allEntities.map((e) => e.entity_type))];
     return {
       provider: "local",
       reason: `PII detected: ${entityTypes.join(", ")}`,
@@ -41,7 +41,7 @@ function createPIIResult(
   hasPII: boolean,
   entities: Array<{ entity_type: string }> = [],
 ): PIIDetectionResult {
-  const newEntities = entities.map((e) => ({
+  const allEntities = entities.map((e) => ({
     entity_type: e.entity_type,
     start: 0,
     end: 10,
@@ -50,8 +50,8 @@ function createPIIResult(
 
   return {
     hasPII,
-    newEntities,
-    entitiesByMessage: [newEntities],
+    allEntities,
+    messageEntities: [[allEntities]],
     language: "en",
     languageFallback: false,
     scanTimeMs: 50,
@@ -104,16 +104,16 @@ describe("decideRoute", () => {
 });
 
 /**
- * Helper to create a mock SecretsDetectionResult
+ * Helper to create a mock MessageSecretsResult
  */
 function createSecretsResult(
   detected: boolean,
   matches: SecretsMatch[] = [],
-): SecretsDetectionResult {
+): MessageSecretsResult {
   return {
     detected,
     matches,
-    redactions: matches.map((m, i) => ({ start: i * 100, end: i * 100 + 50, type: m.type })),
+    messageLocations: [],
   };
 }
 
@@ -175,14 +175,14 @@ describe("decideRoute with secrets", () => {
     });
   });
 
-  describe("with redact action", () => {
-    test("ignores secrets detection for routing (redacted before PII check)", () => {
+  describe("with mask action", () => {
+    test("ignores secrets detection for routing (masked before PII check)", () => {
       const piiResult = createPIIResult(false);
       const secretsResult = createSecretsResult(true, [{ type: "BEARER_TOKEN", count: 1 }]);
 
-      const result = decideRoute(piiResult, secretsResult, "redact");
+      const result = decideRoute(piiResult, secretsResult, "mask");
 
-      // With redact action, we route based on PII, not secrets
+      // With mask action, we route based on PII, not secrets
       expect(result.provider).toBe("openai");
       expect(result.reason).toBe("No PII detected");
     });

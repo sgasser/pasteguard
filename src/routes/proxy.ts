@@ -4,12 +4,9 @@ import { Hono } from "hono";
 import { proxy } from "hono/proxy";
 import { z } from "zod";
 import { getConfig, type MaskingConfig } from "../config";
-import {
-  detectSecrets,
-  extractTextFromRequest,
-  type SecretsDetectionResult,
-} from "../secrets/detect";
-import { type RedactionContext, redactSecrets, unredactResponse } from "../secrets/redact";
+import { unmaskResponse as unmaskPIIResponse } from "../pii/mask";
+import { detectSecretsInMessages, type MessageSecretsResult } from "../secrets/detect";
+import { maskMessages as maskSecretsMessages, unmaskSecretsResponse } from "../secrets/mask";
 import { getRouter, type MaskDecision, type RoutingDecision } from "../services/decision";
 import {
   type ChatCompletionRequest,
@@ -19,9 +16,9 @@ import {
   type LLMResult,
 } from "../services/llm-client";
 import { logRequest, type RequestLogData } from "../services/logger";
-import { unmaskResponse } from "../services/masking";
 import { createUnmaskingStream } from "../services/stream-transformer";
-import { type ContentPart, extractTextContent } from "../utils/content";
+import { extractTextContent } from "../utils/content";
+import type { PlaceholderContext } from "../utils/message-transform";
 
 // Request validation schema
 const ChatCompletionSchema = z
@@ -57,7 +54,7 @@ function createErrorLogData(
   statusCode: number,
   errorMessage: string,
   decision?: RoutingDecision,
-  secretsResult?: SecretsDetectionResult,
+  secretsResult?: MessageSecretsResult,
   maskedContent?: string,
 ): RequestLogData {
   const config = getConfig();
@@ -68,7 +65,7 @@ function createErrorLogData(
     model: body.model || "unknown",
     piiDetected: decision?.piiResult.hasPII ?? false,
     entities: decision
-      ? [...new Set(decision.piiResult.newEntities.map((e) => e.entity_type))]
+      ? [...new Set(decision.piiResult.allEntities.map((e) => e.entity_type))]
       : [],
     latencyMs: Date.now() - startTime,
     scanTimeMs: decision?.piiResult.scanTimeMs ?? 0,
@@ -110,14 +107,13 @@ proxyRoutes.post(
     const router = getRouter();
 
     // Track secrets detection state for response handling
-    let secretsResult: SecretsDetectionResult | undefined;
-    let redactionContext: RedactionContext | undefined;
-    let secretsRedacted = false;
+    let secretsResult: MessageSecretsResult | undefined;
+    let secretsMaskingContext: PlaceholderContext | undefined;
+    let secretsMasked = false;
 
-    // Secrets detection runs before PII detection
+    // Secrets detection runs before PII detection (per-part)
     if (config.secrets_detection.enabled) {
-      const text = extractTextFromRequest(body);
-      secretsResult = detectSecrets(text, config.secrets_detection);
+      secretsResult = detectSecretsInMessages(body.messages, config.secrets_detection);
 
       if (secretsResult.detected) {
         const secretTypes = secretsResult.matches.map((m) => m.type);
@@ -125,16 +121,14 @@ proxyRoutes.post(
 
         // Block action - return 400 error
         if (config.secrets_detection.action === "block") {
-          // Set headers before returning error
           c.header("X-PasteGuard-Secrets-Detected", "true");
           c.header("X-PasteGuard-Secrets-Types", secretTypesStr);
 
-          // Log metadata only (no secret content)
           logRequest(
             {
               timestamp: new Date().toISOString(),
               mode: config.mode,
-              provider: "openai", // Note: Request never reached provider
+              provider: "openai",
               model: body.model || "unknown",
               piiDetected: false,
               entities: [],
@@ -161,12 +155,12 @@ proxyRoutes.post(
           );
         }
 
-        // Redact action - replace secrets with placeholders and continue
-        if (config.secrets_detection.action === "redact") {
-          const redactedMessages = redactMessagesWithSecrets(body.messages, secretsResult);
-          body = { ...body, messages: redactedMessages.messages };
-          redactionContext = redactedMessages.context;
-          secretsRedacted = true;
+        // Mask action - replace secrets with placeholders (per-part)
+        if (config.secrets_detection.action === "mask") {
+          const result = maskSecretsMessages(body.messages, secretsResult);
+          body = { ...body, messages: result.masked };
+          secretsMaskingContext = result.context;
+          secretsMasked = true;
         }
 
         // route_local action is handled in handleCompletion via secretsResult
@@ -204,133 +198,11 @@ proxyRoutes.post(
       startTime,
       router,
       secretsResult,
-      redactionContext,
-      secretsRedacted,
+      secretsMaskingContext,
+      secretsMasked,
     );
   },
 );
-
-/**
- * Redacts secrets in all messages based on detection result
- * Returns redacted messages and the redaction context for unredaction
- */
-function redactMessagesWithSecrets(
-  messages: ChatMessage[],
-  secretsResult: SecretsDetectionResult,
-): { messages: ChatMessage[]; context: RedactionContext } {
-  // Build a map of message content to redactions
-  // Since we concatenated all messages with \n, we need to track positions per message
-  let currentOffset = 0;
-  const messagePositions: { start: number; end: number }[] = [];
-
-  for (const msg of messages) {
-    const text = extractTextContent(msg.content);
-    const length = text.length;
-    messagePositions.push({ start: currentOffset, end: currentOffset + length });
-    currentOffset += length + 1; // +1 for \n separator
-  }
-
-  // Create redaction context
-  let context: RedactionContext = {
-    mapping: {},
-    reverseMapping: {},
-    counters: {},
-  };
-
-  // Apply redactions to each message
-  const redactedMessages = messages.map((msg, i) => {
-    // Handle null/undefined content
-    if (!msg.content) {
-      return msg;
-    }
-
-    // Handle array content (multimodal messages)
-    if (Array.isArray(msg.content)) {
-      const msgPos = messagePositions[i];
-
-      // Filter redactions for this message
-      const messageRedactions = (secretsResult.redactions || [])
-        .filter((r) => r.start >= msgPos.start && r.end <= msgPos.end)
-        .map((r) => ({
-          ...r,
-          start: r.start - msgPos.start,
-          end: r.end - msgPos.start,
-        }));
-
-      if (messageRedactions.length === 0) {
-        return msg;
-      }
-
-      // Track offset position within the concatenated text for this message
-      // (matches how extractTextContent joins parts with \n)
-      let partOffset = 0;
-
-      // Redact only text parts of array content with proper offset tracking
-      const redactedContent = msg.content.map((part: ContentPart) => {
-        if (part.type === "text" && typeof part.text === "string") {
-          const partLength = part.text.length;
-
-          // Find redactions that apply to this specific part
-          const partRedactions = messageRedactions
-            .filter((r) => r.start < partOffset + partLength && r.end > partOffset)
-            .map((r) => ({
-              ...r,
-              start: Math.max(0, r.start - partOffset),
-              end: Math.min(partLength, r.end - partOffset),
-            }));
-
-          if (partRedactions.length > 0) {
-            const { redacted, context: updatedContext } = redactSecrets(
-              part.text,
-              partRedactions,
-              context,
-            );
-            context = updatedContext;
-            partOffset += partLength + 1; // +1 for \n separator
-            return { ...part, text: redacted };
-          }
-
-          partOffset += partLength + 1; // +1 for \n separator
-          return part;
-        }
-        return part;
-      });
-
-      return { ...msg, content: redactedContent };
-    }
-
-    // Handle string content (text-only messages)
-    if (typeof msg.content !== "string") {
-      return msg;
-    }
-
-    const msgPos = messagePositions[i];
-
-    // Filter redactions that fall within this message's position
-    const messageRedactions = (secretsResult.redactions || [])
-      .filter((r) => r.start >= msgPos.start && r.end <= msgPos.end)
-      .map((r) => ({
-        ...r,
-        start: r.start - msgPos.start,
-        end: r.end - msgPos.start,
-      }));
-
-    if (messageRedactions.length === 0) {
-      return msg;
-    }
-
-    const { redacted, context: updatedContext } = redactSecrets(
-      msg.content,
-      messageRedactions,
-      context,
-    );
-    context = updatedContext;
-
-    return { ...msg, content: redacted };
-  });
-
-  return { messages: redactedMessages, context };
-}
 
 /**
  * Handle chat completion for both route and mask modes
@@ -341,9 +213,9 @@ async function handleCompletion(
   decision: RoutingDecision,
   startTime: number,
   router: ReturnType<typeof getRouter>,
-  secretsResult?: SecretsDetectionResult,
-  redactionContext?: RedactionContext,
-  secretsRedacted?: boolean,
+  secretsResult?: MessageSecretsResult,
+  secretsMaskingContext?: PlaceholderContext,
+  secretsMasked?: boolean,
 ) {
   const client = router.getClient(decision.provider);
   const maskingConfig = router.getMaskingConfig();
@@ -377,8 +249,8 @@ async function handleCompletion(
     c.header("X-PasteGuard-Secrets-Detected", "true");
     c.header("X-PasteGuard-Secrets-Types", secretsTypes.join(","));
   }
-  if (secretsRedacted) {
-    c.header("X-PasteGuard-Secrets-Redacted", "true");
+  if (secretsMasked) {
+    c.header("X-PasteGuard-Secrets-Masked", "true");
   }
 
   try {
@@ -394,7 +266,7 @@ async function handleCompletion(
         maskingConfig,
         secretsDetected,
         secretsTypes,
-        redactionContext,
+        secretsMaskingContext,
       );
     }
 
@@ -407,7 +279,7 @@ async function handleCompletion(
       maskingConfig,
       secretsDetected,
       secretsTypes,
-      redactionContext,
+      secretsMaskingContext,
     );
   } catch (error) {
     console.error("LLM request error:", error);
@@ -476,7 +348,7 @@ function handleStreamingResponse(
   maskingConfig: MaskingConfig,
   secretsDetected?: boolean,
   secretsTypes?: string[],
-  redactionContext?: RedactionContext,
+  secretsMaskingContext?: PlaceholderContext,
 ) {
   logRequest(
     createLogData(
@@ -497,14 +369,14 @@ function handleStreamingResponse(
 
   // Determine if we need to transform the stream
   const needsPIIUnmasking = isMaskDecision(decision);
-  const needsSecretsUnredaction = redactionContext !== undefined;
+  const needsSecretsUnmasking = secretsMaskingContext !== undefined;
 
-  if (needsPIIUnmasking || needsSecretsUnredaction) {
+  if (needsPIIUnmasking || needsSecretsUnmasking) {
     const unmaskingStream = createUnmaskingStream(
       result.response,
       needsPIIUnmasking ? decision.maskingContext : undefined,
       maskingConfig,
-      redactionContext,
+      secretsMaskingContext,
     );
     return c.body(unmaskingStream);
   }
@@ -524,7 +396,7 @@ function handleJsonResponse(
   maskingConfig: MaskingConfig,
   secretsDetected?: boolean,
   secretsTypes?: string[],
-  redactionContext?: RedactionContext,
+  secretsMaskingContext?: PlaceholderContext,
 ) {
   logRequest(
     createLogData(
@@ -543,12 +415,12 @@ function handleJsonResponse(
 
   // First unmask PII if needed
   if (isMaskDecision(decision)) {
-    response = unmaskResponse(response, decision.maskingContext, maskingConfig);
+    response = unmaskPIIResponse(response, decision.maskingContext, maskingConfig);
   }
 
-  // Then unredact secrets if needed
-  if (redactionContext) {
-    response = unredactResponse(response, redactionContext);
+  // Then unmask secrets if needed
+  if (secretsMaskingContext) {
+    response = unmaskSecretsResponse(response, secretsMaskingContext);
   }
 
   return c.json(response);
@@ -572,7 +444,7 @@ function createLogData(
     provider: decision.provider,
     model: result.model,
     piiDetected: decision.piiResult.hasPII,
-    entities: [...new Set(decision.piiResult.newEntities.map((e) => e.entity_type))],
+    entities: [...new Set(decision.piiResult.allEntities.map((e) => e.entity_type))],
     latencyMs: Date.now() - startTime,
     scanTimeMs: decision.piiResult.scanTimeMs,
     promptTokens: response?.usage?.prompt_tokens,

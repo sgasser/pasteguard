@@ -1,10 +1,7 @@
 import type { MaskingConfig } from "../config";
-import {
-  flushRedactionBuffer,
-  type RedactionContext,
-  unredactStreamChunk,
-} from "../secrets/redact";
-import { flushStreamBuffer, type MaskingContext, unmaskStreamChunk } from "./masking";
+import { flushMaskingBuffer, unmaskStreamChunk } from "../pii/mask";
+import { flushSecretsMaskingBuffer, unmaskSecretsStreamChunk } from "../secrets/mask";
+import type { PlaceholderContext } from "../utils/message-transform";
 
 /**
  * Creates a transform stream that unmasks SSE content
@@ -12,13 +9,13 @@ import { flushStreamBuffer, type MaskingContext, unmaskStreamChunk } from "./mas
  * Processes Server-Sent Events (SSE) chunks, buffering partial placeholders
  * and unmasking complete ones before forwarding to the client.
  *
- * Supports both PII unmasking and secret unredaction, or either alone.
+ * Supports both PII unmasking and secrets unmasking, or either alone.
  */
 export function createUnmaskingStream(
   source: ReadableStream<Uint8Array>,
-  piiContext: MaskingContext | undefined,
+  piiContext: PlaceholderContext | undefined,
   config: MaskingConfig,
-  secretsContext?: RedactionContext,
+  secretsContext?: PlaceholderContext,
 ): ReadableStream<Uint8Array> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
@@ -39,14 +36,14 @@ export function createUnmaskingStream(
 
             // Flush PII buffer first
             if (piiBuffer && piiContext) {
-              flushed = flushStreamBuffer(piiBuffer, piiContext, config);
+              flushed = flushMaskingBuffer(piiBuffer, piiContext, config);
             } else if (piiBuffer) {
               flushed = piiBuffer;
             }
 
             // Then flush secrets buffer
             if (secretsBuffer && secretsContext) {
-              flushed += flushRedactionBuffer(secretsBuffer, secretsContext);
+              flushed += flushSecretsMaskingBuffer(secretsBuffer, secretsContext);
             } else if (secretsBuffer) {
               flushed += secretsBuffer;
             }
@@ -101,9 +98,9 @@ export function createUnmaskingStream(
                     processedContent = output;
                   }
 
-                  // Then unredact secrets if context provided
+                  // Then unmask secrets if context provided
                   if (secretsContext && processedContent) {
-                    const { output, remainingBuffer } = unredactStreamChunk(
+                    const { output, remainingBuffer } = unmaskSecretsStreamChunk(
                       secretsBuffer,
                       processedContent,
                       secretsContext,

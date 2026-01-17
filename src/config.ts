@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { SUPPORTED_LANGUAGES } from "./constants/languages";
 
 // Schema definitions
 
@@ -23,36 +24,7 @@ const MaskingSchema = z.object({
   marker_text: z.string().default("[protected]"),
 });
 
-// All 25 spaCy languages with trained pipelines
-// See docker/presidio/languages.yaml for full list
-const SupportedLanguages = [
-  "ca", // Catalan
-  "zh", // Chinese
-  "hr", // Croatian
-  "da", // Danish
-  "nl", // Dutch
-  "en", // English
-  "fi", // Finnish
-  "fr", // French
-  "de", // German
-  "el", // Greek
-  "it", // Italian
-  "ja", // Japanese
-  "ko", // Korean
-  "lt", // Lithuanian
-  "mk", // Macedonian
-  "nb", // Norwegian
-  "pl", // Polish
-  "pt", // Portuguese
-  "ro", // Romanian
-  "ru", // Russian
-  "sl", // Slovenian
-  "es", // Spanish
-  "sv", // Swedish
-  "uk", // Ukrainian
-] as const;
-
-const LanguageEnum = z.enum(SupportedLanguages);
+const LanguageEnum = z.enum(SUPPORTED_LANGUAGES);
 
 // Accept either array or comma-separated string for languages
 // This allows using env vars like PASTEGUARD_LANGUAGES=en,de,fr
@@ -60,7 +32,7 @@ const LanguagesSchema = z
   .union([z.array(LanguageEnum), z.string()])
   .transform((val) => {
     if (Array.isArray(val)) return val;
-    return val.split(",").map((s) => s.trim()) as (typeof SupportedLanguages)[number][];
+    return val.split(",").map((s) => s.trim()) as (typeof SUPPORTED_LANGUAGES)[number][];
   })
   .pipe(z.array(LanguageEnum))
   .default(["en"]);
@@ -121,7 +93,7 @@ const SecretEntityTypes = [
 
 const SecretsDetectionSchema = z.object({
   enabled: z.boolean().default(true),
-  action: z.enum(["block", "redact", "route_local"]).default("redact"),
+  action: z.enum(["block", "mask", "route_local"]).default("mask"),
   entities: z.array(z.enum(SecretEntityTypes)).default(["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY"]),
   max_scan_chars: z.coerce.number().int().min(0).default(200000),
   log_detected_types: z.boolean().default(true),
@@ -165,7 +137,7 @@ const ConfigSchema = z
     },
     {
       message:
-        "secrets_detection.action 'route_local' is not compatible with mode 'mask'. Use mode 'route' or change secrets_detection.action to 'block' or 'redact'",
+        "secrets_detection.action 'route_local' is not compatible with mode 'mask'. Use mode 'route' or change secrets_detection.action to 'block' or 'mask'",
     },
   );
 

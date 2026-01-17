@@ -1,11 +1,25 @@
 import { describe, expect, test } from "bun:test";
+import type { PIIDetectionResult, PIIEntity } from "../pii/detect";
+import { maskMessages } from "../pii/mask";
 import type { ChatMessage } from "../services/llm-client";
-import { maskMessages } from "../services/masking";
-import type { PIIEntity } from "../services/pii-detector";
 import type { ContentPart } from "../utils/content";
 
+/**
+ * Helper to create PIIDetectionResult from per-part entities
+ */
+function createPIIResult(messageEntities: PIIEntity[][][]): PIIDetectionResult {
+  return {
+    hasPII: messageEntities.flat(2).length > 0,
+    messageEntities,
+    allEntities: messageEntities.flat(2),
+    scanTimeMs: 0,
+    language: "en",
+    languageFallback: false,
+  };
+}
+
 describe("Multimodal content handling", () => {
-  describe("PII masking with offset tracking", () => {
+  describe("PII masking with per-part entities", () => {
     test("masks PII in multimodal array content", () => {
       const messages: ChatMessage[] = [
         {
@@ -18,16 +32,19 @@ describe("Multimodal content handling", () => {
         },
       ];
 
-      // Concatenated text: "My email is john@example.com and\nmy phone is 555-1234"
-      // Entities for this concatenated text:
-      const entities: PIIEntity[] = [
-        { entity_type: "EMAIL_ADDRESS", start: 12, end: 28, score: 0.9 }, // john@example.com in part 0
-        { entity_type: "PHONE_NUMBER", start: 45, end: 53, score: 0.85 }, // 555-1234 in part 2 (after newline)
-      ];
+      // Per-part entities: messageEntities[msgIdx][partIdx] = entities
+      const detection = createPIIResult([
+        [
+          // Part 0: email entity (positions relative to part text)
+          [{ entity_type: "EMAIL_ADDRESS", start: 12, end: 28, score: 0.9 }],
+          // Part 1: image, no entities
+          [],
+          // Part 2: phone entity (positions relative to part text)
+          [{ entity_type: "PHONE_NUMBER", start: 12, end: 20, score: 0.85 }],
+        ],
+      ]);
 
-      const entitiesByMessage = [entities];
-
-      const { masked } = maskMessages(messages, entitiesByMessage);
+      const { masked } = maskMessages(messages, detection);
 
       // Verify the content is still an array
       expect(Array.isArray(masked[0].content)).toBe(true);
@@ -50,8 +67,6 @@ describe("Multimodal content handling", () => {
     });
 
     test("returns masked array instead of original unmasked array", () => {
-      // This tests the bug fix: previously array content was extracted and masked,
-      // but then the original array was returned unchanged
       const messages: ChatMessage[] = [
         {
           role: "user",
@@ -59,12 +74,17 @@ describe("Multimodal content handling", () => {
         },
       ];
 
-      const entities: PIIEntity[] = [
-        { entity_type: "PERSON", start: 8, end: 13, score: 0.9 }, // Alice
-        { entity_type: "EMAIL_ADDRESS", start: 17, end: 33, score: 0.95 }, // alice@secret.com
-      ];
+      const detection = createPIIResult([
+        [
+          // Part 0 entities
+          [
+            { entity_type: "PERSON", start: 8, end: 13, score: 0.9 },
+            { entity_type: "EMAIL_ADDRESS", start: 17, end: 33, score: 0.95 },
+          ],
+        ],
+      ]);
 
-      const { masked } = maskMessages(messages, [entities]);
+      const { masked } = maskMessages(messages, detection);
 
       // Verify content is still array
       expect(Array.isArray(masked[0].content)).toBe(true);
@@ -78,40 +98,58 @@ describe("Multimodal content handling", () => {
       expect(maskedContent[0].text).toContain("[[EMAIL_ADDRESS_1]]");
     });
 
-    test("handles entities spanning multiple parts with proper offsets", () => {
+    test("handles multiple text parts independently", () => {
       const messages: ChatMessage[] = [
         {
           role: "user",
           content: [
-            { type: "text", text: "First part with email@" },
-            { type: "text", text: "example.com in two parts" },
+            { type: "text", text: "First: john@example.com" },
+            { type: "text", text: "Second: jane@example.com" },
           ],
         },
       ];
 
-      // In concatenated text: "First part with email@\nexample.com in two parts"
-      // Email spans from position 16 to 39 (crossing the newline at position 22)
-      const entities: PIIEntity[] = [
-        { entity_type: "EMAIL_ADDRESS", start: 16, end: 34, score: 0.9 },
-      ];
+      const detection = createPIIResult([
+        [
+          // Part 0 entity
+          [{ entity_type: "EMAIL_ADDRESS", start: 7, end: 23, score: 0.9 }],
+          // Part 1 entity
+          [{ entity_type: "EMAIL_ADDRESS", start: 8, end: 24, score: 0.9 }],
+        ],
+      ]);
 
-      const { masked } = maskMessages(messages, [entities]);
+      const { masked } = maskMessages(messages, detection);
 
       const maskedContent = masked[0].content as ContentPart[];
 
-      // Both parts should be affected by the email entity
-      // Part 0: "First part with [[EMAIL" or similar
-      // Part 1: "ADDRESS_1]] in two parts" or similar
-      // The exact split depends on how the masking handles cross-boundary entities
+      expect(maskedContent[0].text).toBe("First: [[EMAIL_ADDRESS_1]]");
+      expect(maskedContent[1].text).toBe("Second: [[EMAIL_ADDRESS_2]]");
+    });
 
-      // At minimum, verify that the entity is masked somewhere
-      const fullMasked = maskedContent
-        .filter((p) => p.type === "text")
-        .map((p) => p.text)
-        .join("\n");
+    test("handles mixed string and array content messages", () => {
+      const messages: ChatMessage[] = [
+        { role: "system", content: "You are helpful" },
+        {
+          role: "user",
+          content: [{ type: "text", text: "My name is John" }],
+        },
+        { role: "assistant", content: "Hello John!" },
+      ];
 
-      expect(fullMasked).toContain("[[EMAIL_ADDRESS_");
-      expect(fullMasked).not.toContain("email@example.com");
+      const detection = createPIIResult([
+        // Message 0 (system): no PII
+        [[]],
+        // Message 1 (user multimodal): PII in part 0
+        [[{ entity_type: "PERSON", start: 11, end: 15, score: 0.9 }]],
+        // Message 2 (assistant): PII in part 0
+        [[{ entity_type: "PERSON", start: 6, end: 10, score: 0.9 }]],
+      ]);
+
+      const { masked } = maskMessages(messages, detection);
+
+      expect(masked[0].content).toBe("You are helpful");
+      expect((masked[1].content as ContentPart[])[0].text).toBe("My name is [[PERSON_1]]");
+      expect(masked[2].content).toBe("Hello [[PERSON_1]]!");
     });
   });
 });

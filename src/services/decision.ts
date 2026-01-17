@@ -1,8 +1,9 @@
 import { type Config, getConfig } from "../config";
-import type { SecretsDetectionResult } from "../secrets/detect";
-import { type ChatMessage, LLMClient } from "../services/llm-client";
-import { createMaskingContext, type MaskingContext, maskMessages } from "../services/masking";
-import { getPIIDetector, type PIIDetectionResult } from "../services/pii-detector";
+import { getPIIDetector, type PIIDetectionResult } from "../pii/detect";
+import { createMaskingContext, maskMessages } from "../pii/mask";
+import type { MessageSecretsResult } from "../secrets/detect";
+import type { PlaceholderContext } from "../utils/message-transform";
+import { type ChatMessage, LLMClient } from "./llm-client";
 
 /**
  * Routing decision result for route mode
@@ -23,7 +24,7 @@ export interface MaskDecision {
   reason: string;
   piiResult: PIIDetectionResult;
   maskedMessages: ChatMessage[];
-  maskingContext: MaskingContext;
+  maskingContext: PlaceholderContext;
 }
 
 export type RoutingDecision = RouteDecision | MaskDecision;
@@ -61,13 +62,13 @@ export class Router {
    */
   async decide(
     messages: ChatMessage[],
-    secretsResult?: SecretsDetectionResult,
+    secretsResult?: MessageSecretsResult,
   ): Promise<RoutingDecision> {
     const detector = getPIIDetector();
     const piiResult = await detector.analyzeMessages(messages);
 
     if (this.config.mode === "mask") {
-      return await this.decideMask(messages, piiResult);
+      return this.decideMask(messages, piiResult);
     }
 
     return this.decideRoute(piiResult, secretsResult);
@@ -82,7 +83,7 @@ export class Router {
    */
   private decideRoute(
     piiResult: PIIDetectionResult,
-    secretsResult?: SecretsDetectionResult,
+    secretsResult?: MessageSecretsResult,
   ): RouteDecision {
     // Check for secrets route_local action first (takes precedence)
     if (secretsResult?.detected && this.config.secrets_detection.action === "route_local") {
@@ -97,7 +98,7 @@ export class Router {
 
     // Route based on PII detection
     if (piiResult.hasPII) {
-      const entityTypes = [...new Set(piiResult.newEntities.map((e) => e.entity_type))];
+      const entityTypes = [...new Set(piiResult.allEntities.map((e) => e.entity_type))];
       return {
         mode: "route",
         provider: "local",
@@ -115,10 +116,7 @@ export class Router {
     };
   }
 
-  private async decideMask(
-    messages: ChatMessage[],
-    piiResult: PIIDetectionResult,
-  ): Promise<MaskDecision> {
+  private decideMask(messages: ChatMessage[], piiResult: PIIDetectionResult): MaskDecision {
     if (!piiResult.hasPII) {
       return {
         mode: "mask",
@@ -130,9 +128,9 @@ export class Router {
       };
     }
 
-    const { masked, context } = maskMessages(messages, piiResult.entitiesByMessage);
+    const { masked, context } = maskMessages(messages, piiResult);
 
-    const entityTypes = [...new Set(piiResult.newEntities.map((e) => e.entity_type))];
+    const entityTypes = [...new Set(piiResult.allEntities.map((e) => e.entity_type))];
 
     return {
       mode: "mask",

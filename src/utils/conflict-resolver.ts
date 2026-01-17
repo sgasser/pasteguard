@@ -1,19 +1,23 @@
 // Conflict resolution based on Microsoft Presidio's logic
 // https://github.com/microsoft/presidio/blob/main/presidio-anonymizer/presidio_anonymizer/anonymizer_engine.py
 
-export interface EntityWithScore {
+/**
+ * Base interface for items with position (used by both PII and secrets)
+ */
+export interface Span {
   start: number;
   end: number;
+}
+
+/**
+ * Extended interface for PII entities with confidence scores
+ */
+export interface EntityWithScore extends Span {
   score: number;
   entity_type: string;
 }
 
-interface Interval {
-  start: number;
-  end: number;
-}
-
-function overlaps(a: Interval, b: Interval): boolean {
+function overlaps(a: Span, b: Span): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
@@ -28,7 +32,7 @@ function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
   return groups;
 }
 
-function mergeOverlapping<T extends Interval>(intervals: T[], merge: (a: T, b: T) => T): T[] {
+function mergeOverlapping<T extends Span>(intervals: T[], merge: (a: T, b: T) => T): T[] {
   if (intervals.length <= 1) return [...intervals];
 
   const sorted = [...intervals].sort((a, b) => a.start - b.start);
@@ -92,11 +96,14 @@ export function resolveConflicts<T extends EntityWithScore>(entities: T[]): T[] 
   return removeConflicting(afterMerge);
 }
 
-/** For secrets without scores. Keeps non-overlapping, longer wins ties. */
-export function resolveOverlaps<T extends Interval>(entities: T[]): T[] {
-  if (entities.length <= 1) return [...entities];
+/**
+ * Simple conflict resolution for items without scores (secrets)
+ * Keeps non-overlapping spans, longer span wins ties.
+ */
+export function resolveOverlaps<T extends Span>(items: T[]): T[] {
+  if (items.length <= 1) return [...items];
 
-  const sorted = [...entities].sort((a, b) => {
+  const sorted = [...items].sort((a, b) => {
     if (a.start !== b.start) return a.start - b.start;
     return b.end - b.start - (a.end - a.start);
   });

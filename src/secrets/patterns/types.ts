@@ -18,7 +18,10 @@ export interface SecretsMatch {
   count: number;
 }
 
-export interface SecretsRedaction {
+/**
+ * Location of a detected secret in text
+ */
+export interface SecretLocation {
   start: number;
   end: number;
   type: SecretEntityType;
@@ -27,7 +30,18 @@ export interface SecretsRedaction {
 export interface SecretsDetectionResult {
   detected: boolean;
   matches: SecretsMatch[];
-  redactions?: SecretsRedaction[];
+  locations?: SecretLocation[];
+}
+
+/**
+ * Per-message, per-part secrets detection result
+ * Structure: messageLocations[msgIdx][partIdx] = locations for that part
+ */
+export interface MessageSecretsResult {
+  detected: boolean;
+  matches: SecretsMatch[];
+  /** Per-message, per-part secret locations */
+  messageLocations: SecretLocation[][][];
 }
 
 /**

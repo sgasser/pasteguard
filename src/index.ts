@@ -4,12 +4,12 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { getConfig } from "./config";
+import { getPIIDetector } from "./pii/detect";
 import { dashboardRoutes } from "./routes/dashboard";
 import { healthRoutes } from "./routes/health";
 import { infoRoutes } from "./routes/info";
 import { proxyRoutes } from "./routes/proxy";
 import { getLogger } from "./services/logger";
-import { getPIIDetector } from "./services/pii-detector";
 
 type Variables = {
   requestId: string;
@@ -106,9 +106,7 @@ async function validateStartup() {
   if (config.secrets_detection.action === "route_local" && config.mode === "mask") {
     console.error("\n❌ Configuration error detected!\n");
     console.error("   secrets_detection.action 'route_local' is not compatible with mode 'mask'.");
-    console.error(
-      "   Use mode 'route' or change secrets_detection.action to 'block' or 'redact'.\n",
-    );
+    console.error("   Use mode 'route' or change secrets_detection.action to 'block' or 'mask'.\n");
     console.error("[STARTUP] ✗ Invalid configuration. Exiting for safety.");
     process.exit(1);
   }

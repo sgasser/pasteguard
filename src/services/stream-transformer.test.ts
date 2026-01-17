@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { MaskingConfig } from "../config";
-import { createMaskingContext } from "./masking";
+import { createMaskingContext } from "../pii/mask";
 import { createUnmaskingStream } from "./stream-transformer";
 
 const defaultConfig: MaskingConfig = {

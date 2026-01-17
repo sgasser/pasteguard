@@ -1,8 +1,8 @@
 import type {
   PatternDetector,
+  SecretLocation,
   SecretsDetectionResult,
   SecretsMatch,
-  SecretsRedaction,
 } from "./types";
 import { detectPattern } from "./utils";
 
@@ -18,13 +18,13 @@ export const privateKeysDetector: PatternDetector = {
 
   detect(text: string, enabledTypes: Set<string>): SecretsDetectionResult {
     const matches: SecretsMatch[] = [];
-    const redactions: SecretsRedaction[] = [];
+    const locations: SecretLocation[] = [];
 
     // OpenSSH private key pattern
     if (enabledTypes.has("OPENSSH_PRIVATE_KEY")) {
       const opensshPattern =
         /-----BEGIN OPENSSH PRIVATE KEY-----[\s\S]*?-----END OPENSSH PRIVATE KEY-----/g;
-      detectPattern(text, opensshPattern, "OPENSSH_PRIVATE_KEY", matches, redactions);
+      detectPattern(text, opensshPattern, "OPENSSH_PRIVATE_KEY", matches, locations);
     }
 
     // PEM private key patterns
@@ -34,7 +34,7 @@ export const privateKeysDetector: PatternDetector = {
 
       // RSA PRIVATE KEY
       const rsaPattern = /-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----/g;
-      detectPattern(text, rsaPattern, "PEM_PRIVATE_KEY", matches, redactions, matchedPositions);
+      detectPattern(text, rsaPattern, "PEM_PRIVATE_KEY", matches, locations, matchedPositions);
 
       // Remove PEM_PRIVATE_KEY from matches to accumulate all PEM types together
       const pemMatch = matches.find((m) => m.type === "PEM_PRIVATE_KEY");
@@ -51,7 +51,7 @@ export const privateKeysDetector: PatternDetector = {
         privateKeyPattern,
         "PEM_PRIVATE_KEY",
         tempMatches,
-        redactions,
+        locations,
         matchedPositions,
       );
       totalPemCount += tempMatches[0]?.count || 0;
@@ -65,7 +65,7 @@ export const privateKeysDetector: PatternDetector = {
         encryptedPattern,
         "PEM_PRIVATE_KEY",
         tempMatches2,
-        redactions,
+        locations,
         matchedPositions,
       );
       totalPemCount += tempMatches2[0]?.count || 0;
@@ -78,7 +78,7 @@ export const privateKeysDetector: PatternDetector = {
     return {
       detected: matches.length > 0,
       matches,
-      redactions: redactions.length > 0 ? redactions : undefined,
+      locations: locations.length > 0 ? locations : undefined,
     };
   },
 };

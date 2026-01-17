@@ -86,10 +86,10 @@ secrets_detection:
   enabled: true
 
   # Action to take when secrets are detected:
-  #   redact:       Replace secrets with placeholders, unmask in response (default)
+  #   mask:         Replace secrets with placeholders, unmask in response (default)
   #   block:        Block the request with HTTP 400
   #   route_local:  Route to local provider (only works in route mode)
-  action: redact
+  action: mask
 
   # Secret types to detect
   # Private Keys (enabled by default):
