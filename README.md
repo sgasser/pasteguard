@@ -41,6 +41,17 @@ PasteGuard is an OpenAI-compatible proxy that sits between your app and the LLM 
 
 Works with OpenAI, Azure, and any OpenAI-compatible API. Just change one URL.
 
+## Browser Extension (Beta)
+
+An open source browser extension that brings PasteGuard protection to ChatGPT, Claude, Gemini, Copilot, and Perplexity.
+
+- Paste customer data → PII is masked before it reaches the AI
+- You see the original, AI sees `[[PERSON_1]]`, `[[EMAIL_1]]`
+
+Open source (Apache 2.0). Built in public — early feedback shapes the product.
+
+**[Join the Beta →](https://tally.so/r/J9pNLr)**
+
 ## Features
 
 - **PII Detection** — Names, emails, phone numbers, credit cards, IBANs, and more
