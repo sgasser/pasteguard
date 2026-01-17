@@ -104,6 +104,11 @@ secrets_detection:
   # Tokens (opt-in):
   #   - JWT_TOKEN:           JSON Web Tokens (eyJ...)
   #   - BEARER_TOKEN:        Bearer tokens in Authorization-style contexts
+  #
+  # Environment Variables (opt-in):
+  #   - ENV_PASSWORD:        DB_PASSWORD=..., ADMIN_PWD=... (8+ char values)
+  #   - ENV_SECRET:          APP_SECRET=..., JWT_SECRET=... (8+ char values)
+  #   - CONNECTION_STRING:   postgres://user:pass@host, mongodb://...
   entities:
     - OPENSSH_PRIVATE_KEY
     - PEM_PRIVATE_KEY
@@ -113,6 +118,9 @@ secrets_detection:
     # - API_KEY_GITHUB
     # - JWT_TOKEN
     # - BEARER_TOKEN
+    # - ENV_PASSWORD
+    # - ENV_SECRET
+    # - CONNECTION_STRING
 
   # Maximum characters to scan per request (performance limit)
   # Note: Secrets placed after this limit won't be detected.
