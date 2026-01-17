@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SecretsDetectionConfig } from "../config";
-import type { ChatCompletionRequest } from "../services/llm-client";
-import { detectSecrets, extractTextFromRequest } from "./detect";
+import { detectSecrets } from "./detect";
 
 const defaultConfig: SecretsDetectionConfig = {
   enabled: true,
@@ -50,8 +49,8 @@ describe("detectSecrets", () => {
     expect(result.matches).toHaveLength(1);
     expect(result.matches[0].type).toBe("OPENSSH_PRIVATE_KEY");
     expect(result.matches[0].count).toBe(1);
-    expect(result.redactions).toBeDefined();
-    expect(result.redactions?.length).toBe(1);
+    expect(result.locations).toBeDefined();
+    expect(result.locations?.length).toBe(1);
   });
 
   test("detects RSA private key", () => {
@@ -85,7 +84,7 @@ describe("detectSecrets", () => {
     expect(result.matches).toHaveLength(1);
     expect(result.matches[0].type).toBe("OPENSSH_PRIVATE_KEY");
     expect(result.matches[0].count).toBe(2);
-    expect(result.redactions?.length).toBe(2);
+    expect(result.locations?.length).toBe(2);
   });
 
   test("detects multiple secrets of different types", () => {
@@ -169,13 +168,13 @@ describe("detectSecrets", () => {
     expect(result.matches[0].count).toBe(1); // Should be 1, not 2
   });
 
-  test("redactions are sorted by start position descending", () => {
+  test("locations are sorted by start position descending", () => {
     const text = `${opensshKey}\n\n${rsaKey}`;
     const result = detectSecrets(text, defaultConfig);
-    expect(result.redactions).toBeDefined();
-    if (result.redactions && result.redactions.length > 1) {
-      for (let i = 0; i < result.redactions.length - 1; i++) {
-        expect(result.redactions[i].start).toBeGreaterThan(result.redactions[i + 1].start);
+    expect(result.locations).toBeDefined();
+    if (result.locations && result.locations.length > 1) {
+      for (let i = 0; i < result.locations.length - 1; i++) {
+        expect(result.locations[i].start).toBeGreaterThan(result.locations[i + 1].start);
       }
     }
   });
@@ -203,8 +202,8 @@ describe("detectSecrets - API Keys", () => {
     expect(result.matches).toHaveLength(1);
     expect(result.matches[0].type).toBe("API_KEY_OPENAI");
     expect(result.matches[0].count).toBe(1);
-    expect(result.redactions).toBeDefined();
-    expect(result.redactions?.[0].type).toBe("API_KEY_OPENAI");
+    expect(result.locations).toBeDefined();
+    expect(result.locations?.[0].type).toBe("API_KEY_OPENAI");
   });
 
   test("detects AWS access key", () => {
@@ -408,13 +407,13 @@ ADMIN_PWD=adminpass123`;
     expect(result.detected).toBe(false);
   });
 
-  test("redaction positions are correct", () => {
+  test("location positions are correct", () => {
     const text = "config: DB_PASSWORD=mysecretpassword123 here";
     const result = detectSecrets(text, passwordConfig);
-    expect(result.redactions).toBeDefined();
-    expect(result.redactions?.length).toBe(1);
-    const redacted = text.slice(result.redactions![0].start, result.redactions![0].end);
-    expect(redacted).toBe("DB_PASSWORD=mysecretpassword123");
+    expect(result.locations).toBeDefined();
+    expect(result.locations?.length).toBe(1);
+    const matched = text.slice(result.locations![0].start, result.locations![0].end);
+    expect(matched).toBe("DB_PASSWORD=mysecretpassword123");
   });
 });
 
@@ -481,13 +480,13 @@ SESSION_SECRET=session_key_here`;
     expect(result.detected).toBe(false);
   });
 
-  test("redaction positions are correct", () => {
+  test("location positions are correct", () => {
     const text = "export APP_SECRET=mysupersecretvalue123 # comment";
     const result = detectSecrets(text, secretConfig);
-    expect(result.redactions).toBeDefined();
-    expect(result.redactions?.length).toBe(1);
-    const redacted = text.slice(result.redactions![0].start, result.redactions![0].end);
-    expect(redacted).toBe("APP_SECRET=mysupersecretvalue123");
+    expect(result.locations).toBeDefined();
+    expect(result.locations?.length).toBe(1);
+    const matched = text.slice(result.locations![0].start, result.locations![0].end);
+    expect(matched).toBe("APP_SECRET=mysupersecretvalue123");
   });
 });
 
@@ -596,13 +595,13 @@ CACHE=redis://default:pass@redis:6379`;
     expect(result.detected).toBe(false);
   });
 
-  test("redaction covers full connection string", () => {
+  test("location covers full connection string", () => {
     const text = "export DB=postgres://admin:secret123@db.example.com:5432/prod";
     const result = detectSecrets(text, connConfig);
-    expect(result.redactions).toBeDefined();
-    expect(result.redactions?.length).toBe(1);
-    const redacted = text.slice(result.redactions![0].start, result.redactions![0].end);
-    expect(redacted).toBe("postgres://admin:secret123@db.example.com:5432/prod");
+    expect(result.locations).toBeDefined();
+    expect(result.locations?.length).toBe(1);
+    const matched = text.slice(result.locations![0].start, result.locations![0].end);
+    expect(matched).toBe("postgres://admin:secret123@db.example.com:5432/prod");
   });
 });
 
@@ -636,81 +635,16 @@ ${rsaKey}
     expect(result.matches.length).toBeGreaterThanOrEqual(4);
   });
 
-  test("redaction positions are correct for all types", () => {
+  test("location positions are correct for all types", () => {
     const text = `Key: ${awsAccessKey} and ${githubToken}`;
     const result = detectSecrets(text, allConfig);
-    expect(result.redactions).toBeDefined();
-    expect(result.redactions?.length).toBe(2);
+    expect(result.locations).toBeDefined();
+    expect(result.locations?.length).toBe(2);
 
-    // Verify redactions point to correct positions
-    for (const redaction of result.redactions || []) {
-      const extracted = text.slice(redaction.start, redaction.end);
+    // Verify locations point to correct positions
+    for (const location of result.locations || []) {
+      const extracted = text.slice(location.start, location.end);
       expect(extracted.length).toBeGreaterThan(10);
     }
-  });
-});
-
-describe("extractTextFromRequest", () => {
-  test("extracts text from simple messages", () => {
-    const request: ChatCompletionRequest = {
-      messages: [
-        { role: "user", content: "Hello world" },
-        { role: "assistant", content: "Hi there" },
-      ],
-    };
-    const text = extractTextFromRequest(request);
-    expect(text).toBe("Hello world\nHi there");
-  });
-
-  test("extracts text from system messages", () => {
-    const request: ChatCompletionRequest = {
-      messages: [
-        { role: "system", content: "You are helpful" },
-        { role: "user", content: "Hello" },
-      ],
-    };
-    const text = extractTextFromRequest(request);
-    expect(text).toBe("You are helpful\nHello");
-  });
-
-  test("filters out empty messages", () => {
-    const request: ChatCompletionRequest = {
-      messages: [
-        { role: "user", content: "Hello" },
-        { role: "assistant", content: "" },
-        { role: "user", content: "World" },
-      ],
-    };
-    const text = extractTextFromRequest(request);
-    expect(text).toBe("Hello\nWorld");
-  });
-
-  test("handles single message", () => {
-    const request: ChatCompletionRequest = {
-      messages: [{ role: "user", content: "Test" }],
-    };
-    const text = extractTextFromRequest(request);
-    expect(text).toBe("Test");
-  });
-
-  test("handles empty messages array", () => {
-    const request: ChatCompletionRequest = {
-      messages: [],
-    };
-    const text = extractTextFromRequest(request);
-    expect(text).toBe("");
-  });
-
-  test("extracts all message content in order", () => {
-    const request: ChatCompletionRequest = {
-      messages: [
-        { role: "system", content: "System" },
-        { role: "user", content: "User1" },
-        { role: "assistant", content: "Assistant" },
-        { role: "user", content: "User2" },
-      ],
-    };
-    const text = extractTextFromRequest(request);
-    expect(text).toBe("System\nUser1\nAssistant\nUser2");
   });
 });

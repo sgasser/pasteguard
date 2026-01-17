@@ -1,31 +1,21 @@
 import type { SecretsDetectionConfig } from "../config";
-import type { ChatCompletionRequest } from "../services/llm-client";
-import { extractTextContent } from "../utils/content";
+import type { ChatMessage } from "../services/llm-client";
+import type { ContentPart } from "../utils/content";
 import { patternDetectors } from "./patterns";
-import type { SecretsDetectionResult, SecretsMatch, SecretsRedaction } from "./patterns/types";
-
-// Re-export types from patterns module for backwards compatibility
-export type {
-  SecretEntityType,
+import type {
+  MessageSecretsResult,
+  SecretLocation,
   SecretsDetectionResult,
   SecretsMatch,
-  SecretsRedaction,
 } from "./patterns/types";
 
-/**
- * Extracts all text content from an OpenAI chat completion request
- *
- * Concatenates content from all messages (system, user, assistant) for secrets scanning.
- * Handles both string content (text-only) and array content (multimodal messages).
- *
- * Returns concatenated text for secrets scanning.
- */
-export function extractTextFromRequest(body: ChatCompletionRequest): string {
-  return body.messages
-    .map((message) => extractTextContent(message.content))
-    .filter((text) => text.length > 0)
-    .join("\n");
-}
+export type {
+  MessageSecretsResult,
+  SecretEntityType,
+  SecretLocation,
+  SecretsDetectionResult,
+  SecretsMatch,
+} from "./patterns/types";
 
 /**
  * Detects secret material (e.g. private keys, API keys, tokens) in text
@@ -54,7 +44,7 @@ export function detectSecrets(
 
   // Aggregate results from all pattern detectors
   const allMatches: SecretsMatch[] = [];
-  const allRedactions: SecretsRedaction[] = [];
+  const allLocations: SecretLocation[] = [];
 
   for (const detector of patternDetectors) {
     // Skip detectors that don't handle any enabled types
@@ -63,17 +53,80 @@ export function detectSecrets(
 
     const result = detector.detect(textToScan, enabledTypes);
     allMatches.push(...result.matches);
-    if (result.redactions) {
-      allRedactions.push(...result.redactions);
+    if (result.locations) {
+      allLocations.push(...result.locations);
     }
   }
 
-  // Sort redactions by start position (descending) for safe replacement
-  allRedactions.sort((a, b) => b.start - a.start);
+  // Sort locations by start position (descending) for safe replacement
+  allLocations.sort((a, b) => b.start - a.start);
 
   return {
     detected: allMatches.length > 0,
     matches: allMatches,
-    redactions: allRedactions.length > 0 ? allRedactions : undefined,
+    locations: allLocations.length > 0 ? allLocations : undefined,
+  };
+}
+
+/**
+ * Detects secrets in chat messages with per-part granularity
+ *
+ * For string content, partIdx is always 0.
+ * For array content (multimodal), each text part is scanned separately.
+ * This avoids complex offset mapping when applying masks.
+ */
+export function detectSecretsInMessages(
+  messages: ChatMessage[],
+  config: SecretsDetectionConfig,
+): MessageSecretsResult {
+  if (!config.enabled) {
+    return {
+      detected: false,
+      matches: [],
+      messageLocations: messages.map(() => []),
+    };
+  }
+
+  const matchCounts = new Map<string, number>();
+
+  const messageLocations: SecretLocation[][][] = messages.map((message) => {
+    // String content → single part at index 0
+    if (typeof message.content === "string") {
+      const result = detectSecrets(message.content, config);
+      for (const match of result.matches) {
+        matchCounts.set(match.type, (matchCounts.get(match.type) || 0) + match.count);
+      }
+      return [result.locations || []];
+    }
+
+    // Array content (multimodal) → one array per part
+    if (Array.isArray(message.content)) {
+      return message.content.map((part: ContentPart) => {
+        if (part.type !== "text" || typeof part.text !== "string") {
+          return [];
+        }
+        const result = detectSecrets(part.text, config);
+        for (const match of result.matches) {
+          matchCounts.set(match.type, (matchCounts.get(match.type) || 0) + match.count);
+        }
+        return result.locations || [];
+      });
+    }
+
+    // Null/undefined content
+    return [];
+  });
+
+  const allMatches: SecretsMatch[] = [];
+  for (const [type, count] of matchCounts) {
+    allMatches.push({ type: type as SecretLocation["type"], count });
+  }
+
+  const hasLocations = messageLocations.some((msg) => msg.some((part) => part.length > 0));
+
+  return {
+    detected: hasLocations,
+    matches: allMatches,
+    messageLocations,
   };
 }

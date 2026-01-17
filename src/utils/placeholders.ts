@@ -1,5 +1,5 @@
 /**
- * Placeholder constants for PII masking and secrets redaction
+ * Placeholder constants for PII masking and secrets masking
  * Single source of truth for all placeholder-related logic
  */
 
@@ -11,8 +11,8 @@ export const PLACEHOLDER_DELIMITERS = {
 /** PII placeholder format: [[TYPE_N]] e.g. [[PERSON_1]], [[EMAIL_ADDRESS_2]] */
 export const PII_PLACEHOLDER_FORMAT = "[[{TYPE}_{N}]]";
 
-/** Secrets placeholder format: [[SECRET_REDACTED_TYPE_N]] e.g. [[SECRET_REDACTED_API_KEY_OPENAI_1]] */
-export const SECRET_PLACEHOLDER_FORMAT = "[[SECRET_REDACTED_{N}]]";
+/** Secrets placeholder format: [[SECRET_MASKED_TYPE_N]] e.g. [[SECRET_MASKED_API_KEY_OPENAI_1]] */
+export const SECRET_PLACEHOLDER_FORMAT = "[[SECRET_MASKED_{N}]]";
 
 /**
  * Generates a placeholder string from the format

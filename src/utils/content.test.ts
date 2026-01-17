@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type ContentPart, extractTextContent, hasTextContent } from "./content";
+import { type ContentPart, extractTextContent } from "./content";
 
 describe("extractTextContent", () => {
   test("returns empty string for null", () => {
@@ -45,35 +45,5 @@ describe("extractTextContent", () => {
 
   test("handles empty array", () => {
     expect(extractTextContent([])).toBe("");
-  });
-});
-
-describe("hasTextContent", () => {
-  test("returns false for null", () => {
-    expect(hasTextContent(null)).toBe(false);
-  });
-
-  test("returns false for undefined", () => {
-    expect(hasTextContent(undefined)).toBe(false);
-  });
-
-  test("returns true for non-empty string", () => {
-    expect(hasTextContent("Hello")).toBe(true);
-  });
-
-  test("returns false for empty string", () => {
-    expect(hasTextContent("")).toBe(false);
-  });
-
-  test("returns true for array with text", () => {
-    const content: ContentPart[] = [{ type: "text", text: "Hello" }];
-    expect(hasTextContent(content)).toBe(true);
-  });
-
-  test("returns false for array without text", () => {
-    const content: ContentPart[] = [
-      { type: "image_url", image_url: { url: "https://example.com/image.jpg" } },
-    ];
-    expect(hasTextContent(content)).toBe(false);
   });
 });

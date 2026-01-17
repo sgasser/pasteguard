@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import pkg from "../../package.json";
 import { getConfig } from "../config";
+import { getPIIDetector } from "../pii/detect";
 import { getRouter } from "../services/decision";
-import { getPIIDetector } from "../services/pii-detector";
 
 export const infoRoutes = new Hono();
 

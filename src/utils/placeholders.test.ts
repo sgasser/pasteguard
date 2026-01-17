@@ -23,7 +23,7 @@ describe("placeholder constants", () => {
   test("secret format uses correct delimiters", () => {
     expect(SECRET_PLACEHOLDER_FORMAT).toContain(PLACEHOLDER_DELIMITERS.start);
     expect(SECRET_PLACEHOLDER_FORMAT).toContain(PLACEHOLDER_DELIMITERS.end);
-    expect(SECRET_PLACEHOLDER_FORMAT).toBe("[[SECRET_REDACTED_{N}]]");
+    expect(SECRET_PLACEHOLDER_FORMAT).toBe("[[SECRET_MASKED_{N}]]");
   });
 });
 
@@ -42,12 +42,12 @@ describe("generatePlaceholder", () => {
 describe("generateSecretPlaceholder", () => {
   test("generates secret placeholder", () => {
     const result = generateSecretPlaceholder("API_KEY_OPENAI", 1);
-    expect(result).toBe("[[SECRET_REDACTED_API_KEY_OPENAI_1]]");
+    expect(result).toBe("[[SECRET_MASKED_API_KEY_OPENAI_1]]");
   });
 
   test("generates secret placeholder with different type and count", () => {
     const result = generateSecretPlaceholder("PEM_PRIVATE_KEY", 2);
-    expect(result).toBe("[[SECRET_REDACTED_PEM_PRIVATE_KEY_2]]");
+    expect(result).toBe("[[SECRET_MASKED_PEM_PRIVATE_KEY_2]]");
   });
 });
 

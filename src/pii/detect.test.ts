@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { PIIDetector } from "./pii-detector";
+import { PIIDetector } from "./detect";
 
 const originalFetch = globalThis.fetch;
 
@@ -62,10 +62,16 @@ describe("PIIDetector", () => {
       const result = await detector.analyzeMessages(messages);
 
       expect(result.hasPII).toBe(true);
-      expect(result.entitiesByMessage).toHaveLength(3);
-      expect(result.entitiesByMessage[0]).toHaveLength(1);
-      expect(result.entitiesByMessage[1]).toHaveLength(1);
-      expect(result.entitiesByMessage[2]).toHaveLength(1);
+      // Per-message, per-part: messageEntities[msgIdx][partIdx] = entities
+      expect(result.messageEntities).toHaveLength(3);
+      // Each message has 1 part (string content)
+      expect(result.messageEntities[0]).toHaveLength(1);
+      expect(result.messageEntities[1]).toHaveLength(1);
+      expect(result.messageEntities[2]).toHaveLength(1);
+      // Each part has 1 entity
+      expect(result.messageEntities[0][0]).toHaveLength(1);
+      expect(result.messageEntities[1][0]).toHaveLength(1);
+      expect(result.messageEntities[2][0]).toHaveLength(1);
     });
 
     test("detects PII in system message when user message has none", async () => {
@@ -82,8 +88,8 @@ describe("PIIDetector", () => {
       const result = await detector.analyzeMessages(messages);
 
       expect(result.hasPII).toBe(true);
-      expect(result.entitiesByMessage[0]).toHaveLength(1);
-      expect(result.entitiesByMessage[0][0].entity_type).toBe("PERSON");
+      expect(result.messageEntities[0][0]).toHaveLength(1);
+      expect(result.messageEntities[0][0][0].entity_type).toBe("PERSON");
     });
 
     test("detects PII in earlier user message", async () => {
@@ -101,7 +107,7 @@ describe("PIIDetector", () => {
       const result = await detector.analyzeMessages(messages);
 
       expect(result.hasPII).toBe(true);
-      expect(result.entitiesByMessage[0]).toHaveLength(1);
+      expect(result.messageEntities[0][0]).toHaveLength(1);
     });
 
     test("returns empty result for no messages", async () => {
@@ -111,8 +117,8 @@ describe("PIIDetector", () => {
       const result = await detector.analyzeMessages([]);
 
       expect(result.hasPII).toBe(false);
-      expect(result.entitiesByMessage).toHaveLength(0);
-      expect(result.newEntities).toHaveLength(0);
+      expect(result.messageEntities).toHaveLength(0);
+      expect(result.allEntities).toHaveLength(0);
     });
 
     test("handles multimodal content", async () => {
@@ -134,7 +140,12 @@ describe("PIIDetector", () => {
       const result = await detector.analyzeMessages(messages);
 
       expect(result.hasPII).toBe(true);
-      expect(result.entitiesByMessage[0]).toHaveLength(1);
+      // Multimodal message has 2 parts
+      expect(result.messageEntities[0]).toHaveLength(2);
+      // First part (text) has 1 entity
+      expect(result.messageEntities[0][0]).toHaveLength(1);
+      // Second part (image) has no entities
+      expect(result.messageEntities[0][1]).toHaveLength(0);
     });
 
     test("skips messages with empty content", async () => {
@@ -150,8 +161,10 @@ describe("PIIDetector", () => {
 
       const result = await detector.analyzeMessages(messages);
 
-      expect(result.entitiesByMessage).toHaveLength(2);
-      expect(result.entitiesByMessage[0]).toHaveLength(0);
+      expect(result.messageEntities).toHaveLength(2);
+      // First message (empty string) has 1 part with no entities
+      expect(result.messageEntities[0]).toHaveLength(1);
+      expect(result.messageEntities[0][0]).toHaveLength(0);
     });
   });
 

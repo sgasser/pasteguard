@@ -1,32 +1,8 @@
 import eld from "eld/small";
 import { getConfig } from "../config";
+import type { SupportedLanguage } from "../constants/languages";
 
-// All 24 spaCy languages with trained pipelines
-export type SupportedLanguage =
-  | "ca"
-  | "zh"
-  | "hr"
-  | "da"
-  | "nl"
-  | "en"
-  | "fi"
-  | "fr"
-  | "de"
-  | "el"
-  | "it"
-  | "ja"
-  | "ko"
-  | "lt"
-  | "mk"
-  | "nb"
-  | "pl"
-  | "pt"
-  | "ro"
-  | "ru"
-  | "sl"
-  | "es"
-  | "sv"
-  | "uk";
+export type { SupportedLanguage } from "../constants/languages";
 
 export interface LanguageDetectionResult {
   language: SupportedLanguage;

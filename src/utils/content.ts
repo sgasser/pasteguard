@@ -67,13 +67,3 @@ export function extractTextContent(content: MessageContent): string {
   // Unexpected type - return empty string
   return "";
 }
-
-/**
- * Checks if content has any text
- *
- * @param content - The message content to check
- * @returns true if content contains text, false otherwise
- */
-export function hasTextContent(content: MessageContent): boolean {
-  return extractTextContent(content).length > 0;
-}

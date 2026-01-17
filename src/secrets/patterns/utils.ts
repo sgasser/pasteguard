@@ -1,14 +1,14 @@
-import type { SecretsMatch, SecretsRedaction } from "./types";
+import type { SecretLocation, SecretsMatch } from "./types";
 
 /**
- * Helper to detect secrets matching a pattern and collect matches/redactions
+ * Helper to detect secrets matching a pattern and collect matches/locations
  */
 export function detectPattern(
   text: string,
   pattern: RegExp,
   entityType: string,
   matches: SecretsMatch[],
-  redactions: SecretsRedaction[],
+  locations: SecretLocation[],
   existingPositions?: Set<number>,
 ): number {
   let count = 0;
@@ -19,10 +19,10 @@ export function detectPattern(
 
       count++;
       existingPositions?.add(match.index);
-      redactions.push({
+      locations.push({
         start: match.index,
         end: match.index + match[0].length,
-        type: entityType as SecretsRedaction["type"],
+        type: entityType as SecretLocation["type"],
       });
     }
   }

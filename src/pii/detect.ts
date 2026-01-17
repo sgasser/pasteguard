@@ -1,6 +1,6 @@
 import { getConfig } from "../config";
+import { getLanguageDetector, type SupportedLanguage } from "../services/language-detector";
 import { extractTextContent, type MessageContent } from "../utils/content";
-import { getLanguageDetector, type SupportedLanguage } from "./language-detector";
 
 export interface PIIEntity {
   entity_type: string;
@@ -16,10 +16,16 @@ interface AnalyzeRequest {
   score_threshold?: number;
 }
 
+/**
+ * Per-message, per-part PII detection result
+ * Structure: messageEntities[msgIdx][partIdx] = entities for that part
+ */
 export interface PIIDetectionResult {
   hasPII: boolean;
-  entitiesByMessage: PIIEntity[][];
-  newEntities: PIIEntity[];
+  /** Per-message, per-part entities */
+  messageEntities: PIIEntity[][][];
+  /** Flattened list of all entities (for summary/logging) */
+  allEntities: PIIEntity[];
   scanTimeMs: number;
   language: SupportedLanguage;
   languageFallback: boolean;
@@ -78,33 +84,65 @@ export class PIIDetector {
     }
   }
 
+  /**
+   * Analyzes messages for PII with per-part granularity
+   *
+   * For string content, entities are in messageEntities[msgIdx][0].
+   * For array content (multimodal), each text part is scanned separately.
+   */
   async analyzeMessages(
     messages: Array<{ role: string; content: MessageContent }>,
   ): Promise<PIIDetectionResult> {
     const startTime = Date.now();
     const config = getConfig();
 
+    // Detect language from the last user message
     const lastUserMsg = messages.findLast((m) => m.role === "user");
     const langText = lastUserMsg ? extractTextContent(lastUserMsg.content) : "";
     const langResult = langText
       ? getLanguageDetector().detect(langText)
       : { language: config.pii_detection.fallback_language, usedFallback: true };
 
-    const scannedRoles = ["system", "developer", "user", "assistant"];
+    const scannedRoles = ["system", "developer", "user", "assistant", "tool"];
 
-    const entitiesByMessage = await Promise.all(
-      messages.map((message) => {
-        const text = extractTextContent(message.content);
-        return text && scannedRoles.includes(message.role)
-          ? this.detectPII(text, langResult.language)
-          : Promise.resolve([]);
+    // Detect PII per message, per content part
+    const messageEntities: PIIEntity[][][] = await Promise.all(
+      messages.map(async (message) => {
+        if (!scannedRoles.includes(message.role)) {
+          return [];
+        }
+
+        // String content → wrap in single-element array
+        if (typeof message.content === "string") {
+          const entities = message.content
+            ? await this.detectPII(message.content, langResult.language)
+            : [];
+          return [entities];
+        }
+
+        // Array content (multimodal) → per-part detection
+        if (Array.isArray(message.content)) {
+          return await Promise.all(
+            message.content.map(async (part) => {
+              if (part.type === "text" && typeof part.text === "string") {
+                return await this.detectPII(part.text, langResult.language);
+              }
+              return [];
+            }),
+          );
+        }
+
+        // Null/undefined content
+        return [];
       }),
     );
 
+    const allEntities = messageEntities.flat(2);
+
     return {
-      hasPII: entitiesByMessage.some((e) => e.length > 0),
-      entitiesByMessage,
-      newEntities: entitiesByMessage.flat(),
+      hasPII: allEntities.length > 0,
+      messageEntities,
+      allEntities,
       scanTimeMs: Date.now() - startTime,
       language: langResult.language,
       languageFallback: langResult.usedFallback,
