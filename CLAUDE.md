@@ -78,7 +78,7 @@ PASTEGUARD_TAG=eu docker compose up -d
 LANGUAGES=en,de,ja docker compose up -d --build
 ```
 
-See @presidio/languages.yaml for 24 available languages.
+See @docker/presidio/languages.yaml for 24 available languages.
 
 ## Testing
 

@@ -19,6 +19,7 @@ services:
     image: ghcr.io/sgasser/pasteguard:${PASTEGUARD_TAG:-en}
     build:
       context: .
+      dockerfile: docker/Dockerfile
       args:
         LANGUAGES: ${LANGUAGES:-en}
     ports:
@@ -37,6 +38,7 @@ services:
     image: ghcr.io/sgasser/pasteguard:${PASTEGUARD_TAG:-en}
     build:
       context: .
+      dockerfile: docker/Dockerfile
       args:
         LANGUAGES: ${LANGUAGES:-en}
     ports:

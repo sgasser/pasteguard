@@ -48,7 +48,7 @@ pii_detection:
   #
   # Available (24 languages): ca, zh, hr, da, nl, en, fi, fr, de, el,
   #   it, ja, ko, lt, mk, nb, pl, pt, ro, ru, sl, es, sv, uk
-  # See presidio/languages.yaml for full list with details
+  # See docker/presidio/languages.yaml for full list with details
   languages:
     - en
     # Add more languages to match your Docker build:

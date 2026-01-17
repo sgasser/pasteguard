@@ -24,7 +24,7 @@ const MaskingSchema = z.object({
 });
 
 // All 25 spaCy languages with trained pipelines
-// See presidio/languages.yaml for full list
+// See docker/presidio/languages.yaml for full list
 const SupportedLanguages = [
   "ca", // Catalan
   "zh", // Chinese

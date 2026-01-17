@@ -1,7 +1,7 @@
 # PasteGuard - All-in-One Image
 # Single container with Proxy + PII Detection
 #
-# Build: docker build --build-arg LANGUAGES=en -t pasteguard:en .
+# Build: docker build -f docker/Dockerfile --build-arg LANGUAGES=en -t pasteguard:en .
 # Run:   docker run -p 3000:3000 -v ./config.yaml:/app/config.yaml -v ./data:/app/data pasteguard:en
 
 ARG LANGUAGES="en"
@@ -15,8 +15,8 @@ WORKDIR /build
 
 RUN pip install --no-cache-dir pyyaml
 
-COPY presidio/languages.yaml /build/
-COPY presidio/scripts/generate-configs.py /build/
+COPY docker/presidio/languages.yaml /build/
+COPY docker/presidio/generate-configs.py /build/
 
 ARG LANGUAGES
 RUN python generate-configs.py \
@@ -85,7 +85,7 @@ COPY --from=bun-builder /app/tsconfig.json ./
 RUN mkdir -p /app/data
 
 # Copy supervisor configuration
-COPY supervisord.conf /etc/supervisor/conf.d/pasteguard.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/pasteguard.conf
 
 # Environment defaults
 ENV PRESIDIO_URL=http://localhost:5002
