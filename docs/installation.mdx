@@ -87,11 +87,18 @@ LANGUAGES=en,de,ja docker compose up -d --build
 
 ## Environment Variables
 
+**Runtime (docker run):**
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PASTEGUARD_TAG` | `en` | Image tag (`en`, `eu`) |
-| `PASTEGUARD_LANGUAGES` | (per image) | Override auto-configured languages |
-| `LANGUAGES` | `en` | Languages for local build |
+| `PASTEGUARD_LANGUAGES` | (per image) | Override enabled languages at runtime |
+
+**Build-time (docker compose build):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PASTEGUARD_TAG` | `en` | Image tag for docker compose |
+| `LANGUAGES` | `en` | Languages to include when building locally |
 
 ## Next Steps
 
