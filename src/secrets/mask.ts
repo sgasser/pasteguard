@@ -1,4 +1,4 @@
-import type { ChatCompletionResponse, ChatMessage } from "../services/llm-client";
+import type { ChatCompletionResponse, ChatMessage } from "../providers/openai-client";
 import { resolveOverlaps } from "../utils/conflict-resolver";
 import {
   createPlaceholderContext,

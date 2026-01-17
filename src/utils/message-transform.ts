@@ -9,7 +9,7 @@
  * This module provides shared infrastructure to avoid duplication.
  */
 
-import type { ChatMessage } from "../services/llm-client";
+import type { ChatMessage } from "../providers/openai-client";
 import type { Span } from "./conflict-resolver";
 import type { ContentPart } from "./content";
 import { findPartialPlaceholderStart } from "./placeholders";

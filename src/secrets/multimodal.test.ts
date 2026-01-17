@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { PIIDetectionResult, PIIEntity } from "../pii/detect";
 import { maskMessages } from "../pii/mask";
-import type { ChatMessage } from "../services/llm-client";
+import type { ChatMessage } from "../providers/openai-client";
 import type { ContentPart } from "../utils/content";
 
 /**

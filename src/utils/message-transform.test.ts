@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ChatMessage } from "../services/llm-client";
+import type { ChatMessage } from "../providers/openai-client";
 import type { Span } from "./conflict-resolver";
 import {
   createPlaceholderContext,

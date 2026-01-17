@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { MaskingConfig } from "../config";
-import type { ChatMessage } from "../services/llm-client";
+import type { ChatMessage } from "../providers/openai-client";
 import { createPIIResult } from "../test-utils/detection-results";
 import type { PIIEntity } from "./detect";
 import {

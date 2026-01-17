@@ -1,5 +1,5 @@
 import type { SecretsDetectionConfig } from "../config";
-import type { ChatMessage } from "../services/llm-client";
+import type { ChatMessage } from "../providers/openai-client";
 import type { ContentPart } from "../utils/content";
 import { patternDetectors } from "./patterns";
 import type {

@@ -8,7 +8,7 @@ import { getPIIDetector } from "./pii/detect";
 import { dashboardRoutes } from "./routes/dashboard";
 import { healthRoutes } from "./routes/health";
 import { infoRoutes } from "./routes/info";
-import { proxyRoutes } from "./routes/proxy";
+import { openaiRoutes } from "./routes/openai";
 import { getLogger } from "./services/logger";
 
 type Variables = {
@@ -42,7 +42,7 @@ app.get("/favicon.svg", (c) => {
 
 app.route("/", healthRoutes);
 app.route("/", infoRoutes);
-app.route("/openai/v1", proxyRoutes);
+app.route("/openai/v1", openaiRoutes);
 
 if (config.dashboard.enabled) {
   app.route("/dashboard", dashboardRoutes);
