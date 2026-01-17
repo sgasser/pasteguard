@@ -1,9 +1,9 @@
 import { type Config, getConfig } from "../config";
 import { getPIIDetector, type PIIDetectionResult } from "../pii/detect";
 import { createMaskingContext, maskMessages } from "../pii/mask";
+import { type ChatMessage, LLMClient } from "../providers/openai-client";
 import type { MessageSecretsResult } from "../secrets/detect";
 import type { PlaceholderContext } from "../utils/message-transform";
-import { type ChatMessage, LLMClient } from "../providers/openai-client";
 
 /**
  * Routing decision result for route mode
