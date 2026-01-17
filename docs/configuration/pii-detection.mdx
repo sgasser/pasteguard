@@ -8,7 +8,7 @@ description: Configure PII detection settings
 ```yaml
 pii_detection:
   presidio_url: http://localhost:5002
-  languages: [en, de]
+  languages: ${PASTEGUARD_LANGUAGES:-en}  # Auto-configured per Docker image
   fallback_language: en
   score_threshold: 0.7
   entities:
@@ -26,34 +26,47 @@ pii_detection:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `presidio_url` | `http://localhost:5002` | Presidio analyzer URL |
-| `languages` | `[en]` | Languages to detect. Must match Docker build |
+| `languages` | (per image) | Languages to detect. Auto-configured in Docker images |
 | `fallback_language` | `en` | Fallback if detected language not in list |
 | `score_threshold` | `0.7` | Minimum confidence (0.0-1.0) |
 | `entities` | See below | Entity types to detect |
 
 ## Languages
 
-Use prebuilt images or build locally:
+Languages are auto-configured per Docker image:
+
+- **`:en` image** → English only
+- **`:eu` image** → English, German, Spanish, French, Italian, Dutch, Polish, Portuguese, Romanian
+
+For custom language builds:
 
 ```bash
-# Use EU image (en, de, es, fr, it, nl, pl, pt, ro)
-PASTEGUARD_TAG=eu docker compose up -d
-
-# Or build with custom languages
-LANGUAGES=en,de,fr docker compose up -d --build
+LANGUAGES=en,de,ja docker compose up -d --build
 ```
 
 Available languages (24):
 `ca`, `zh`, `hr`, `da`, `nl`, `en`, `fi`, `fr`, `de`, `el`, `it`, `ja`, `ko`, `lt`, `mk`, `nb`, `pl`, `pt`, `ro`, `ru`, `sl`, `es`, `sv`, `uk`
 
-### Single Language
+### Override Languages
 
-If only one language is specified, language detection is skipped for better performance:
+To override the auto-configured languages:
 
 ```yaml
 pii_detection:
-  languages: [en]
+  languages:
+    - en
+    - de
 ```
+
+Or via environment variable:
+
+```bash
+docker run -e PASTEGUARD_LANGUAGES=en,de ghcr.io/sgasser/pasteguard:eu
+```
+
+### Single Language
+
+If only one language is configured, language detection is skipped for better performance.
 
 ### Fallback Language
 
@@ -61,8 +74,7 @@ If the detected language isn't in your list, the fallback is used:
 
 ```yaml
 pii_detection:
-  languages: [en, de]
-  fallback_language: en  # Used for French text, etc.
+  fallback_language: en  # Used for unsupported languages
 ```
 
 ## Entities
