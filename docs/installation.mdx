@@ -22,23 +22,17 @@ ghcr.io/sgasser/pasteguard
 
 ## Quick Start
 
-**1. Download config file:**
+**Zero-config (works out of the box):**
+
+```bash
+docker run -d --name pasteguard -p 3000:3000 ghcr.io/sgasser/pasteguard:en
+```
+
+**With custom config and persistent logs:**
 
 ```bash
 curl -O https://raw.githubusercontent.com/sgasser/pasteguard/main/config.example.yaml
 mv config.example.yaml config.yaml
-```
-
-**2. Start PasteGuard:**
-
-<CodeGroup>
-
-```bash Docker Compose
-curl -O https://raw.githubusercontent.com/sgasser/pasteguard/main/docker-compose.yml
-docker compose up -d
-```
-
-```bash Docker Run
 mkdir -p data
 docker run -d --name pasteguard -p 3000:3000 \
   -v ./config.yaml:/app/config.yaml:ro \
@@ -46,9 +40,7 @@ docker run -d --name pasteguard -p 3000:3000 \
   ghcr.io/sgasser/pasteguard:en
 ```
 
-</CodeGroup>
-
-**3. Verify:**
+**Verify:**
 
 ```bash
 curl http://localhost:3000/health
