@@ -80,6 +80,7 @@ COPY --from=bun-builder /app/node_modules ./node_modules
 COPY --from=bun-builder /app/src ./src
 COPY --from=bun-builder /app/package.json ./
 COPY --from=bun-builder /app/tsconfig.json ./
+COPY config.example.yaml ./
 
 # Create data directory
 RUN mkdir -p /app/data
