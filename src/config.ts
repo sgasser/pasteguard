@@ -54,9 +54,20 @@ const SupportedLanguages = [
 
 const LanguageEnum = z.enum(SupportedLanguages);
 
+// Accept either array or comma-separated string for languages
+// This allows using env vars like PASTEGUARD_LANGUAGES=en,de,fr
+const LanguagesSchema = z
+  .union([z.array(LanguageEnum), z.string()])
+  .transform((val) => {
+    if (Array.isArray(val)) return val;
+    return val.split(",").map((s) => s.trim()) as (typeof SupportedLanguages)[number][];
+  })
+  .pipe(z.array(LanguageEnum))
+  .default(["en"]);
+
 const PIIDetectionSchema = z.object({
   presidio_url: z.string().url(),
-  languages: z.array(LanguageEnum).default(["en"]),
+  languages: LanguagesSchema,
   fallback_language: LanguageEnum.default("en"),
   score_threshold: z.coerce.number().min(0).max(1).default(0.7),
   entities: z

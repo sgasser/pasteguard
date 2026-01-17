@@ -43,19 +43,19 @@ pii_detection:
   # Supported languages for PII detection
   # Auto-detects language from input text and uses appropriate model
   #
-  # Languages must match the Docker image tag (en, eu) or custom build:
-  #   PASTEGUARD_TAG=eu docker compose up -d
+  # Docker: Uses PASTEGUARD_LANGUAGES env var (auto-configured per image)
+  # Local:  Uncomment the array below and comment out the env var line
   #
   # Available (24 languages): ca, zh, hr, da, nl, en, fi, fr, de, el,
   #   it, ja, ko, lt, mk, nb, pl, pt, ro, ru, sl, es, sv, uk
   # See docker/presidio/languages.yaml for full list with details
-  languages:
-    - en
-    # Add more languages to match your Docker build:
-    # - de
-    # - fr
-    # - es
-    # - it
+  languages: ${PASTEGUARD_LANGUAGES:-en}
+  # languages:
+  #   - en
+  #   - de
+  #   - fr
+  #   - es
+  #   - it
 
   # Fallback language if detected language is not in the list above
   fallback_language: en
