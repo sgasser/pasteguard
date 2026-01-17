@@ -38,6 +38,30 @@ docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
 
 Languages are auto-configured per image — no config changes needed. The EU image automatically enables all 9 European languages.
 
+## Production Setup
+
+For persistent logs and custom configuration:
+
+```bash
+# Download config
+curl -O https://raw.githubusercontent.com/sgasser/pasteguard/main/config.example.yaml
+mv config.example.yaml config.yaml
+
+# Create data directory
+mkdir -p data
+
+# Run with persistence
+docker run -d --name pasteguard --restart unless-stopped -p 3000:3000 \
+  -v ./config.yaml:/app/config.yaml:ro \
+  -v ./data:/app/data \
+  ghcr.io/sgasser/pasteguard:en
+```
+
+This gives you:
+- **Custom config** — edit `config.yaml` to change detection settings
+- **Persistent logs** — request history in `data/pasteguard.db` survives restarts
+- **Auto-restart** — container restarts automatically
+
 ## Custom Language Builds
 
 For languages not in prebuilt images (Nordic, Asian, Eastern European), clone and build:
