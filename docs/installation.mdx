@@ -22,28 +22,8 @@ ghcr.io/sgasser/pasteguard
 
 ## Quick Start
 
-**Zero-config (works out of the box):**
-
 ```bash
-docker run -d --name pasteguard -p 3000:3000 ghcr.io/sgasser/pasteguard:en
-```
-
-**With custom config and persistent logs:**
-
-```bash
-curl -O https://raw.githubusercontent.com/sgasser/pasteguard/main/config.example.yaml
-mv config.example.yaml config.yaml
-mkdir -p data
-docker run -d --name pasteguard -p 3000:3000 \
-  -v ./config.yaml:/app/config.yaml:ro \
-  -v ./data:/app/data \
-  ghcr.io/sgasser/pasteguard:en
-```
-
-**Verify:**
-
-```bash
-curl http://localhost:3000/health
+docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
 ```
 
 Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
@@ -53,7 +33,7 @@ Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 For German, Spanish, French, Italian, Dutch, Polish, Portuguese, and Romanian:
 
 ```bash
-docker run -d --name pasteguard -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
+docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
 ```
 
 Languages are auto-configured per image — no config changes needed. The EU image automatically enables all 9 European languages.

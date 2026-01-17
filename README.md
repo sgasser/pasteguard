@@ -75,19 +75,19 @@ PasteGuard sits between your app and your provider. It's OpenAI-compatible — j
 ## Quick Start
 
 ```bash
-docker run -d --name pasteguard -p 3000:3000 ghcr.io/sgasser/pasteguard:en
+docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
 ```
 
 Point your app to `http://localhost:3000/openai/v1` instead of `https://api.openai.com/v1`.
 
 Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 
-### Multiple Languages
+### European Languages
 
-For European languages (German, Spanish, French, Italian, Dutch, Polish, Portuguese, Romanian):
+For German, Spanish, French, Italian, Dutch, Polish, Portuguese, and Romanian:
 
 ```bash
-docker run -d --name pasteguard -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
+docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
 ```
 
 For custom config, persistent logs, or other languages: **[Read the docs →](https://pasteguard.com/docs/installation)**

@@ -8,12 +8,10 @@ description: Get PasteGuard running in 2 minutes
 ## 1. Start PasteGuard
 
 ```bash
-docker run -d --name pasteguard -p 3000:3000 ghcr.io/sgasser/pasteguard:en
+docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
 ```
 
-That's it! PasteGuard runs on `http://localhost:3000` with sensible defaults.
-
-Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
+PasteGuard runs on `http://localhost:3000`. Open `http://localhost:3000/dashboard` to see the dashboard.
 
 <Note>
 For custom configuration, European languages, or persistent logs, see [Installation](/installation).
