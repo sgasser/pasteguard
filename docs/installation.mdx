@@ -52,32 +52,11 @@ Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 
 For German, Spanish, French, Italian, Dutch, Polish, Portuguese, and Romanian:
 
-<CodeGroup>
-
-```bash Docker Compose
-PASTEGUARD_TAG=eu docker compose up -d
+```bash
+docker run -d --name pasteguard -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
 ```
 
-```bash Docker Run
-docker run -d --name pasteguard -p 3000:3000 \
-  -v ./config.yaml:/app/config.yaml:ro \
-  -v ./data:/app/data \
-  ghcr.io/sgasser/pasteguard:eu
-```
-
-</CodeGroup>
-
-Update your `config.yaml` to enable the languages you need:
-
-```yaml
-pii_detection:
-  languages:
-    - en
-    - de
-    - fr
-    - es
-    - it
-```
+Languages are auto-configured per image — no config changes needed. The EU image automatically enables all 9 European languages.
 
 ## Custom Language Builds
 
@@ -111,6 +90,7 @@ LANGUAGES=en,de,ja docker compose up -d --build
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PASTEGUARD_TAG` | `en` | Image tag (`en`, `eu`) |
+| `PASTEGUARD_LANGUAGES` | (per image) | Override auto-configured languages |
 | `LANGUAGES` | `en` | Languages for local build |
 
 ## Next Steps
