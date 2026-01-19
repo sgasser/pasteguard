@@ -3,7 +3,7 @@
  */
 
 import type { OpenAIProviderConfig } from "../../config";
-import { HEALTH_CHECK_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "../../constants/timeouts";
+import { REQUEST_TIMEOUT_MS } from "../../constants/timeouts";
 import { ProviderError } from "../errors";
 import type { OpenAIRequest, OpenAIResponse } from "./types";
 
@@ -85,26 +85,6 @@ export async function callOpenAI(
   }
 
   return { response: await response.json(), isStreaming: false, model };
-}
-
-/**
- * Check if OpenAI API is reachable
- */
-export async function checkOpenAIHealth(config: OpenAIProviderConfig): Promise<boolean> {
-  try {
-    const baseUrl = config.base_url.replace(/\/$/, "");
-    // Use models endpoint - returns 401 if no auth, 200 if OK
-    const response = await fetch(`${baseUrl}/models`, {
-      method: "GET",
-      signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS),
-    });
-
-    // 401 means API is up but no auth - that's OK for health check
-    // 200 means API is up with valid auth
-    return response.status === 401 || response.status === 200;
-  } catch {
-    return false;
-  }
 }
 
 /**

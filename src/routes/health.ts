@@ -23,7 +23,7 @@ healthRoutes.get("/health", async (c) => {
     services.presidio = presidioHealth ? "up" : "down";
   }
 
-  if (config.mode === "route") {
+  if (config.mode === "route" && config.local) {
     services.local_llm = localHealth ? "up" : "down";
   }
 

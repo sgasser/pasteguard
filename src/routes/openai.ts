@@ -51,7 +51,7 @@ export const openaiRoutes = new Hono();
  * POST /v1/chat/completions
  */
 openaiRoutes.post(
-  "/chat/completions",
+  "/v1/chat/completions",
   zValidator("json", OpenAIRequestSchema, (result, c) => {
     if (!result.success) {
       return c.json(
@@ -141,12 +141,13 @@ openaiRoutes.post(
 );
 
 /**
- * Wildcard proxy for /models, /embeddings, /audio/*, /images/*, etc.
+ * Proxy all other requests to OpenAI
  */
 openaiRoutes.all("/*", (c) => {
   const config = getConfig();
   const { baseUrl } = getOpenAIInfo(config.providers.openai);
-  const path = c.req.path.replace(/^\/openai\/v1/, "");
+  // /openai/v1/models -> /v1/models
+  const path = c.req.path.replace(/^\/openai/, "");
 
   return proxy(`${baseUrl}${path}`, {
     ...c.req,

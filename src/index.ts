@@ -5,6 +5,7 @@ import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { getConfig } from "./config";
 import { getPIIDetector } from "./pii/detect";
+import { anthropicRoutes } from "./routes/anthropic";
 import { dashboardRoutes } from "./routes/dashboard";
 import { healthRoutes } from "./routes/health";
 import { infoRoutes } from "./routes/info";
@@ -42,7 +43,8 @@ app.get("/favicon.svg", (c) => {
 
 app.route("/", healthRoutes);
 app.route("/", infoRoutes);
-app.route("/openai/v1", openaiRoutes);
+app.route("/openai", openaiRoutes);
+app.route("/anthropic", anthropicRoutes);
 
 if (config.dashboard.enabled) {
   app.route("/dashboard", dashboardRoutes);
@@ -178,6 +180,7 @@ Provider:
 
 Server:     http://${host}:${port}
 OpenAI API: http://${host}:${port}/openai/v1/chat/completions
+Anthropic:  http://${host}:${port}/anthropic/v1/messages
 Health:     http://${host}:${port}/health
 Info:       http://${host}:${port}/info
 Dashboard:  http://${host}:${port}/dashboard
