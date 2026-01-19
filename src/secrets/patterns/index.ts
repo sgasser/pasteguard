@@ -17,6 +17,5 @@ export const patternDetectors: PatternDetector[] = [
   envVarsDetector,
 ];
 
-// Re-export types and utilities for convenience
 export type { PatternDetector, SecretEntityType, SecretsDetectionResult } from "./types";
 export { detectPattern } from "./utils";

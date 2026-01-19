@@ -1,33 +1,36 @@
-import type { ChatCompletionResponse, ChatMessage } from "../providers/openai-client";
-import { resolveOverlaps } from "../utils/conflict-resolver";
+/**
+ * Secrets masking
+ */
+
+import { resolveOverlaps } from "../masking/conflict-resolver";
+import { incrementAndGenerate } from "../masking/context";
+import { generateSecretPlaceholder } from "../masking/placeholders";
 import {
-  createPlaceholderContext,
-  flushBuffer,
-  incrementAndGenerate,
-  type MaskResult,
+  createMaskingContext,
+  flushMaskingBuffer as flushBuffer,
+  maskSpans,
   type PlaceholderContext,
-  processStreamChunk,
-  replaceWithPlaceholders,
-  restorePlaceholders,
-  restoreResponsePlaceholders,
-  transformMessagesPerPart,
-} from "../utils/message-transform";
-import { generateSecretPlaceholder } from "../utils/placeholders";
+  unmaskStreamChunk as unmaskChunk,
+  unmask as unmaskText,
+} from "../masking/service";
+import type { RequestExtractor, TextSpan } from "../masking/types";
 import type { MessageSecretsResult, SecretLocation } from "./detect";
 
-export type { MaskResult } from "../utils/message-transform";
+export {
+  createMaskingContext as createSecretsMaskingContext,
+  type PlaceholderContext,
+} from "../masking/service";
 
 /**
- * Creates a new secrets masking context for a request
+ * Result of masking operation
  */
-export function createSecretsMaskingContext(): PlaceholderContext {
-  return createPlaceholderContext();
+export interface MaskResult {
+  masked: string;
+  context: PlaceholderContext;
 }
 
 /**
  * Generates a placeholder for a secret type
- *
- * Format: [[SECRET_MASKED_{TYPE}_{N}]] e.g. [[SECRET_MASKED_API_KEY_OPENAI_1]]
  */
 function generatePlaceholder(secretType: string, context: PlaceholderContext): string {
   return incrementAndGenerate(secretType, context, generateSecretPlaceholder);
@@ -41,75 +44,105 @@ export function maskSecrets(
   locations: SecretLocation[],
   context?: PlaceholderContext,
 ): MaskResult {
-  const ctx = context || createSecretsMaskingContext();
-  const masked = replaceWithPlaceholders(
-    text,
-    locations,
-    ctx,
+  const spans: TextSpan[] = [{ text, path: "text", messageIndex: 0, partIndex: 0 }];
+  const perSpanData = [locations];
+
+  const result = maskSpans(
+    spans,
+    perSpanData,
     (loc) => loc.type,
     generatePlaceholder,
     resolveOverlaps,
+    context,
   );
-  return { masked, context: ctx };
+
+  return {
+    masked: result.maskedSpans[0]?.maskedText ?? text,
+    context: result.context,
+  };
 }
 
 /**
  * Unmasks text by replacing placeholders with original secrets
- *
- * @param text - Text containing secret placeholders
- * @param context - Masking context with mappings
  */
 export function unmaskSecrets(text: string, context: PlaceholderContext): string {
-  return restorePlaceholders(text, context);
-}
-
-/**
- * Masks secrets in messages using per-part detection results
- *
- * Uses transformMessagesPerPart for the common iteration pattern.
- */
-export function maskMessages(
-  messages: ChatMessage[],
-  detection: MessageSecretsResult,
-): { masked: ChatMessage[]; context: PlaceholderContext } {
-  const context = createSecretsMaskingContext();
-
-  const masked = transformMessagesPerPart(
-    messages,
-    detection.messageLocations,
-    (text, locations, ctx) => maskSecrets(text, locations, ctx).masked,
-    context,
-  );
-
-  return { masked, context };
+  return unmaskText(text, context);
 }
 
 /**
  * Streaming unmask helper - processes chunks and unmasks when complete placeholders are found
- *
- * Returns the unmasked portion and any remaining buffer that might contain partial placeholders.
  */
 export function unmaskSecretsStreamChunk(
   buffer: string,
   newChunk: string,
   context: PlaceholderContext,
 ): { output: string; remainingBuffer: string } {
-  return processStreamChunk(buffer, newChunk, context, unmaskSecrets);
+  return unmaskChunk(buffer, newChunk, context);
 }
 
 /**
  * Flushes remaining buffer at end of stream
  */
 export function flushSecretsMaskingBuffer(buffer: string, context: PlaceholderContext): string {
-  return flushBuffer(buffer, context, unmaskSecrets);
+  return flushBuffer(buffer, context);
 }
 
 /**
- * Unmasks a chat completion response by replacing placeholders in all choices
+ * Unmasks secrets in a response using an extractor
  */
-export function unmaskSecretsResponse(
-  response: ChatCompletionResponse,
+export function unmaskSecretsResponse<TRequest, TResponse>(
+  response: TResponse,
   context: PlaceholderContext,
-): ChatCompletionResponse {
-  return restoreResponsePlaceholders(response, context);
+  extractor: RequestExtractor<TRequest, TResponse>,
+): TResponse {
+  return extractor.unmaskResponse(response, context);
+}
+
+/**
+ * Result of masking a request
+ */
+export interface MaskRequestResult<TRequest> {
+  /** The masked request */
+  masked: TRequest;
+  /** Masking context for unmasking response */
+  context: PlaceholderContext;
+}
+
+/**
+ * Masks secrets in a request using an extractor
+ */
+export function maskRequest<TRequest, TResponse>(
+  request: TRequest,
+  detection: MessageSecretsResult,
+  extractor: RequestExtractor<TRequest, TResponse>,
+): MaskRequestResult<TRequest> {
+  const context = createMaskingContext();
+
+  if (!detection.spanLocations) {
+    return { masked: request, context };
+  }
+
+  // Extract text spans from request
+  const spans = extractor.extractTexts(request);
+
+  // Mask the spans
+  const { maskedSpans } = maskSpans(
+    spans,
+    detection.spanLocations,
+    (loc) => loc.type,
+    generatePlaceholder,
+    resolveOverlaps,
+    context,
+  );
+
+  // Filter to only spans that were actually masked (have locations)
+  const changedSpans = maskedSpans.filter((_, i) => {
+    const locations = detection.spanLocations![i] || [];
+    return locations.length > 0;
+  });
+
+  // Apply masked text back to request
+  const masked = extractor.applyMasked(request, changedSpans);
+
+  return { masked, context };
 }

@@ -1,6 +1,5 @@
 /**
- * Placeholder constants for PII masking and secrets masking
- * Single source of truth for all placeholder-related logic
+ * Placeholder constants and utilities
  */
 
 export const PLACEHOLDER_DELIMITERS = {

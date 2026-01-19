@@ -38,6 +38,7 @@ const LanguagesSchema = z
   .default(["en"]);
 
 const PIIDetectionSchema = z.object({
+  enabled: z.boolean().default(true),
   presidio_url: z.string().url(),
   languages: LanguagesSchema,
   fallback_language: LanguageEnum.default("en"),
@@ -103,7 +104,7 @@ const ConfigSchema = z
   .object({
     mode: z.enum(["route", "mask"]).default("route"),
     server: ServerSchema.default({}),
-    // Providers - OpenAI-compatible endpoints
+    // Providers
     providers: z.object({
       openai: OpenAIProviderSchema.default({}),
     }),

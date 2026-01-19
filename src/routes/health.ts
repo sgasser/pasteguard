@@ -1,21 +1,30 @@
 import { Hono } from "hono";
 import { getConfig } from "../config";
-import { getRouter } from "../services/decision";
+import { checkLocalHealth } from "../providers/local";
+import { healthCheck as checkPresidio } from "../services/pii";
 
 export const healthRoutes = new Hono();
 
 healthRoutes.get("/health", async (c) => {
   const config = getConfig();
-  const router = getRouter();
-  const health = await router.healthCheck();
-  const isHealthy = health.presidio;
+  const piiEnabled = config.pii_detection.enabled;
 
-  const services: Record<string, string> = {
-    presidio: health.presidio ? "up" : "down",
-  };
+  const [presidioHealth, localHealth] = await Promise.all([
+    piiEnabled ? checkPresidio() : Promise.resolve(true),
+    config.mode === "route" && config.local
+      ? checkLocalHealth(config.local)
+      : Promise.resolve(true),
+  ]);
+
+  const isHealthy = piiEnabled ? presidioHealth : true;
+
+  const services: Record<string, string> = {};
+  if (piiEnabled) {
+    services.presidio = presidioHealth ? "up" : "down";
+  }
 
   if (config.mode === "route") {
-    services.local_llm = health.local ? "up" : "down";
+    services.local_llm = localHealth ? "up" : "down";
   }
 
   return c.json(

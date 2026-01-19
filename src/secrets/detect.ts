@@ -1,6 +1,5 @@
 import type { SecretsDetectionConfig } from "../config";
-import type { ChatMessage } from "../providers/openai-client";
-import type { ContentPart } from "../utils/content";
+import type { RequestExtractor, TextSpan } from "../masking/types";
 import { patternDetectors } from "./patterns";
 import type {
   MessageSecretsResult,
@@ -69,64 +68,53 @@ export function detectSecrets(
 }
 
 /**
- * Detects secrets in chat messages with per-part granularity
- *
- * For string content, partIdx is always 0.
- * For array content (multimodal), each text part is scanned separately.
- * This avoids complex offset mapping when applying masks.
+ * Detects secrets in a request using an extractor
  */
-export function detectSecretsInMessages(
-  messages: ChatMessage[],
+export function detectSecretsInRequest<TRequest, TResponse>(
+  request: TRequest,
+  config: SecretsDetectionConfig,
+  extractor: RequestExtractor<TRequest, TResponse>,
+): MessageSecretsResult {
+  const spans = extractor.extractTexts(request);
+  return detectSecretsInSpans(spans, config);
+}
+
+/**
+ * Detects secrets in text spans (low-level)
+ */
+export function detectSecretsInSpans(
+  spans: TextSpan[],
   config: SecretsDetectionConfig,
 ): MessageSecretsResult {
   if (!config.enabled) {
     return {
       detected: false,
       matches: [],
-      messageLocations: messages.map(() => []),
+      spanLocations: spans.map(() => []),
     };
   }
 
+  // Detect secrets in each span
   const matchCounts = new Map<string, number>();
-
-  const messageLocations: SecretLocation[][][] = messages.map((message) => {
-    // String content → single part at index 0
-    if (typeof message.content === "string") {
-      const result = detectSecrets(message.content, config);
-      for (const match of result.matches) {
-        matchCounts.set(match.type, (matchCounts.get(match.type) || 0) + match.count);
-      }
-      return [result.locations || []];
+  const spanLocations: SecretLocation[][] = spans.map((span) => {
+    const result = detectSecrets(span.text, config);
+    for (const match of result.matches) {
+      matchCounts.set(match.type, (matchCounts.get(match.type) || 0) + match.count);
     }
-
-    // Array content (multimodal) → one array per part
-    if (Array.isArray(message.content)) {
-      return message.content.map((part: ContentPart) => {
-        if (part.type !== "text" || typeof part.text !== "string") {
-          return [];
-        }
-        const result = detectSecrets(part.text, config);
-        for (const match of result.matches) {
-          matchCounts.set(match.type, (matchCounts.get(match.type) || 0) + match.count);
-        }
-        return result.locations || [];
-      });
-    }
-
-    // Null/undefined content
-    return [];
+    return result.locations || [];
   });
 
+  // Build matches array
   const allMatches: SecretsMatch[] = [];
   for (const [type, count] of matchCounts) {
     allMatches.push({ type: type as SecretLocation["type"], count });
   }
 
-  const hasLocations = messageLocations.some((msg) => msg.some((part) => part.length > 0));
+  const hasLocations = spanLocations.some((locs) => locs.length > 0);
 
   return {
     detected: hasLocations,
     matches: allMatches,
-    messageLocations,
+    spanLocations,
   };
 }

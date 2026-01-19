@@ -1,7 +1,7 @@
-import type { MaskingConfig } from "../config";
-import { flushMaskingBuffer, unmaskStreamChunk } from "../pii/mask";
-import { flushSecretsMaskingBuffer, unmaskSecretsStreamChunk } from "../secrets/mask";
-import type { PlaceholderContext } from "../utils/message-transform";
+import type { MaskingConfig } from "../../config";
+import type { PlaceholderContext } from "../../masking/context";
+import { flushMaskingBuffer, unmaskStreamChunk } from "../../pii/mask";
+import { flushSecretsMaskingBuffer, unmaskSecretsStreamChunk } from "../../secrets/mask";
 
 /**
  * Creates a transform stream that unmasks SSE content

@@ -1,6 +1,7 @@
 import { getConfig } from "../config";
+import { HEALTH_CHECK_TIMEOUT_MS } from "../constants/timeouts";
+import type { RequestExtractor } from "../masking/types";
 import { getLanguageDetector, type SupportedLanguage } from "../services/language-detector";
-import { extractTextContent, type MessageContent } from "../utils/content";
 
 export interface PIIEntity {
   entity_type: string;
@@ -16,15 +17,9 @@ interface AnalyzeRequest {
   score_threshold?: number;
 }
 
-/**
- * Per-message, per-part PII detection result
- * Structure: messageEntities[msgIdx][partIdx] = entities for that part
- */
 export interface PIIDetectionResult {
   hasPII: boolean;
-  /** Per-message, per-part entities */
-  messageEntities: PIIEntity[][][];
-  /** Flattened list of all entities (for summary/logging) */
+  spanEntities: PIIEntity[][];
   allEntities: PIIEntity[];
   scanTimeMs: number;
   language: SupportedLanguage;
@@ -85,63 +80,38 @@ export class PIIDetector {
   }
 
   /**
-   * Analyzes messages for PII with per-part granularity
-   *
-   * For string content, entities are in messageEntities[msgIdx][0].
-   * For array content (multimodal), each text part is scanned separately.
+   * Analyzes a request for PII using an extractor
    */
-  async analyzeMessages(
-    messages: Array<{ role: string; content: MessageContent }>,
+  async analyzeRequest<TRequest, TResponse>(
+    request: TRequest,
+    extractor: RequestExtractor<TRequest, TResponse>,
   ): Promise<PIIDetectionResult> {
     const startTime = Date.now();
     const config = getConfig();
 
-    // Detect language from the last user message
-    const lastUserMsg = messages.findLast((m) => m.role === "user");
-    const langText = lastUserMsg ? extractTextContent(lastUserMsg.content) : "";
+    // Extract all text spans from request
+    const spans = extractor.extractTexts(request);
+
+    // Detect language from message content (skip system spans with messageIndex -1)
+    const messageSpans = spans.filter((span) => span.messageIndex >= 0);
+    const langText = messageSpans.map((s) => s.text).join("\n");
     const langResult = langText
       ? getLanguageDetector().detect(langText)
       : { language: config.pii_detection.fallback_language, usedFallback: true };
 
-    const scannedRoles = ["system", "developer", "user", "assistant", "tool"];
-
-    // Detect PII per message, per content part
-    const messageEntities: PIIEntity[][][] = await Promise.all(
-      messages.map(async (message) => {
-        if (!scannedRoles.includes(message.role)) {
-          return [];
-        }
-
-        // String content → wrap in single-element array
-        if (typeof message.content === "string") {
-          const entities = message.content
-            ? await this.detectPII(message.content, langResult.language)
-            : [];
-          return [entities];
-        }
-
-        // Array content (multimodal) → per-part detection
-        if (Array.isArray(message.content)) {
-          return await Promise.all(
-            message.content.map(async (part) => {
-              if (part.type === "text" && typeof part.text === "string") {
-                return await this.detectPII(part.text, langResult.language);
-              }
-              return [];
-            }),
-          );
-        }
-
-        // Null/undefined content
-        return [];
+    // Detect PII for each span independently
+    const spanEntities: PIIEntity[][] = await Promise.all(
+      spans.map(async (span) => {
+        if (!span.text) return [];
+        return this.detectPII(span.text, langResult.language);
       }),
     );
 
-    const allEntities = messageEntities.flat(2);
+    const allEntities = spanEntities.flat();
 
     return {
       hasPII: allEntities.length > 0,
-      messageEntities,
+      spanEntities,
       allEntities,
       scanTimeMs: Date.now() - startTime,
       language: langResult.language,
@@ -154,7 +124,7 @@ export class PIIDetector {
     try {
       const response = await fetch(`${this.presidioUrl}/health`, {
         method: "GET",
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS),
       });
       return response.ok;
     } catch {
@@ -199,7 +169,7 @@ export class PIIDetector {
           language,
           entities: ["PERSON"],
         }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS),
       });
 
       // If we get a response (even empty array), the language is supported

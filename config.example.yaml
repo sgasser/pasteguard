@@ -12,14 +12,20 @@ server:
   port: 3000
   host: "0.0.0.0"
 
-# Providers - OpenAI-compatible API endpoints
-# Can be cloud (OpenAI, Azure) or self-hosted (vLLM, LiteLLM proxy, etc.)
+# Providers - API endpoints
+# Can be cloud (OpenAI, Anthropic, Azure) or self-hosted (vLLM, LiteLLM proxy, etc.)
 providers:
   # OpenAI-compatible endpoint (required)
   # The proxy forwards your client's Authorization header
   openai:
     base_url: https://api.openai.com/v1
     # api_key: ${OPENAI_API_KEY}  # Optional fallback if client doesn't send auth header
+
+  # Anthropic endpoint (optional)
+  # Enable to use /anthropic/v1/messages endpoint
+  anthropic:
+    base_url: https://api.anthropic.com
+    # api_key: ${ANTHROPIC_API_KEY}  # Optional fallback if client doesn't send auth header
 
 # Local provider - only used when mode: route
 # Supports: ollama (native), openai (for vLLM, LocalAI, LM Studio, etc.)

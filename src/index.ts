@@ -177,7 +177,7 @@ Provider:
 ╚═══════════════════════════════════════════════════════════╝
 
 Server:     http://${host}:${port}
-API:        http://${host}:${port}/openai/v1/chat/completions
+OpenAI API: http://${host}:${port}/openai/v1/chat/completions
 Health:     http://${host}:${port}/health
 Info:       http://${host}:${port}/info
 Dashboard:  http://${host}:${port}/dashboard

@@ -34,14 +34,13 @@ export interface SecretsDetectionResult {
 }
 
 /**
- * Per-message, per-part secrets detection result
- * Structure: messageLocations[msgIdx][partIdx] = locations for that part
+ * Per-span secrets detection result
  */
 export interface MessageSecretsResult {
   detected: boolean;
   matches: SecretsMatch[];
-  /** Per-message, per-part secret locations */
-  messageLocations: SecretLocation[][][];
+  /** Per-span secret locations: spanLocations[spanIdx] = locations */
+  spanLocations?: SecretLocation[][];
 }
 
 /**

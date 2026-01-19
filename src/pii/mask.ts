@@ -1,31 +1,33 @@
+/**
+ * PII masking
+ */
+
 import type { MaskingConfig } from "../config";
-import type { ChatCompletionResponse, ChatMessage } from "../providers/openai-client";
-import { resolveConflicts } from "../utils/conflict-resolver";
-import {
-  createPlaceholderContext,
-  flushBuffer,
-  incrementAndGenerate,
-  type MaskResult,
-  type PlaceholderContext,
-  processStreamChunk,
-  replaceWithPlaceholders,
-  restorePlaceholders,
-  restoreResponsePlaceholders,
-  transformMessagesPerPart,
-} from "../utils/message-transform";
+import { resolveConflicts } from "../masking/conflict-resolver";
+import { incrementAndGenerate } from "../masking/context";
 import {
   generatePlaceholder as generatePlaceholderFromFormat,
   PII_PLACEHOLDER_FORMAT,
-} from "../utils/placeholders";
+} from "../masking/placeholders";
+import {
+  flushMaskingBuffer as flushBuffer,
+  type MaskSpansResult,
+  maskSpans,
+  type PlaceholderContext,
+  unmaskStreamChunk as unmaskChunk,
+  unmask as unmaskText,
+} from "../masking/service";
+import type { RequestExtractor, TextSpan } from "../masking/types";
 import type { PIIDetectionResult, PIIEntity } from "./detect";
 
-export type { MaskResult } from "../utils/message-transform";
+export { createMaskingContext, type PlaceholderContext } from "../masking/service";
 
 /**
- * Creates a new masking context for a request
+ * Result of masking operation
  */
-export function createMaskingContext(): PlaceholderContext {
-  return createPlaceholderContext();
+export interface MaskResult {
+  masked: string;
+  context: PlaceholderContext;
 }
 
 /**
@@ -52,52 +54,33 @@ export function mask(
   entities: PIIEntity[],
   context?: PlaceholderContext,
 ): MaskResult {
-  const ctx = context || createMaskingContext();
-  const masked = replaceWithPlaceholders(
-    text,
-    entities,
-    ctx,
+  const spans: TextSpan[] = [{ text, path: "text", messageIndex: 0, partIndex: 0 }];
+  const perSpanData = [entities];
+
+  const result = maskSpans(
+    spans,
+    perSpanData,
     (e) => e.entity_type,
     generatePlaceholder,
     resolveConflicts,
+    context,
   );
-  return { masked, context: ctx };
+
+  return {
+    masked: result.maskedSpans[0]?.maskedText ?? text,
+    context: result.context,
+  };
 }
 
 /**
  * Unmasks text by replacing placeholders with original values
- *
- * Optionally adds markers to indicate protected content
  */
 export function unmask(text: string, context: PlaceholderContext, config: MaskingConfig): string {
-  return restorePlaceholders(text, context, getFormatValue(config));
-}
-
-/**
- * Masks messages using per-part entity detection results
- *
- * Uses transformMessagesPerPart for the common iteration pattern.
- */
-export function maskMessages(
-  messages: ChatMessage[],
-  detection: PIIDetectionResult,
-): { masked: ChatMessage[]; context: PlaceholderContext } {
-  const context = createMaskingContext();
-
-  const masked = transformMessagesPerPart(
-    messages,
-    detection.messageEntities,
-    (text, entities, ctx) => mask(text, entities, ctx).masked,
-    context,
-  );
-
-  return { masked, context };
+  return unmaskText(text, context, getFormatValue(config));
 }
 
 /**
  * Streaming unmask helper - processes chunks and unmasks when complete placeholders are found
- *
- * Returns the unmasked portion and any remaining buffer that might contain partial placeholders
  */
 export function unmaskStreamChunk(
   buffer: string,
@@ -105,7 +88,7 @@ export function unmaskStreamChunk(
   context: PlaceholderContext,
   config: MaskingConfig,
 ): { output: string; remainingBuffer: string } {
-  return processStreamChunk(buffer, newChunk, context, (text, ctx) => unmask(text, ctx, config));
+  return unmaskChunk(buffer, newChunk, context, getFormatValue(config));
 }
 
 /**
@@ -116,16 +99,68 @@ export function flushMaskingBuffer(
   context: PlaceholderContext,
   config: MaskingConfig,
 ): string {
-  return flushBuffer(buffer, context, (text, ctx) => unmask(text, ctx, config));
+  return flushBuffer(buffer, context, getFormatValue(config));
 }
 
 /**
- * Unmasks a chat completion response by replacing placeholders in all choices
+ * Result of masking a request
  */
-export function unmaskResponse(
-  response: ChatCompletionResponse,
+export interface MaskRequestResult<TRequest> {
+  /** The masked request */
+  request: TRequest;
+  /** Masking context for unmasking response */
+  context: PlaceholderContext;
+}
+
+/**
+ * Masks PII in a request using an extractor
+ */
+export function maskRequest<TRequest, TResponse>(
+  request: TRequest,
+  detection: PIIDetectionResult,
+  extractor: RequestExtractor<TRequest, TResponse>,
+  existingContext?: PlaceholderContext,
+): MaskRequestResult<TRequest> {
+  const spans = extractor.extractTexts(request);
+  const { maskedSpans, context } = maskSpansWithEntities(
+    spans,
+    detection.spanEntities,
+    existingContext,
+  );
+
+  // Filter to only spans that were actually masked
+  const changedSpans = maskedSpans.filter((_, i) => {
+    const entities = detection.spanEntities[i] || [];
+    return entities.length > 0;
+  });
+
+  const maskedRequest = extractor.applyMasked(request, changedSpans);
+  return { request: maskedRequest, context };
+}
+
+function maskSpansWithEntities(
+  spans: TextSpan[],
+  spanEntities: PIIEntity[][],
+  existingContext?: PlaceholderContext,
+): MaskSpansResult {
+  return maskSpans(
+    spans,
+    spanEntities,
+    (e) => e.entity_type,
+    generatePlaceholder,
+    resolveConflicts,
+    existingContext,
+  );
+}
+
+/**
+ * Unmasks a response using a request extractor
+ */
+export function unmaskResponse<TRequest, TResponse>(
+  response: TResponse,
   context: PlaceholderContext,
   config: MaskingConfig,
-): ChatCompletionResponse {
-  return restoreResponsePlaceholders(response, context, getFormatValue(config));
+  extractor: RequestExtractor<TRequest, TResponse>,
+): TResponse {
+  return extractor.unmaskResponse(response, context, getFormatValue(config));
 }

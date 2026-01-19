@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { createSecretsResult } from "../test-utils/detection-results";
+import { openaiExtractor } from "../masking/extractors/openai";
+import type { OpenAIMessage, OpenAIRequest, OpenAIResponse } from "../providers/openai/types";
+import { createSecretsResultFromSpans } from "../test-utils/detection-results";
 import type { SecretLocation } from "./detect";
 import {
   createSecretsMaskingContext,
   flushSecretsMaskingBuffer,
-  maskMessages,
+  maskRequest,
   maskSecrets,
   unmaskSecrets,
   unmaskSecretsResponse,
@@ -12,6 +14,11 @@ import {
 } from "./mask";
 
 const sampleSecret = "sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx";
+
+/** Helper to create a minimal request from messages */
+function createRequest(messages: OpenAIMessage[]): OpenAIRequest {
+  return { model: "gpt-4", messages };
+}
 
 describe("secrets placeholder format", () => {
   test("uses [[SECRET_MASKED_TYPE_N]] format", () => {
@@ -59,59 +66,61 @@ describe("secrets placeholder format", () => {
   });
 });
 
-describe("maskMessages with MessageSecretsResult", () => {
+describe("maskRequest with MessageSecretsResult", () => {
   test("masks secrets in multiple messages", () => {
-    const messages = [
-      { role: "user" as const, content: `My key is ${sampleSecret}` },
-      { role: "assistant" as const, content: "I'll help you with that." },
-    ];
-    const detection = createSecretsResult([
-      [[{ start: 10, end: 10 + sampleSecret.length, type: "API_KEY_OPENAI" }]],
-      [[]],
+    const request = createRequest([
+      { role: "user", content: `My key is ${sampleSecret}` },
+      { role: "assistant", content: "I'll help you with that." },
+    ]);
+    // spanLocations[0] = first message (user), spanLocations[1] = second message (assistant)
+    const detection = createSecretsResultFromSpans([
+      [{ start: 10, end: 10 + sampleSecret.length, type: "API_KEY_OPENAI" }],
+      [],
     ]);
 
-    const { masked, context } = maskMessages(messages, detection);
+    const { masked, context } = maskRequest(request, detection, openaiExtractor);
 
-    expect(masked[0].content).toContain("[[SECRET_MASKED_API_KEY_OPENAI_1]]");
-    expect(masked[0].content).not.toContain(sampleSecret);
-    expect(masked[1].content).toBe("I'll help you with that.");
+    expect(masked.messages[0].content).toContain("[[SECRET_MASKED_API_KEY_OPENAI_1]]");
+    expect(masked.messages[0].content).not.toContain(sampleSecret);
+    expect(masked.messages[1].content).toBe("I'll help you with that.");
     expect(Object.keys(context.mapping)).toHaveLength(1);
   });
 
   test("shares context across messages - same secret gets same placeholder", () => {
-    const messages = [
-      { role: "user" as const, content: `Key1: ${sampleSecret}` },
-      { role: "user" as const, content: `Key2: ${sampleSecret}` },
-    ];
-    const detection = createSecretsResult([
-      [[{ start: 6, end: 6 + sampleSecret.length, type: "API_KEY_OPENAI" }]],
-      [[{ start: 6, end: 6 + sampleSecret.length, type: "API_KEY_OPENAI" }]],
+    const request = createRequest([
+      { role: "user", content: `Key1: ${sampleSecret}` },
+      { role: "user", content: `Key2: ${sampleSecret}` },
+    ]);
+    const detection = createSecretsResultFromSpans([
+      [{ start: 6, end: 6 + sampleSecret.length, type: "API_KEY_OPENAI" }],
+      [{ start: 6, end: 6 + sampleSecret.length, type: "API_KEY_OPENAI" }],
     ]);
 
-    const { masked, context } = maskMessages(messages, detection);
+    const { masked, context } = maskRequest(request, detection, openaiExtractor);
 
-    expect(masked[0].content).toBe("Key1: [[SECRET_MASKED_API_KEY_OPENAI_1]]");
-    expect(masked[1].content).toBe("Key2: [[SECRET_MASKED_API_KEY_OPENAI_1]]");
+    expect(masked.messages[0].content).toBe("Key1: [[SECRET_MASKED_API_KEY_OPENAI_1]]");
+    expect(masked.messages[1].content).toBe("Key2: [[SECRET_MASKED_API_KEY_OPENAI_1]]");
     expect(Object.keys(context.mapping)).toHaveLength(1);
   });
 
   test("handles multimodal array content", () => {
-    const messages = [
+    const request = createRequest([
       {
-        role: "user" as const,
+        role: "user",
         content: [
           { type: "text", text: `Key: ${sampleSecret}` },
           { type: "image_url", image_url: { url: "https://example.com/img.jpg" } },
         ],
       },
-    ];
-    const detection = createSecretsResult([
-      [[{ start: 5, end: 5 + sampleSecret.length, type: "API_KEY_OPENAI" }], []],
+    ]);
+    // Two spans: text content at index 0, image is skipped
+    const detection = createSecretsResultFromSpans([
+      [{ start: 5, end: 5 + sampleSecret.length, type: "API_KEY_OPENAI" }],
     ]);
 
-    const { masked } = maskMessages(messages, detection);
+    const { masked } = maskRequest(request, detection, openaiExtractor);
 
-    const content = masked[0].content as Array<{ type: string; text?: string }>;
+    const content = masked.messages[0].content as Array<{ type: string; text?: string }>;
     expect(content[0].text).toBe("Key: [[SECRET_MASKED_API_KEY_OPENAI_1]]");
     expect(content[1].type).toBe("image_url");
   });
@@ -179,45 +188,45 @@ describe("unmaskSecretsResponse", () => {
     const context = createSecretsMaskingContext();
     context.mapping["[[SECRET_MASKED_API_KEY_OPENAI_1]]"] = sampleSecret;
 
-    const response = {
+    const response: OpenAIResponse = {
       id: "test",
-      object: "chat.completion" as const,
+      object: "chat.completion",
       created: Date.now(),
       model: "gpt-4",
       choices: [
         {
           index: 0,
           message: {
-            role: "assistant" as const,
+            role: "assistant",
             content: "Your key is [[SECRET_MASKED_API_KEY_OPENAI_1]]",
           },
-          finish_reason: "stop" as const,
+          finish_reason: "stop",
         },
       ],
     };
 
-    const result = unmaskSecretsResponse(response, context);
+    const result = unmaskSecretsResponse(response, context, openaiExtractor);
     expect(result.choices[0].message.content).toBe(`Your key is ${sampleSecret}`);
   });
 
   test("preserves response structure", () => {
     const context = createSecretsMaskingContext();
-    const response = {
+    const response: OpenAIResponse = {
       id: "test-id",
-      object: "chat.completion" as const,
+      object: "chat.completion",
       created: 12345,
       model: "gpt-4-turbo",
       choices: [
         {
           index: 0,
-          message: { role: "assistant" as const, content: "Hello" },
-          finish_reason: "stop" as const,
+          message: { role: "assistant", content: "Hello" },
+          finish_reason: "stop",
         },
       ],
       usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
     };
 
-    const result = unmaskSecretsResponse(response, context);
+    const result = unmaskSecretsResponse(response, context, openaiExtractor);
     expect(result.id).toBe("test-id");
     expect(result.model).toBe("gpt-4-turbo");
     expect(result.usage).toEqual({ prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 });

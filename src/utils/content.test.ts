@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type ContentPart, extractTextContent } from "./content";
+import { extractTextContent, type OpenAIContentPart } from "./content";
 
 describe("extractTextContent", () => {
   test("returns empty string for null", () => {
@@ -15,12 +15,12 @@ describe("extractTextContent", () => {
   });
 
   test("extracts text from single text part", () => {
-    const content: ContentPart[] = [{ type: "text", text: "What's in this image?" }];
+    const content: OpenAIContentPart[] = [{ type: "text", text: "What's in this image?" }];
     expect(extractTextContent(content)).toBe("What's in this image?");
   });
 
   test("extracts and joins multiple text parts", () => {
-    const content: ContentPart[] = [
+    const content: OpenAIContentPart[] = [
       { type: "text", text: "First part" },
       { type: "text", text: "Second part" },
     ];
@@ -28,7 +28,7 @@ describe("extractTextContent", () => {
   });
 
   test("skips image_url parts", () => {
-    const content: ContentPart[] = [
+    const content: OpenAIContentPart[] = [
       { type: "text", text: "Look at this" },
       { type: "image_url", image_url: { url: "https://example.com/image.jpg" } },
       { type: "text", text: "What is it?" },
@@ -37,7 +37,7 @@ describe("extractTextContent", () => {
   });
 
   test("returns empty string for array with no text parts", () => {
-    const content: ContentPart[] = [
+    const content: OpenAIContentPart[] = [
       { type: "image_url", image_url: { url: "https://example.com/image.jpg" } },
     ];
     expect(extractTextContent(content)).toBe("");

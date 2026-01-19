@@ -2,27 +2,28 @@ import { Hono } from "hono";
 import pkg from "../../package.json";
 import { getConfig } from "../config";
 import { getPIIDetector } from "../pii/detect";
-import { getRouter } from "../services/decision";
+import { getLocalInfo } from "../providers/local";
+import { getOpenAIInfo } from "../providers/openai/client";
 
 export const infoRoutes = new Hono();
 
 infoRoutes.get("/info", (c) => {
   const config = getConfig();
-  const router = getRouter();
-  const providers = router.getProvidersInfo();
   const detector = getPIIDetector();
   const languageValidation = detector.getLanguageValidation();
+
+  const providers: Record<string, { base_url: string }> = {
+    openai: {
+      base_url: getOpenAIInfo(config.providers.openai).baseUrl,
+    },
+  };
 
   const info: Record<string, unknown> = {
     name: "PasteGuard",
     version: pkg.version,
     description: "Privacy proxy for LLMs",
     mode: config.mode,
-    providers: {
-      openai: {
-        base_url: providers.openai.baseUrl,
-      },
-    },
+    providers,
     pii_detection: {
       languages: languageValidation
         ? {
@@ -37,10 +38,11 @@ infoRoutes.get("/info", (c) => {
     },
   };
 
-  if (config.mode === "route" && providers.local) {
+  if (config.mode === "route" && config.local) {
+    const localInfo = getLocalInfo(config.local);
     info.local = {
-      type: providers.local.type,
-      base_url: providers.local.baseUrl,
+      type: localInfo.type,
+      base_url: localInfo.baseUrl,
     };
   }
 

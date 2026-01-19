@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import type { ChatMessage } from "../providers/openai-client";
 import type { Span } from "./conflict-resolver";
 import {
   createPlaceholderContext,
@@ -8,9 +7,7 @@ import {
   processStreamChunk,
   replaceWithPlaceholders,
   restorePlaceholders,
-  restoreResponsePlaceholders,
-  transformMessagesPerPart,
-} from "./message-transform";
+} from "./context";
 
 /**
  * Simple placeholder format for testing: [[TYPE_N]]
@@ -257,162 +254,6 @@ describe("replace -> restore roundtrip", () => {
 
     const restored = restorePlaceholders(replaced, ctx);
     expect(restored).toBe(original);
-  });
-});
-
-describe("transformMessagesPerPart", () => {
-  test("transforms string content", () => {
-    const messages: ChatMessage[] = [{ role: "user", content: "Hello world" }];
-    const perPartData = [[[{ marker: true }]]];
-
-    const result = transformMessagesPerPart(
-      messages,
-      perPartData,
-      (text, data) => (data.length > 0 ? text.toUpperCase() : text),
-      {},
-    );
-
-    expect(result[0].content).toBe("HELLO WORLD");
-  });
-
-  test("skips messages without data", () => {
-    const messages: ChatMessage[] = [
-      { role: "user", content: "Keep this" },
-      { role: "assistant", content: "And this" },
-    ];
-    const perPartData = [[[]], [[]]];
-
-    const result = transformMessagesPerPart(
-      messages,
-      perPartData,
-      (text) => text.toUpperCase(),
-      {},
-    );
-
-    expect(result[0].content).toBe("Keep this");
-    expect(result[1].content).toBe("And this");
-  });
-
-  test("transforms array content (multimodal)", () => {
-    const messages: ChatMessage[] = [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: "Hello" },
-          { type: "image_url", image_url: { url: "https://example.com/img.jpg" } },
-        ],
-      },
-    ];
-    const perPartData = [[[{ marker: true }], []]];
-
-    const result = transformMessagesPerPart(
-      messages,
-      perPartData,
-      (text, data) => (data.length > 0 ? text.toUpperCase() : text),
-      {},
-    );
-
-    const content = result[0].content as Array<{ type: string; text?: string }>;
-    expect(content[0].text).toBe("HELLO");
-    expect(content[1].type).toBe("image_url");
-  });
-
-  test("preserves message roles", () => {
-    const messages: ChatMessage[] = [
-      { role: "system", content: "sys" },
-      { role: "user", content: "usr" },
-      { role: "assistant", content: "ast" },
-    ];
-    const perPartData = [[[]], [[]], [[]]];
-
-    const result = transformMessagesPerPart(messages, perPartData, (t) => t, {});
-
-    expect(result[0].role).toBe("system");
-    expect(result[1].role).toBe("user");
-    expect(result[2].role).toBe("assistant");
-  });
-
-  test("passes context to transform function", () => {
-    const messages: ChatMessage[] = [{ role: "user", content: "test" }];
-    const perPartData = [[[{ id: 1 }]]];
-    const ctx = { prefix: ">> " };
-
-    const result = transformMessagesPerPart(
-      messages,
-      perPartData,
-      (text, _data, context: { prefix: string }) => context.prefix + text,
-      ctx,
-    );
-
-    expect(result[0].content).toBe(">> test");
-  });
-});
-
-describe("restoreResponsePlaceholders", () => {
-  test("restores placeholders in response choices", () => {
-    const ctx = createPlaceholderContext();
-    ctx.mapping["[[X_1]]"] = "secret";
-
-    const response = {
-      id: "test",
-      choices: [{ message: { content: "Value: [[X_1]]" } }],
-    };
-
-    const result = restoreResponsePlaceholders(response, ctx);
-    expect(result.choices[0].message.content).toBe("Value: secret");
-  });
-
-  test("handles multiple choices", () => {
-    const ctx = createPlaceholderContext();
-    ctx.mapping["[[X_1]]"] = "val";
-
-    const response = {
-      id: "test",
-      choices: [{ message: { content: "A: [[X_1]]" } }, { message: { content: "B: [[X_1]]" } }],
-    };
-
-    const result = restoreResponsePlaceholders(response, ctx);
-    expect(result.choices[0].message.content).toBe("A: val");
-    expect(result.choices[1].message.content).toBe("B: val");
-  });
-
-  test("preserves response structure", () => {
-    const ctx = createPlaceholderContext();
-    const response = {
-      id: "resp-123",
-      model: "test-model",
-      choices: [{ message: { content: "text" } }],
-      usage: { tokens: 10 },
-    };
-
-    const result = restoreResponsePlaceholders(response, ctx);
-    expect(result.id).toBe("resp-123");
-    expect(result.model).toBe("test-model");
-    expect(result.usage).toEqual({ tokens: 10 });
-  });
-
-  test("applies formatValue function", () => {
-    const ctx = createPlaceholderContext();
-    ctx.mapping["[[X_1]]"] = "secret";
-
-    const response = {
-      id: "test",
-      choices: [{ message: { content: "[[X_1]]" } }],
-    };
-
-    const result = restoreResponsePlaceholders(response, ctx, (v) => `<${v}>`);
-    expect(result.choices[0].message.content).toBe("<secret>");
-  });
-
-  test("handles non-string content", () => {
-    const ctx = createPlaceholderContext();
-    const response = {
-      id: "test",
-      choices: [{ message: { content: null } }],
-    };
-
-    const result = restoreResponsePlaceholders(response, ctx);
-    expect(result.choices[0].message.content).toBe(null);
   });
 });
 

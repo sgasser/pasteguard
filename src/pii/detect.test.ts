@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { openaiExtractor } from "../masking/extractors/openai";
+import type { OpenAIMessage, OpenAIRequest } from "../providers/openai/types";
 import { PIIDetector } from "./detect";
 
 const originalFetch = globalThis.fetch;
@@ -39,12 +41,16 @@ function mockPresidio(
   }) as unknown as typeof fetch;
 }
 
+function createRequest(messages: OpenAIMessage[]): OpenAIRequest {
+  return { model: "gpt-4", messages };
+}
+
 describe("PIIDetector", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
   });
 
-  describe("analyzeMessages", () => {
+  describe("analyzeRequest", () => {
     test("scans all message roles", async () => {
       mockPresidio({
         "system-pii": [{ entity_type: "PERSON", start: 0, end: 10, score: 0.9 }],
@@ -53,25 +59,19 @@ describe("PIIDetector", () => {
       });
 
       const detector = new PIIDetector();
-      const messages = [
+      const request = createRequest([
         { role: "system", content: "system-pii here" },
         { role: "user", content: "user-pii here" },
         { role: "assistant", content: "assistant-pii here" },
-      ];
+      ]);
 
-      const result = await detector.analyzeMessages(messages);
+      const result = await detector.analyzeRequest(request, openaiExtractor);
 
       expect(result.hasPII).toBe(true);
-      // Per-message, per-part: messageEntities[msgIdx][partIdx] = entities
-      expect(result.messageEntities).toHaveLength(3);
-      // Each message has 1 part (string content)
-      expect(result.messageEntities[0]).toHaveLength(1);
-      expect(result.messageEntities[1]).toHaveLength(1);
-      expect(result.messageEntities[2]).toHaveLength(1);
-      // Each part has 1 entity
-      expect(result.messageEntities[0][0]).toHaveLength(1);
-      expect(result.messageEntities[1][0]).toHaveLength(1);
-      expect(result.messageEntities[2][0]).toHaveLength(1);
+      expect(result.spanEntities).toHaveLength(3);
+      expect(result.spanEntities[0]).toHaveLength(1);
+      expect(result.spanEntities[1]).toHaveLength(1);
+      expect(result.spanEntities[2]).toHaveLength(1);
     });
 
     test("detects PII in system message when user message has none", async () => {
@@ -80,16 +80,16 @@ describe("PIIDetector", () => {
       });
 
       const detector = new PIIDetector();
-      const messages = [
+      const request = createRequest([
         { role: "system", content: "Context from PDF: John Doe lives at 123 Main St" },
         { role: "user", content: "Extract the data into JSON" },
-      ];
+      ]);
 
-      const result = await detector.analyzeMessages(messages);
+      const result = await detector.analyzeRequest(request, openaiExtractor);
 
       expect(result.hasPII).toBe(true);
-      expect(result.messageEntities[0][0]).toHaveLength(1);
-      expect(result.messageEntities[0][0][0].entity_type).toBe("PERSON");
+      expect(result.spanEntities[0]).toHaveLength(1);
+      expect(result.spanEntities[0][0].entity_type).toBe("PERSON");
     });
 
     test("detects PII in earlier user message", async () => {
@@ -98,26 +98,28 @@ describe("PIIDetector", () => {
       });
 
       const detector = new PIIDetector();
-      const messages = [
+      const request = createRequest([
         { role: "user", content: "My email is secret@email.com" },
         { role: "assistant", content: "Got it." },
         { role: "user", content: "Now do something else" },
-      ];
+      ]);
 
-      const result = await detector.analyzeMessages(messages);
+      const result = await detector.analyzeRequest(request, openaiExtractor);
 
       expect(result.hasPII).toBe(true);
-      expect(result.messageEntities[0][0]).toHaveLength(1);
+      expect(result.spanEntities[0]).toHaveLength(1);
     });
 
     test("returns empty result for no messages", async () => {
       mockPresidio({});
 
       const detector = new PIIDetector();
-      const result = await detector.analyzeMessages([]);
+      const request = createRequest([]);
+
+      const result = await detector.analyzeRequest(request, openaiExtractor);
 
       expect(result.hasPII).toBe(false);
-      expect(result.messageEntities).toHaveLength(0);
+      expect(result.spanEntities).toHaveLength(0);
       expect(result.allEntities).toHaveLength(0);
     });
 
@@ -127,7 +129,7 @@ describe("PIIDetector", () => {
       });
 
       const detector = new PIIDetector();
-      const messages = [
+      const request = createRequest([
         {
           role: "user",
           content: [
@@ -135,17 +137,14 @@ describe("PIIDetector", () => {
             { type: "image_url", image_url: { url: "data:image/png;base64,..." } },
           ],
         },
-      ];
+      ]);
 
-      const result = await detector.analyzeMessages(messages);
+      const result = await detector.analyzeRequest(request, openaiExtractor);
 
       expect(result.hasPII).toBe(true);
-      // Multimodal message has 2 parts
-      expect(result.messageEntities[0]).toHaveLength(2);
-      // First part (text) has 1 entity
-      expect(result.messageEntities[0][0]).toHaveLength(1);
-      // Second part (image) has no entities
-      expect(result.messageEntities[0][1]).toHaveLength(0);
+      // Only text parts are extracted as spans (image is skipped)
+      expect(result.spanEntities).toHaveLength(1);
+      expect(result.spanEntities[0]).toHaveLength(1);
     });
 
     test("skips messages with empty content", async () => {
@@ -154,17 +153,16 @@ describe("PIIDetector", () => {
       });
 
       const detector = new PIIDetector();
-      const messages = [
+      const request = createRequest([
         { role: "user", content: "" },
         { role: "assistant", content: "test response" },
-      ];
+      ]);
 
-      const result = await detector.analyzeMessages(messages);
+      const result = await detector.analyzeRequest(request, openaiExtractor);
 
-      expect(result.messageEntities).toHaveLength(2);
-      // First message (empty string) has 1 part with no entities
-      expect(result.messageEntities[0]).toHaveLength(1);
-      expect(result.messageEntities[0][0]).toHaveLength(0);
+      expect(result.spanEntities).toHaveLength(2);
+      // First message (empty string) has no entities
+      expect(result.spanEntities[0]).toHaveLength(0);
     });
   });
 

@@ -1,18 +1,9 @@
 /**
- * Generic utilities for per-part message transformations
- *
- * Both PII masking and secrets masking need to:
- * 1. Iterate over messages and their content parts
- * 2. Apply transformations based on per-part detection data
- * 3. Handle string vs array content uniformly
- *
- * This module provides shared infrastructure to avoid duplication.
+ * Placeholder context and text transformation utilities
  */
 
-import type { ChatMessage } from "../providers/openai-client";
+import { findPartialPlaceholderStart } from "../masking/placeholders";
 import type { Span } from "./conflict-resolver";
-import type { ContentPart } from "./content";
-import { findPartialPlaceholderStart } from "./placeholders";
 
 /**
  * Generic context for placeholder-based transformations
@@ -65,54 +56,6 @@ export function incrementAndGenerate(
 }
 
 /**
- * Transforms messages using per-part data
- *
- * Generic function that handles the common pattern of:
- * - Iterating over messages
- * - Handling string vs array content
- * - Applying a transform function per text part
- *
- * @param messages - Chat messages to transform
- * @param perPartData - Per-message, per-part data: data[msgIdx][partIdx]
- * @param transform - Function to transform text using the part data
- * @param context - Shared context passed to all transform calls
- */
-export function transformMessagesPerPart<TData, TContext>(
-  messages: ChatMessage[],
-  perPartData: TData[][][],
-  transform: (text: string, data: TData[], context: TContext) => string,
-  context: TContext,
-): ChatMessage[] {
-  return messages.map((msg, msgIdx) => {
-    const partData = perPartData[msgIdx] || [];
-
-    // String content → data is in partData[0]
-    if (typeof msg.content === "string") {
-      const data = partData[0] || [];
-      if (data.length === 0) return msg;
-      const transformed = transform(msg.content, data, context);
-      return { ...msg, content: transformed };
-    }
-
-    // Array content (multimodal) → data is per-part
-    if (Array.isArray(msg.content)) {
-      const transformedContent = msg.content.map((part: ContentPart, partIdx: number) => {
-        const data = partData[partIdx] || [];
-        if (part.type === "text" && typeof part.text === "string" && data.length > 0) {
-          const transformed = transform(part.text, data, context);
-          return { ...part, text: transformed };
-        }
-        return part;
-      });
-      return { ...msg, content: transformedContent };
-    }
-
-    // Null/undefined content
-    return msg;
-  });
-}
-
-/**
  * Restores placeholders in text with original values
  *
  * Generic function used by both PII unmasking and secrets unmasking.
@@ -139,31 +82,6 @@ export function restorePlaceholders(
   }
 
   return result;
-}
-
-/**
- * Restores placeholders in a chat completion response
- *
- * @param response - The response object with choices
- * @param context - Context with placeholder mappings
- * @param formatValue - Optional function to format restored values
- */
-export function restoreResponsePlaceholders<
-  T extends { choices: Array<{ message: { content: unknown } }> },
->(response: T, context: PlaceholderContext, formatValue?: (original: string) => string): T {
-  return {
-    ...response,
-    choices: response.choices.map((choice) => ({
-      ...choice,
-      message: {
-        ...choice.message,
-        content:
-          typeof choice.message.content === "string"
-            ? restorePlaceholders(choice.message.content, context, formatValue)
-            : choice.message.content,
-      },
-    })),
-  } as T;
 }
 
 /**

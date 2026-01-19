@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { MaskingConfig } from "../config";
-import type { ChatMessage } from "../providers/openai-client";
-import { createPIIResult } from "../test-utils/detection-results";
+import { openaiExtractor } from "../masking/extractors/openai";
+import type { OpenAIMessage, OpenAIRequest, OpenAIResponse } from "../providers/openai/types";
+import { createPIIResultFromSpans } from "../test-utils/detection-results";
 import type { PIIEntity } from "./detect";
 import {
   createMaskingContext,
   flushMaskingBuffer,
   mask,
-  maskMessages,
+  maskRequest,
   unmask,
   unmaskResponse,
   unmaskStreamChunk,
@@ -22,6 +23,11 @@ const configWithMarkers: MaskingConfig = {
   show_markers: true,
   marker_text: "[protected]",
 };
+
+/** Helper to create a minimal request from messages */
+function createRequest(messages: OpenAIMessage[]): OpenAIRequest {
+  return { model: "gpt-4", messages };
+}
 
 describe("PII placeholder format", () => {
   test("uses [[TYPE_N]] format", () => {
@@ -83,50 +89,51 @@ describe("marker feature", () => {
     const context = createMaskingContext();
     context.mapping["[[PERSON_1]]"] = "John Doe";
 
-    const response = {
+    const response: OpenAIResponse = {
       id: "test",
-      object: "chat.completion" as const,
+      object: "chat.completion",
       created: 1234567890,
       model: "gpt-4",
       choices: [
         {
           index: 0,
-          message: { role: "assistant" as const, content: "Hello [[PERSON_1]]" },
-          finish_reason: "stop" as const,
+          message: { role: "assistant", content: "Hello [[PERSON_1]]" },
+          finish_reason: "stop",
         },
       ],
     };
 
-    const result = unmaskResponse(response, context, configWithMarkers);
+    const result = unmaskResponse(response, context, configWithMarkers, openaiExtractor);
     expect(result.choices[0].message.content).toBe("Hello [protected]John Doe");
   });
 });
 
-describe("maskMessages with PIIDetectionResult", () => {
+describe("maskRequest with PIIDetectionResult", () => {
   test("masks multiple messages using detection result", () => {
-    const messages: ChatMessage[] = [
+    const request = createRequest([
       { role: "user", content: "My email is test@example.com" },
       { role: "assistant", content: "Got it" },
       { role: "user", content: "Also john@test.com" },
-    ];
-
-    const detection = createPIIResult([
-      [[{ entity_type: "EMAIL_ADDRESS", start: 12, end: 28, score: 1.0 }]],
-      [[]],
-      [[{ entity_type: "EMAIL_ADDRESS", start: 5, end: 18, score: 1.0 }]],
     ]);
 
-    const { masked, context } = maskMessages(messages, detection);
+    // spanEntities[0] = first message, [1] = second message, [2] = third message
+    const detection = createPIIResultFromSpans([
+      [{ entity_type: "EMAIL_ADDRESS", start: 12, end: 28, score: 1.0 }],
+      [],
+      [{ entity_type: "EMAIL_ADDRESS", start: 5, end: 18, score: 1.0 }],
+    ]);
 
-    expect(masked[0].content).toBe("My email is [[EMAIL_ADDRESS_1]]");
-    expect(masked[1].content).toBe("Got it");
-    expect(masked[2].content).toBe("Also [[EMAIL_ADDRESS_2]]");
+    const { request: masked, context } = maskRequest(request, detection, openaiExtractor);
+
+    expect(masked.messages[0].content).toBe("My email is [[EMAIL_ADDRESS_1]]");
+    expect(masked.messages[1].content).toBe("Got it");
+    expect(masked.messages[2].content).toBe("Also [[EMAIL_ADDRESS_2]]");
     expect(context.mapping["[[EMAIL_ADDRESS_1]]"]).toBe("test@example.com");
     expect(context.mapping["[[EMAIL_ADDRESS_2]]"]).toBe("john@test.com");
   });
 
   test("handles multimodal content", () => {
-    const messages: ChatMessage[] = [
+    const request = createRequest([
       {
         role: "user",
         content: [
@@ -134,15 +141,16 @@ describe("maskMessages with PIIDetectionResult", () => {
           { type: "image_url", image_url: { url: "https://example.com/img.jpg" } },
         ],
       },
-    ];
-
-    const detection = createPIIResult([
-      [[{ entity_type: "EMAIL_ADDRESS", start: 8, end: 21, score: 1.0 }], []],
     ]);
 
-    const { masked } = maskMessages(messages, detection);
+    // One span for the text content (image is skipped)
+    const detection = createPIIResultFromSpans([
+      [{ entity_type: "EMAIL_ADDRESS", start: 8, end: 21, score: 1.0 }],
+    ]);
 
-    const content = masked[0].content as Array<{ type: string; text?: string }>;
+    const { request: masked } = maskRequest(request, detection, openaiExtractor);
+
+    const content = masked.messages[0].content as Array<{ type: string; text?: string }>;
     expect(content[0].text).toBe("Contact [[EMAIL_ADDRESS_1]]");
     expect(content[1].type).toBe("image_url");
   });
@@ -288,25 +296,25 @@ describe("unmaskResponse", () => {
     context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
     context.mapping["[[PERSON_1]]"] = "John Doe";
 
-    const response = {
+    const response: OpenAIResponse = {
       id: "chatcmpl-123",
-      object: "chat.completion" as const,
+      object: "chat.completion",
       created: 1234567890,
       model: "gpt-4",
       choices: [
         {
           index: 0,
           message: {
-            role: "assistant" as const,
+            role: "assistant",
             content: "Contact [[PERSON_1]] at [[EMAIL_ADDRESS_1]]",
           },
-          finish_reason: "stop" as const,
+          finish_reason: "stop",
         },
       ],
       usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
     };
 
-    const result = unmaskResponse(response, context, defaultConfig);
+    const result = unmaskResponse(response, context, defaultConfig, openaiExtractor);
 
     expect(result.choices[0].message.content).toBe("Contact John Doe at test@test.com");
     expect(result.id).toBe("chatcmpl-123");
