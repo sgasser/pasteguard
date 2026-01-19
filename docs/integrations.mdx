@@ -5,28 +5,42 @@ description: Use PasteGuard with IDEs, chat interfaces, and SDKs
 
 # Integrations
 
-PasteGuard works with any tool that supports the OpenAI API. Just change the base URL to point to PasteGuard.
+PasteGuard drops into your existing workflow. Point your tools to PasteGuard and every request gets PII protection automatically.
 
-## Cursor
+| Provider | PasteGuard URL |
+|----------|----------------|
+| OpenAI | `http://localhost:3000/openai/v1` |
+| Anthropic | `http://localhost:3000/anthropic` |
 
-In Cursor settings, configure a custom OpenAI base URL:
+## AI Coding Assistants
+
+### Claude Code
+
+Protect your prompts when using Claude Code. One environment variable, full PII protection:
+
+```bash
+ANTHROPIC_BASE_URL=http://localhost:3000/anthropic claude
+```
+
+Customer names, emails, and sensitive data in your codebase stay private.
+
+### Cursor
+
+Add PII protection to your Cursor workflow:
 
 1. Open **Settings** → **Models**
 2. Scroll to **API Keys** section
 3. Enable **Override OpenAI Base URL** toggle
-4. Enter:
-   ```
-   http://localhost:3000/openai/v1
-   ```
-5. Add your OpenAI API key above
+4. Enter: `http://localhost:3000/openai/v1`
+5. Add your OpenAI API key
 
-All requests from Cursor now go through PasteGuard with PII protection.
+Every code completion and chat message now goes through PasteGuard.
 
 ## Chat Interfaces
 
 ### Open WebUI
 
-In your Docker Compose or environment:
+Self-host your chat interface with built-in privacy:
 
 ```yaml
 services:
@@ -36,11 +50,9 @@ services:
       - OPENAI_API_KEY=your-key
 ```
 
-Or point Open WebUI to PasteGuard as an "OpenAI-compatible" connection.
-
 ### LibreChat
 
-Configure in your `librechat.yaml`:
+Add PasteGuard as a custom endpoint:
 
 ```yaml
 version: 1.2.8
@@ -57,7 +69,29 @@ endpoints:
       titleModel: "gpt-5.2"
 ```
 
-## Python / JavaScript
+## SDKs
+
+### Anthropic SDK
+
+<CodeGroup>
+
+```python Python
+from anthropic import Anthropic
+
+client = Anthropic(
+    base_url="http://localhost:3000/anthropic"
+)
+```
+
+```javascript JavaScript
+import Anthropic from '@anthropic-ai/sdk';
+
+const client = new Anthropic({
+  baseURL: 'http://localhost:3000/anthropic'
+});
+```
+
+</CodeGroup>
 
 ### OpenAI SDK
 
@@ -107,13 +141,17 @@ llm = OpenAILike(
 )
 ```
 
-## Environment Variable
+## Environment Variables
 
-Most tools respect the `OPENAI_API_BASE` or `OPENAI_BASE_URL` environment variable:
+Most tools respect the standard environment variables:
 
 ```bash
+# OpenAI-compatible tools
 export OPENAI_API_BASE=http://localhost:3000/openai/v1
 export OPENAI_API_KEY=your-key
+
+# Anthropic tools
+export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
 ```
 
 ## Verify It Works

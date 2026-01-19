@@ -1,0 +1,134 @@
+---
+title: Anthropic
+description: POST /anthropic/v1/messages
+---
+
+# Anthropic Endpoint
+
+Generate messages with automatic PII and secrets protection using the Anthropic Messages API.
+
+```
+POST /anthropic/v1/messages
+```
+
+<Note>
+This endpoint receives PII detection and masking. The request format follows the [Anthropic Messages API](https://docs.anthropic.com/en/api/messages).
+</Note>
+
+## Request
+
+```bash
+curl http://localhost:3000/anthropic/v1/messages \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1024,
+    "messages": [
+      {"role": "user", "content": "Hello"}
+    ]
+  }'
+```
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `model` | string | Yes | Model ID (e.g., `claude-sonnet-4-20250514`) |
+| `messages` | array | Yes | Conversation messages |
+| `max_tokens` | number | Yes | Maximum tokens to generate |
+| `stream` | boolean | No | Enable streaming |
+| `system` | string/array | No | System prompt |
+| `temperature` | number | No | Sampling temperature (0-1) |
+
+All Anthropic parameters are supported and forwarded to the provider.
+
+## Response
+
+```json
+{
+  "id": "msg_abc123",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-4-20250514",
+  "content": [
+    {
+      "type": "text",
+      "text": "Hello! How can I help you today?"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 10,
+    "output_tokens": 15
+  }
+}
+```
+
+## Streaming
+
+Set `stream: true` for Server-Sent Events:
+
+<CodeGroup>
+
+```python Python
+from anthropic import Anthropic
+
+client = Anthropic(base_url="http://localhost:3000/anthropic")
+
+with client.messages.stream(
+    model="claude-sonnet-4-20250514",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Write a haiku"}]
+) as stream:
+    for text in stream.text_stream:
+        print(text, end="")
+```
+
+```javascript JavaScript
+import Anthropic from '@anthropic-ai/sdk';
+
+const client = new Anthropic({
+  baseURL: 'http://localhost:3000/anthropic'
+});
+
+const stream = client.messages.stream({
+  model: 'claude-sonnet-4-20250514',
+  max_tokens: 1024,
+  messages: [{ role: 'user', content: 'Write a haiku' }]
+});
+
+for await (const event of stream) {
+  if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+    process.stdout.write(event.delta.text);
+  }
+}
+```
+
+</CodeGroup>
+
+## Response Headers
+
+PasteGuard adds headers to indicate PII and secrets handling:
+
+| Header | Description |
+|--------|-------------|
+| `X-PasteGuard-Mode` | Current mode (`mask` or `route`) |
+| `X-PasteGuard-Provider` | Provider used (`anthropic` or `local`) |
+| `X-PasteGuard-PII-Detected` | `true` if PII was found |
+| `X-PasteGuard-PII-Masked` | `true` if PII was masked (mask mode only) |
+| `X-PasteGuard-Language` | Detected language code |
+| `X-PasteGuard-Language-Fallback` | `true` if configured language was not available |
+| `X-PasteGuard-Secrets-Detected` | `true` if secrets were found |
+| `X-PasteGuard-Secrets-Types` | Comma-separated list of detected secret types |
+| `X-PasteGuard-Secrets-Masked` | `true` if secrets were masked |
+
+## Content Types
+
+PasteGuard scans all text content in Anthropic requests:
+
+- **User messages** — String content or text blocks
+- **Assistant messages** — Including thinking blocks
+- **System prompts** — String or content block array
+- **Tool results** — Text content in tool responses
