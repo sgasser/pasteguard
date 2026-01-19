@@ -32,7 +32,7 @@ PasteGuard is a privacy proxy that sits between your app and the LLM API. It det
 - **Mask Mode** — Replace PII with placeholders, send to your provider, restore in response. No local infrastructure needed.
 - **Route Mode** — Send PII requests to a local LLM (Ollama, vLLM, llama.cpp), everything else to your provider. Data never leaves your network.
 
-Works with OpenAI, Anthropic, Azure, and any OpenAI-compatible API. Just change one URL.
+Works with OpenAI, Anthropic, and compatible APIs (Azure, OpenRouter, Groq, etc.). Just change one URL.
 
 ## Browser Extension (Beta)
 

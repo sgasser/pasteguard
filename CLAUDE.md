@@ -1,6 +1,6 @@
 # PasteGuard
 
-OpenAI-compatible proxy with two privacy modes: route to local LLM or mask PII for configured provider.
+Privacy proxy for OpenAI and Anthropic APIs with two modes: route to local LLM or mask PII for configured provider.
 
 ## Tech Stack
 
