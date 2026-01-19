@@ -30,6 +30,17 @@ export interface OpenAIErrorResponse {
 }
 
 /**
+ * Error response format for Anthropic
+ */
+export interface AnthropicErrorResponse {
+  type: "error";
+  error: {
+    type: "invalid_request_error" | "server_error";
+    message: string;
+  };
+}
+
+/**
  * Format adapters for different API schemas
  */
 export const errorFormats = {
@@ -45,6 +56,18 @@ export const errorFormats = {
           type,
           param: null,
           code: code ?? null,
+        },
+      };
+    },
+  },
+
+  anthropic: {
+    error(message: string, type: "invalid_request_error" | "server_error"): AnthropicErrorResponse {
+      return {
+        type: "error",
+        error: {
+          type,
+          message,
         },
       };
     },
@@ -184,7 +207,7 @@ export function toSecretsHeaderData<T>(
 }
 
 export interface CreateLogDataOptions {
-  provider: "openai" | "local";
+  provider: "openai" | "anthropic" | "local";
   model: string;
   startTime: number;
   pii?: PIILogData;
@@ -227,7 +250,7 @@ export function createLogData(options: CreateLogDataOptions): RequestLogData {
 // ============================================================================
 
 export interface ProviderErrorContext {
-  provider: "openai" | "local";
+  provider: "openai" | "anthropic" | "local";
   model: string;
   startTime: number;
   pii?: PIILogData;

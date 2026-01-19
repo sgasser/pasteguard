@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import pkg from "../../package.json";
 import { getConfig } from "../config";
 import { getPIIDetector } from "../pii/detect";
+import { getAnthropicInfo } from "../providers/anthropic/client";
 import { getLocalInfo } from "../providers/local";
 import { getOpenAIInfo } from "../providers/openai/client";
 
@@ -12,9 +13,12 @@ infoRoutes.get("/info", (c) => {
   const detector = getPIIDetector();
   const languageValidation = detector.getLanguageValidation();
 
-  const providers: Record<string, { base_url: string }> = {
+  const providers = {
     openai: {
       base_url: getOpenAIInfo(config.providers.openai).baseUrl,
+    },
+    anthropic: {
+      base_url: getAnthropicInfo(config.providers.anthropic).baseUrl,
     },
   };
 

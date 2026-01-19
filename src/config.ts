@@ -19,6 +19,12 @@ const OpenAIProviderSchema = z.object({
   api_key: z.string().optional(), // Optional fallback if client doesn't send auth header
 });
 
+// Anthropic provider
+const AnthropicProviderSchema = z.object({
+  base_url: z.string().url().default("https://api.anthropic.com"),
+  api_key: z.string().optional(), // Optional fallback if client doesn't send auth header
+});
+
 const MaskingSchema = z.object({
   show_markers: z.boolean().default(false),
   marker_text: z.string().default("[protected]"),
@@ -110,6 +116,7 @@ const ConfigSchema = z
     // Providers
     providers: z.object({
       openai: OpenAIProviderSchema.default({}),
+      anthropic: AnthropicProviderSchema.default({}),
     }),
     // Local provider - only for route mode
     local: LocalProviderSchema.optional(),
@@ -147,6 +154,7 @@ const ConfigSchema = z
 
 export type Config = z.infer<typeof ConfigSchema>;
 export type OpenAIProviderConfig = z.infer<typeof OpenAIProviderSchema>;
+export type AnthropicProviderConfig = z.infer<typeof AnthropicProviderSchema>;
 export type LocalProviderConfig = z.infer<typeof LocalProviderSchema>;
 export type MaskingConfig = z.infer<typeof MaskingSchema>;
 export type SecretsDetectionConfig = z.infer<typeof SecretsDetectionSchema>;

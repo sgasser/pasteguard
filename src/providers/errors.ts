@@ -3,7 +3,7 @@
  */
 
 /**
- * Error from upstream provider (OpenAI, etc.)
+ * Error from upstream provider (OpenAI, Anthropic, etc.)
  */
 export class ProviderError extends Error {
   constructor(
