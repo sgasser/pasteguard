@@ -48,7 +48,8 @@
     {
       "group": "API Reference",
       "pages": [
-        "api-reference/chat-completions",
+        "api-reference/openai",
+        "api-reference/anthropic",
         "api-reference/status",
         "api-reference/dashboard-api"
       ]
