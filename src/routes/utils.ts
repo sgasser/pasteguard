@@ -284,7 +284,7 @@ export function handleProviderError(
         secrets: ctx.secrets,
         maskedContent: ctx.maskedContent,
         statusCode: error.status,
-        errorMessage: error.message,
+        errorMessage: error.errorMessage,
       }),
       ctx.userAgent,
     );
