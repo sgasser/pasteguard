@@ -5,6 +5,8 @@
 
 import type { LocalProviderConfig } from "../config";
 import { HEALTH_CHECK_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "../constants/timeouts";
+import type { AnthropicResult } from "./anthropic/client";
+import type { AnthropicRequest, AnthropicResponse } from "./anthropic/types";
 import { ProviderError, type ProviderResult } from "./openai/client";
 import type { OpenAIRequest } from "./openai/types";
 
@@ -45,6 +47,53 @@ export async function callLocal(
   }
 
   return { response: await response.json(), isStreaming: false, model: config.model };
+}
+
+/**
+ * Call local LLM with Anthropic Messages API format
+ * Used in route mode for PII-containing Anthropic requests
+ * Ollama supports Anthropic API at /v1/messages
+ */
+export async function callLocalAnthropic(
+  request: AnthropicRequest,
+  config: LocalProviderConfig,
+): Promise<AnthropicResult> {
+  const baseUrl = config.base_url.replace(/\/$/, "");
+  // Ollama's Anthropic-compatible endpoint
+  const endpoint = `${baseUrl}/v1/messages`;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (config.api_key) {
+    headers.Authorization = `Bearer ${config.api_key}`;
+  }
+
+  const isStreaming = request.stream ?? false;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ...request, model: config.model, stream: isStreaming }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new ProviderError(response.status, response.statusText, await response.text());
+  }
+
+  if (isStreaming) {
+    if (!response.body) {
+      throw new Error("No response body for streaming request");
+    }
+    return { response: response.body, isStreaming: true, model: config.model };
+  }
+
+  return {
+    response: (await response.json()) as AnthropicResponse,
+    isStreaming: false,
+    model: config.model,
+  };
 }
 
 /**
