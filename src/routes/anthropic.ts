@@ -3,12 +3,10 @@
  *
  * Flow:
  * 1. Validate request
- * 2. Process secrets (detect, maybe block or mask)
+ * 2. Process secrets (detect, maybe block, mask, or route_local)
  * 3. Detect PII
- * 4. Mask PII if found
- * 5. Send to Anthropic, unmask response
- *
- * Note: Anthropic endpoint only supports mask mode (no route mode)
+ * 4. Route mode: if PII found, send to local provider
+ * 5. Mask mode: mask PII if found, send to Anthropic, unmask response
  */
 
 import { zValidator } from "@hono/zod-validator";
@@ -29,6 +27,7 @@ import {
   AnthropicRequestSchema,
   type AnthropicResponse,
 } from "../providers/anthropic/types";
+import { callLocalAnthropic } from "../providers/local";
 import { unmaskSecretsResponse } from "../secrets/mask";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
@@ -68,26 +67,26 @@ anthropicRoutes.post(
     let request = c.req.valid("json") as AnthropicRequest;
     const config = getConfig();
 
-    // Anthropic endpoint only supports mask mode
-    if (config.mode === "route") {
+    // Route mode requires local provider
+    if (config.mode === "route" && !config.local) {
+      return respondError(c, "Route mode requires local provider configuration.", 400);
+    }
+
+    // route_local secrets action requires local provider
+    if (
+      config.secrets_detection.enabled &&
+      config.secrets_detection.action === "route_local" &&
+      !config.local
+    ) {
       return respondError(
         c,
-        "Anthropic endpoint only supports mask mode. Use OpenAI endpoint for route mode.",
+        "secrets_detection.action 'route_local' requires local provider.",
         400,
       );
     }
 
-    // route_local action not supported for Anthropic
-    if (config.secrets_detection.enabled && config.secrets_detection.action === "route_local") {
-      return respondError(
-        c,
-        "secrets_detection.action 'route_local' not supported for Anthropic. Use 'block' or 'mask'.",
-        400,
-      );
-    }
-
-    // Check if Anthropic provider is configured
-    if (!config.providers.anthropic) {
+    // Check if Anthropic provider is configured (required for mask mode, optional for route mode)
+    if (config.mode === "mask" && !config.providers.anthropic) {
       return respondError(
         c,
         "Anthropic provider not configured. Add providers.anthropic to config.yaml.",
@@ -134,7 +133,22 @@ anthropicRoutes.post(
       }
     }
 
-    // Step 3: Mask PII if found
+    // Step 3: Route mode - send to local if PII or secrets detected
+    const shouldRouteToLocal =
+      config.mode === "route" &&
+      (piiResult.hasPII ||
+        (secretsResult.detection?.detected && config.secrets_detection.action === "route_local"));
+
+    if (shouldRouteToLocal) {
+      return sendToLocal(c, request, {
+        request,
+        startTime,
+        piiResult,
+        secretsResult,
+      });
+    }
+
+    // Step 4: Mask mode - mask PII if found, send to Anthropic
     let piiMaskingContext: PlaceholderContext | undefined;
     let maskedContent: string | undefined;
 
@@ -147,7 +161,7 @@ anthropicRoutes.post(
       maskedContent = formatRequestForLog(request);
     }
 
-    // Step 4: Send to Anthropic
+    // Step 5: Send to Anthropic
     return sendToAnthropic(c, request, {
       startTime,
       piiResult,
@@ -217,6 +231,13 @@ interface SendOptions {
   piiMaskingContext?: PlaceholderContext;
   secretsResult: SecretsProcessResult<AnthropicRequest>;
   maskedContent?: string;
+}
+
+interface LocalOptions {
+  request: AnthropicRequest;
+  startTime: number;
+  piiResult: PIIDetectResult;
+  secretsResult: SecretsProcessResult<AnthropicRequest>;
 }
 
 // --- Helpers ---
@@ -299,7 +320,67 @@ function respondDetectionError(
   return respondError(c, "PII detection service unavailable", 503);
 }
 
-// --- Provider handler ---
+// --- Provider handlers ---
+
+async function sendToLocal(c: Context, originalRequest: AnthropicRequest, opts: LocalOptions) {
+  const config = getConfig();
+  const { request, piiResult, secretsResult, startTime } = opts;
+
+  if (!config.local) {
+    throw new Error("Local provider not configured");
+  }
+
+  const maskedContent =
+    piiResult.hasPII || secretsResult.masked ? formatRequestForLog(request) : undefined;
+
+  setResponseHeaders(
+    c,
+    config.mode,
+    "local",
+    toPIIHeaderData(piiResult),
+    toSecretsHeaderData(secretsResult),
+  );
+
+  try {
+    const result = await callLocalAnthropic(request, config.local);
+
+    logRequest(
+      createLogData({
+        provider: "local",
+        model: result.model || originalRequest.model,
+        startTime,
+        pii: toPIILogData(piiResult),
+        secrets: toSecretsLogData(secretsResult),
+        maskedContent,
+      }),
+      c.req.header("User-Agent") || null,
+    );
+
+    if (result.isStreaming) {
+      c.header("Content-Type", "text/event-stream");
+      c.header("Cache-Control", "no-cache");
+      c.header("Connection", "keep-alive");
+      return c.body(result.response as ReadableStream);
+    }
+
+    return c.json(result.response);
+  } catch (error) {
+    return handleProviderError(
+      c,
+      error,
+      {
+        provider: "local",
+        model: originalRequest.model,
+        startTime,
+        pii: toPIILogData(piiResult),
+        secrets: toSecretsLogData(secretsResult),
+        maskedContent,
+        userAgent: c.req.header("User-Agent") || null,
+      },
+      (msg) => errorFormats.anthropic.error(msg, "server_error"),
+    );
+  }
+}
 
 async function sendToAnthropic(c: Context, request: AnthropicRequest, opts: SendOptions) {
   const config = getConfig();
