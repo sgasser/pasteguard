@@ -217,7 +217,7 @@ anthropicRoutes.all("/*", async (c) => {
     }
   }
 
-  return proxy(`${baseUrl}/v1${path}`, {
+  return proxy(`${baseUrl}${path}`, {
     ...c.req,
     headers,
   });
