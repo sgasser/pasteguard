@@ -31,12 +31,14 @@ describe("Anthropic Text Extractor", () => {
         path: "messages[0].content",
         messageIndex: 0,
         partIndex: 0,
+        role: "user",
       });
       expect(spans[1]).toEqual({
         text: "Hi there",
         path: "messages[1].content",
         messageIndex: 1,
         partIndex: 0,
+        role: "assistant",
       });
     });
 
@@ -55,12 +57,14 @@ describe("Anthropic Text Extractor", () => {
         path: "system",
         messageIndex: -1,
         partIndex: 0,
+        role: "system",
       });
       expect(spans[1]).toEqual({
         text: "Hello",
         path: "messages[0].content",
         messageIndex: 0,
         partIndex: 0,
+        role: "user",
       });
     });
 
@@ -81,13 +85,16 @@ describe("Anthropic Text Extractor", () => {
         path: "system[0].text",
         messageIndex: -1,
         partIndex: 0,
+        role: "system",
       });
       expect(spans[1]).toEqual({
         text: "Second system part",
         path: "system[1].text",
         messageIndex: -1,
         partIndex: 1,
+        role: "system",
       });
+      expect(spans[2].role).toBe("user");
     });
 
     test("extracts text from text blocks in array content", () => {
@@ -110,12 +117,14 @@ describe("Anthropic Text Extractor", () => {
         path: "messages[0].content[0].text",
         messageIndex: 0,
         partIndex: 0,
+        role: "user",
       });
       expect(spans[1]).toEqual({
         text: "Be detailed",
         path: "messages[0].content[2].text",
         messageIndex: 0,
         partIndex: 2,
+        role: "user",
       });
     });
 
@@ -138,12 +147,14 @@ describe("Anthropic Text Extractor", () => {
         path: "messages[0].content[0].thinking",
         messageIndex: 0,
         partIndex: 0,
+        role: "assistant",
       });
       expect(spans[1]).toEqual({
         text: "Here's my answer",
         path: "messages[0].content[1].text",
         messageIndex: 0,
         partIndex: 1,
+        role: "assistant",
       });
     });
 
@@ -163,6 +174,7 @@ describe("Anthropic Text Extractor", () => {
         path: "messages[0].content[0].content",
         messageIndex: 0,
         partIndex: 0,
+        role: "tool",
       });
     });
 
@@ -193,6 +205,7 @@ describe("Anthropic Text Extractor", () => {
         messageIndex: 0,
         partIndex: 0,
         nestedPartIndex: 0,
+        role: "tool",
       });
       expect(spans[1]).toEqual({
         text: "Second text block",
@@ -200,6 +213,7 @@ describe("Anthropic Text Extractor", () => {
         messageIndex: 0,
         partIndex: 0,
         nestedPartIndex: 2,
+        role: "tool",
       });
     });
 
@@ -217,8 +231,11 @@ describe("Anthropic Text Extractor", () => {
 
       expect(spans).toHaveLength(3);
       expect(spans[0].messageIndex).toBe(0);
+      expect(spans[0].role).toBe("user");
       expect(spans[1].messageIndex).toBe(1);
+      expect(spans[1].role).toBe("assistant");
       expect(spans[2].messageIndex).toBe(2);
+      expect(spans[2].role).toBe("user");
     });
 
     test("skips redacted_thinking blocks", () => {

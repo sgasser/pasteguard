@@ -88,6 +88,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
             path: "system",
             messageIndex: SYSTEM_MESSAGE_INDEX,
             partIndex: 0,
+            role: "system",
           });
         }
       } else if (Array.isArray(request.system)) {
@@ -103,6 +104,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
                 path: `system[${partIdx}].${pathSuffix}`,
                 messageIndex: SYSTEM_MESSAGE_INDEX,
                 partIndex: partIdx,
+                role: "system",
               });
             }
           }
@@ -121,6 +123,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
             path: `messages[${msgIdx}].content`,
             messageIndex: msgIdx,
             partIndex: 0,
+            role: msg.role,
           });
         }
       } else if (Array.isArray(msg.content)) {
@@ -135,6 +138,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
                 path: `messages[${msgIdx}].content[${partIdx}].text`,
                 messageIndex: msgIdx,
                 partIndex: partIdx,
+                role: msg.role,
               });
             }
           } else if (block.type === "thinking") {
@@ -145,6 +149,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
                 path: `messages[${msgIdx}].content[${partIdx}].thinking`,
                 messageIndex: msgIdx,
                 partIndex: partIdx,
+                role: msg.role,
               });
             }
           } else if (block.type === "tool_result") {
@@ -156,6 +161,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
                   path: `messages[${msgIdx}].content[${partIdx}].content`,
                   messageIndex: msgIdx,
                   partIndex: partIdx,
+                  role: "tool",
                 });
               }
             } else if (Array.isArray(toolResult.content)) {
@@ -170,6 +176,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
                       messageIndex: msgIdx,
                       partIndex: partIdx,
                       nestedPartIndex: nestedIdx,
+                      role: "tool",
                     });
                   }
                 }
