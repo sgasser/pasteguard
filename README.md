@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  Privacy proxy for LLMs. Masks personal data and secrets before sending prompts to your provider.
+  Privacy proxy for OpenAI and Anthropic. Masks personal data and secrets before they reach the API.
 </p>
 
 <p align="center">
@@ -19,11 +19,11 @@
 
 <br/>
 
-<img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
+<img src="assets/demo.gif" width="100%" alt="PasteGuard Demo">
 
 ## What is PasteGuard?
 
-PasteGuard is a privacy proxy that masks personal data and secrets before sending prompts to LLM providers.
+PasteGuard is a privacy proxy that masks personal data and secrets before they reach OpenAI or Anthropic.
 
 ```
 You send:  "Email Dr. Sarah Chen at sarah@hospital.org"
@@ -33,8 +33,8 @@ You get:   Response with original names restored
 
 **Two ways to protect your data:**
 
-- **Mask Mode** — Replace PII with placeholders, send to your provider, restore in response. No local infrastructure needed.
-- **Route Mode** — Send PII requests to a local LLM (Ollama, vLLM, llama.cpp), everything else to your provider. Data never leaves your network.
+- **Mask Mode** — Replace PII with placeholders, send to OpenAI or Anthropic, restore in response. No local infrastructure needed.
+- **Route Mode** — Send PII requests to a local LLM (Ollama, vLLM, llama.cpp), everything else to OpenAI or Anthropic. Data never leaves your network.
 
 Just change one URL to start protecting your data.
 
@@ -52,7 +52,7 @@ Open source (Apache 2.0). Built in public — early feedback shapes the product.
 ## Features
 
 - **PII Detection** — Names, emails, phone numbers, credit cards, IBANs, and more
-- **Secrets Detection** — API keys, tokens, private keys caught before they reach the LLM
+- **Secrets Detection** — API keys, tokens, private keys caught before they reach OpenAI or Anthropic
 - **Streaming Support** — Real-time unmasking as tokens arrive
 - **24 Languages** — English, German, French, and 21 more
 - **OpenAI** — Works with OpenAI and compatible APIs (Azure, OpenRouter, Groq, Together AI, etc.)
@@ -69,12 +69,14 @@ docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
 
 Point your app to PasteGuard:
 
-| Provider | PasteGuard URL | Original URL |
+| API | PasteGuard URL | Original URL |
 |----------|----------------|--------------|
 | OpenAI | `http://localhost:3000/openai/v1` | `https://api.openai.com/v1` |
 | Anthropic | `http://localhost:3000/anthropic` | `https://api.anthropic.com` |
 
 Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
+
+<img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
 
 ### European Languages
 

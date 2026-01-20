@@ -5,7 +5,7 @@ description: Route PII requests to a local LLM
 
 # Route Mode
 
-Route mode sends requests containing PII to a local LLM. Requests without PII go to your configured provider.
+Route mode sends requests containing PII to a local LLM. Requests without PII go to OpenAI or Anthropic.
 
 ## How It Works
 
@@ -16,9 +16,9 @@ Route mode sends requests containing PII to a local LLM. Requests without PII go
     PII stays on your network.
   </Card>
   <Card title="Request without PII" icon="server">
-    Routed to **Configured Provider** (OpenAI, Anthropic, Azure, etc.)
+    Routed to **OpenAI or Anthropic**
 
-    Full provider performance.
+    Full performance.
   </Card>
 </CardGroup>
 
@@ -44,14 +44,14 @@ local:
 ```
 
 In route mode:
-- **No PII detected** → Request goes to configured provider (OpenAI or Anthropic)
-- **PII detected** → Request goes to local provider
+- **No PII detected** → Request goes to OpenAI or Anthropic
+- **PII detected** → Request goes to local LLM
 
 <Note>
-For Anthropic requests, the local provider must support the Anthropic Messages API (e.g., Ollama with Anthropic API compatibility).
+For Anthropic requests, the local LLM must support the Anthropic Messages API (e.g., Ollama with Anthropic API compatibility).
 </Note>
 
-## Local Provider Setup
+## Local LLM Setup
 
 ### Ollama
 
@@ -103,7 +103,7 @@ X-PasteGuard-PII-Detected: true
 X-PasteGuard-Language: en
 ```
 
-When routed to configured provider:
+When routed to OpenAI or Anthropic:
 
 ```
 X-PasteGuard-Mode: route

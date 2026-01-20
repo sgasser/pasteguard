@@ -1,9 +1,9 @@
 ---
 title: Introduction
-description: Privacy proxy for LLMs
+description: Privacy proxy for OpenAI and Anthropic
 ---
 
-PasteGuard masks personal data and secrets before sending prompts to LLM providers.
+PasteGuard masks personal data and secrets before they reach OpenAI or Anthropic.
 
 ```
 You send:  "Email Dr. Sarah Chen at sarah@hospital.org"
@@ -11,7 +11,7 @@ LLM sees:  "Email [[PERSON_1]] at [[EMAIL_ADDRESS_1]]"
 You get:   Response with original names restored
 ```
 
-PasteGuard sits between your app and the LLM API:
+PasteGuard sits between your app and the API:
 
 <Frame>
   <img src="/images/demo.gif" alt="PasteGuard Demo" />
@@ -21,8 +21,8 @@ Two privacy modes:
 
 | Mode | How it works |
 |------|--------------|
-| **Mask** | Replace PII with placeholders, send to provider, restore in response |
-| **Route** | PII requests stay on your local LLM (Ollama, vLLM, llama.cpp), others go to your configured provider |
+| **Mask** | Replace PII with placeholders, send to OpenAI or Anthropic, restore in response |
+| **Route** | PII requests stay on your local LLM (Ollama, vLLM, llama.cpp), others go to OpenAI or Anthropic |
 
 ## Browser Extension (Beta)
 
@@ -40,7 +40,7 @@ Open source (Apache 2.0). Built in public — early feedback shapes the product.
 ## Features
 
 - **PII Detection** — Names, emails, phone numbers, credit cards, IBANs, and more
-- **Secrets Detection** — API keys, tokens, private keys caught before they reach the LLM
+- **Secrets Detection** — API keys, tokens, private keys caught before they reach OpenAI or Anthropic
 - **Streaming Support** — Real-time unmasking as tokens arrive
 - **24 Languages** — English, German, French, and 21 more
 - **OpenAI** — Works with OpenAI and compatible APIs (Azure, OpenRouter, Groq, Together AI, etc.)

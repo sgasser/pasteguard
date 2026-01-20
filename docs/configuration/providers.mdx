@@ -1,11 +1,11 @@
 ---
 title: Providers
-description: Configure your LLM providers
+description: Configure OpenAI, Anthropic, and local LLM endpoints
 ---
 
 # Providers
 
-PasteGuard supports two provider types: configured providers (`providers`) and local provider (`local`).
+Configure endpoints for OpenAI, Anthropic, and local LLMs.
 
 ## OpenAI Provider
 
@@ -76,7 +76,7 @@ providers:
 | `base_url` | Anthropic API endpoint |
 | `api_key` | Optional. Used if client doesn't send `x-api-key` header |
 
-## Local Provider
+## Local LLM
 
 Required for route mode only. Your local LLM for PII requests.
 
@@ -133,7 +133,7 @@ local:
 
 ## API Key Handling
 
-PasteGuard forwards your client's authentication headers to the configured provider. You can optionally set `api_key` in config as a fallback:
+PasteGuard forwards your client's authentication headers to OpenAI or Anthropic. You can optionally set `api_key` in config as a fallback:
 
 ```yaml
 providers:

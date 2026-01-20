@@ -7,7 +7,7 @@ description: Use PasteGuard with IDEs, chat interfaces, and SDKs
 
 PasteGuard drops into your existing workflow. Point your tools to PasteGuard and every request gets PII protection automatically.
 
-| Provider | PasteGuard URL |
+| API | PasteGuard URL |
 |----------|----------------|
 | OpenAI | `http://localhost:3000/openai/v1` |
 | Anthropic | `http://localhost:3000/anthropic` |
@@ -58,7 +58,7 @@ cache: true
 endpoints:
   custom:
     - name: "PasteGuard"
-      apiKey: "${OPENAI_API_KEY}"  # Your API key, forwarded to provider
+      apiKey: "${OPENAI_API_KEY}"  # Your API key, forwarded to OpenAI
       baseURL: "http://localhost:3000/openai/v1"
       models:
         default: ["gpt-5.2"]

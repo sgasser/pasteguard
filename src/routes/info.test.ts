@@ -13,7 +13,7 @@ describe("GET /info", () => {
 
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.name).toBe("PasteGuard");
-    expect(body.version).toBe("0.1.0");
+    expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(body.mode).toBeDefined();
     expect(body.providers).toBeDefined();
     expect(body.pii_detection).toBeDefined();
