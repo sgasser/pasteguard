@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  Privacy proxy for LLMs. Masks personal data and secrets before sending to your provider.
+  Privacy proxy for LLMs. Masks personal data and secrets before sending prompts to your provider.
 </p>
 
 <p align="center">
@@ -23,16 +23,20 @@
 
 ## What is PasteGuard?
 
-When you use LLM APIs, every prompt is sent to external servers — including customer names, emails, and sensitive business data. Many organizations have policies against sending PII to third-party AI services.
+PasteGuard is a privacy proxy that masks personal data and secrets before sending prompts to LLM providers.
 
-PasteGuard is a privacy proxy that sits between your app and the LLM API. It detects personal data and secrets before they leave your network.
+```
+You send:  "Email Dr. Sarah Chen at sarah@hospital.org"
+LLM sees:  "Email [[PERSON_1]] at [[EMAIL_ADDRESS_1]]"
+You get:   Response with original names restored
+```
 
 **Two ways to protect your data:**
 
 - **Mask Mode** — Replace PII with placeholders, send to your provider, restore in response. No local infrastructure needed.
 - **Route Mode** — Send PII requests to a local LLM (Ollama, vLLM, llama.cpp), everything else to your provider. Data never leaves your network.
 
-Works with OpenAI, Anthropic, and compatible APIs (Azure, OpenRouter, Groq, etc.). Just change one URL.
+Just change one URL to start protecting your data.
 
 ## Browser Extension (Beta)
 
@@ -50,27 +54,12 @@ Open source (Apache 2.0). Built in public — early feedback shapes the product.
 - **PII Detection** — Names, emails, phone numbers, credit cards, IBANs, and more
 - **Secrets Detection** — API keys, tokens, private keys caught before they reach the LLM
 - **Streaming Support** — Real-time unmasking as tokens arrive
-- **24 Languages** — Works in English, German, French, and 21 more
-- **OpenAI & Anthropic** — Native support for both APIs
+- **24 Languages** — English, German, French, and 21 more
+- **OpenAI** — Works with OpenAI and compatible APIs (Azure, OpenRouter, Groq, Together AI, etc.)
+- **Anthropic** — Native Claude support, works with Claude Code
 - **Self-Hosted** — Your servers, your data stays yours
-- **Open Source** — Apache 2.0 license, full transparency
+- **Open Source** — Apache 2.0 license
 - **Dashboard** — See every protected request in real-time
-
-## How It Works
-
-```
-You send:     "Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)
-               about next week's project meeting"
-
-LLM receives: "Write a follow-up email to [[PERSON_1]] ([[EMAIL_ADDRESS_1]])
-               about next week's project meeting"
-
-LLM responds: "Dear [[PERSON_1]], Following up on our discussion..."
-
-You receive:  "Dear Dr. Sarah Chen, Following up on our discussion..."
-```
-
-PasteGuard sits between your app and your provider. Just change the base URL.
 
 ## Quick Start
 

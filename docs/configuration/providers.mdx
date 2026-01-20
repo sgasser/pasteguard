@@ -76,18 +76,6 @@ providers:
 | `base_url` | Anthropic API endpoint |
 | `api_key` | Optional. Used if client doesn't send `x-api-key` header |
 
-### Authentication
-
-PasteGuard supports multiple authentication methods for Anthropic:
-
-1. **Client header** — Forward client's `x-api-key` header
-2. **Config API key** — Use `api_key` from config as fallback
-3. **Claude subscription** — Automatically use Claude Code OAuth tokens if available
-
-<Note>
-Users with a Claude Pro/Team subscription can use PasteGuard without an API key when running locally. PasteGuard detects Claude Code OAuth tokens and uses them automatically.
-</Note>
-
 ## Local Provider
 
 Required for route mode only. Your local LLM for PII requests.

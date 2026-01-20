@@ -5,13 +5,13 @@ description: Privacy proxy for LLMs
 
 # What is PasteGuard?
 
-PasteGuard is a privacy proxy that protects personal data and secrets before sending to your provider (OpenAI, Anthropic, Azure, self-hosted, etc.).
+PasteGuard is a privacy proxy that masks personal data and secrets before sending prompts to LLM providers.
 
-## The Problem
-
-When using LLM APIs, every prompt is sent to external servers - including customer names, emails, and sensitive business data. Many organizations have policies against sending PII to third-party AI services.
-
-## The Solution
+```
+You send:  "Email Dr. Sarah Chen at sarah@hospital.org"
+LLM sees:  "Email [[PERSON_1]] at [[EMAIL_ADDRESS_1]]"
+You get:   Response with original names restored
+```
 
 PasteGuard sits between your app and the LLM API:
 
@@ -67,12 +67,13 @@ Open source (Apache 2.0). Built in public — early feedback shapes the product.
 ## Features
 
 - **PII Detection** — Names, emails, phone numbers, credit cards, IBANs, and more
-- **Secrets Detection** — API keys, tokens, private keys, env credentials caught before they reach the LLM
+- **Secrets Detection** — API keys, tokens, private keys caught before they reach the LLM
 - **Streaming Support** — Real-time unmasking as tokens arrive
-- **24 Languages** — Works in English, German, French, and 21 more
-- **OpenAI & Anthropic** — Native support for both APIs
+- **24 Languages** — English, German, French, and 21 more
+- **OpenAI** — Works with OpenAI and compatible APIs (Azure, OpenRouter, Groq, Together AI, etc.)
+- **Anthropic** — Native Claude support, works with Claude Code
 - **Self-Hosted** — Your servers, your data stays yours
-- **Open Source** — Apache 2.0 license, full transparency
+- **Open Source** — Apache 2.0 license
 - **Dashboard** — See every protected request in real-time
 
 ## Next Steps

@@ -1,6 +1,6 @@
 # PasteGuard
 
-Privacy proxy for OpenAI and Anthropic APIs with two modes: route to local LLM or mask PII for configured provider.
+Privacy proxy for LLMs. Masks personal data and secrets before sending prompts to your provider (OpenAI, Anthropic, etc.).
 
 ## Tech Stack
 
@@ -23,6 +23,7 @@ src/
 │   └── timeouts.ts          # HTTP timeout values
 ├── routes/
 │   ├── openai.ts            # /openai/v1/* (chat completions + wildcard proxy)
+│   ├── anthropic.ts         # /anthropic/v1/* (messages + wildcard proxy)
 │   ├── dashboard.tsx        # Dashboard routes + API
 │   ├── health.ts            # GET /health
 │   ├── info.ts              # GET /info
@@ -30,10 +31,14 @@ src/
 ├── providers/
 │   ├── errors.ts            # Shared provider errors
 │   ├── local.ts             # Local LLM client (Ollama/OpenAI-compatible)
-│   └── openai/
-│       ├── client.ts        # OpenAI API client
+│   ├── openai/
+│   │   ├── client.ts        # OpenAI API client
+│   │   ├── stream-transformer.ts  # SSE unmasking for streaming
+│   │   └── types.ts         # OpenAI request/response types
+│   └── anthropic/
+│       ├── client.ts        # Anthropic API client
 │       ├── stream-transformer.ts  # SSE unmasking for streaming
-│       └── types.ts         # OpenAI request/response types
+│       └── types.ts         # Anthropic request/response types
 ├── masking/
 │   ├── service.ts           # Masking orchestration
 │   ├── context.ts           # Masking context management
@@ -41,7 +46,8 @@ src/
 │   ├── conflict-resolver.ts # Overlapping entity resolution
 │   ├── types.ts             # Shared masking types
 │   └── extractors/
-│       └── openai.ts        # OpenAI text extraction/insertion
+│       ├── openai.ts        # OpenAI text extraction/insertion
+│       └── anthropic.ts     # Anthropic text extraction/insertion
 ├── pii/
 │   ├── detect.ts            # Presidio client
 │   └── mask.ts              # PII masking logic
@@ -109,6 +115,7 @@ See @docker/presidio/languages.yaml for 24 available languages.
 
 - `GET /health` - Health check
 - `GET /info` - Mode info
-- `POST /openai/v1/chat/completions` - Main endpoint
+- `POST /openai/v1/chat/completions` - OpenAI endpoint
+- `POST /anthropic/v1/messages` - Anthropic endpoint
 
 Response header `X-PasteGuard-PII-Masked: true` indicates PII was masked.
