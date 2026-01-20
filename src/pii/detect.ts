@@ -10,6 +10,21 @@ export interface PIIEntity {
   score: number;
 }
 
+export function filterWhitelistedEntities(
+  text: string,
+  entities: PIIEntity[],
+  whitelist: string[],
+): PIIEntity[] {
+  if (whitelist.length === 0) return entities;
+
+  return entities.filter((entity) => {
+    const detectedText = text.slice(entity.start, entity.end);
+    return !whitelist.some(
+      (pattern) => pattern.includes(detectedText) || detectedText.includes(pattern),
+    );
+  });
+}
+
 interface AnalyzeRequest {
   text: string;
   language: string;
@@ -103,6 +118,7 @@ export class PIIDetector {
     const scanRoles = config.pii_detection.scan_roles
       ? new Set(config.pii_detection.scan_roles)
       : null;
+    const whitelist = config.masking.whitelist;
 
     const spanEntities: PIIEntity[][] = await Promise.all(
       spans.map(async (span) => {
@@ -110,7 +126,8 @@ export class PIIDetector {
           return [];
         }
         if (!span.text) return [];
-        return this.detectPII(span.text, langResult.language);
+        const entities = await this.detectPII(span.text, langResult.language);
+        return filterWhitelistedEntities(span.text, entities, whitelist);
       }),
     );
 

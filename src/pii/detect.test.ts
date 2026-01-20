@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { openaiExtractor } from "../masking/extractors/openai";
 import type { OpenAIMessage, OpenAIRequest } from "../providers/openai/types";
-import { PIIDetector } from "./detect";
+import { filterWhitelistedEntities, PIIDetector } from "./detect";
 
 const originalFetch = globalThis.fetch;
 
@@ -208,6 +208,53 @@ describe("PIIDetector", () => {
       const healthy = await detector.healthCheck();
 
       expect(healthy).toBe(false);
+    });
+  });
+
+  describe("filterWhitelistedEntities", () => {
+    test("filters entities matching whitelist pattern", () => {
+      const text = "You are Claude Code, Anthropic's official CLI for Claude.";
+      const entities = [{ entity_type: "PERSON", start: 8, end: 14, score: 0.9 }];
+      const whitelist = ["You are Claude Code, Anthropic's official CLI for Claude."];
+
+      const result = filterWhitelistedEntities(text, entities, whitelist);
+
+      expect(result).toHaveLength(0);
+    });
+
+    test("keeps entities not in whitelist", () => {
+      const text = "Contact John Doe at john@example.com";
+      const entities = [
+        { entity_type: "PERSON", start: 8, end: 16, score: 0.9 },
+        { entity_type: "EMAIL_ADDRESS", start: 20, end: 36, score: 0.95 },
+      ];
+      const whitelist = ["Claude"];
+
+      const result = filterWhitelistedEntities(text, entities, whitelist);
+
+      expect(result).toHaveLength(2);
+    });
+
+    test("filters when entity text is contained in whitelist pattern", () => {
+      const text = "Hello Claude, how are you?";
+      const entities = [{ entity_type: "PERSON", start: 6, end: 12, score: 0.85 }];
+      const whitelist = ["You are Claude Code"];
+
+      const result = filterWhitelistedEntities(text, entities, whitelist);
+
+      expect(result).toHaveLength(0);
+    });
+
+    test("returns all entities when whitelist is empty", () => {
+      const text = "Contact Claude at claude@example.com";
+      const entities = [
+        { entity_type: "PERSON", start: 8, end: 14, score: 0.9 },
+        { entity_type: "EMAIL_ADDRESS", start: 18, end: 36, score: 0.95 },
+      ];
+
+      const result = filterWhitelistedEntities(text, entities, []);
+
+      expect(result).toHaveLength(2);
     });
   });
 });

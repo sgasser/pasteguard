@@ -6,6 +6,7 @@ import { createUnmaskingStream } from "./stream-transformer";
 const defaultConfig: MaskingConfig = {
   show_markers: false,
   marker_text: "[protected]",
+  whitelist: [],
 };
 
 /**

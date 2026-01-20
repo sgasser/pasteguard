@@ -42,6 +42,10 @@ masking:
   show_markers: false
   marker_text: "[protected]"
 
+  # Text patterns that are never masked (protects against false positives)
+  # whitelist:
+  #   - "Company Name Inc."
+
 # PII Detection settings (Microsoft Presidio)
 pii_detection:
   presidio_url: ${PRESIDIO_URL:-http://localhost:5002}

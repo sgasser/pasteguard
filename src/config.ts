@@ -22,6 +22,7 @@ const OpenAIProviderSchema = z.object({
 const MaskingSchema = z.object({
   show_markers: z.boolean().default(false),
   marker_text: z.string().default("[protected]"),
+  whitelist: z.array(z.string()).default([]),
 });
 
 const LanguageEnum = z.enum(SUPPORTED_LANGUAGES);
