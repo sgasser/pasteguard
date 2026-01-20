@@ -147,12 +147,14 @@ openaiRoutes.all("/*", (c) => {
   const config = getConfig();
   const { baseUrl } = getOpenAIInfo(config.providers.openai);
   const path = c.req.path.replace(/^\/openai\/v1/, "");
+  const query = c.req.url.includes("?") ? c.req.url.slice(c.req.url.indexOf("?")) : "";
 
-  return proxy(`${baseUrl}${path}`, {
+  return proxy(`${baseUrl}${path}${query}`, {
     ...c.req,
     headers: {
-      "Content-Type": c.req.header("Content-Type"),
-      Authorization: c.req.header("Authorization"),
+      ...c.req.header(),
+      "X-Forwarded-Host": c.req.header("host"),
+      host: undefined,
     },
   });
 });
