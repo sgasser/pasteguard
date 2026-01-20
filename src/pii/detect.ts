@@ -100,8 +100,15 @@ export class PIIDetector {
       : { language: config.pii_detection.fallback_language, usedFallback: true };
 
     // Detect PII for each span independently
+    const scanRoles = config.pii_detection.scan_roles
+      ? new Set(config.pii_detection.scan_roles)
+      : null;
+
     const spanEntities: PIIEntity[][] = await Promise.all(
       spans.map(async (span) => {
+        if (scanRoles && span.role && !scanRoles.has(span.role)) {
+          return [];
+        }
         if (!span.text) return [];
         return this.detectPII(span.text, langResult.language);
       }),

@@ -24,12 +24,14 @@ describe("OpenAI Text Extractor", () => {
         path: "messages[0].content",
         messageIndex: 0,
         partIndex: 0,
+        role: "system",
       });
       expect(spans[1]).toEqual({
         text: "Hello world",
         path: "messages[1].content",
         messageIndex: 1,
         partIndex: 0,
+        role: "user",
       });
     });
 
@@ -53,12 +55,14 @@ describe("OpenAI Text Extractor", () => {
         path: "messages[0].content[0].text",
         messageIndex: 0,
         partIndex: 0,
+        role: "user",
       });
       expect(spans[1]).toEqual({
         text: "Be detailed",
         path: "messages[0].content[2].text",
         messageIndex: 0,
         partIndex: 2,
+        role: "user",
       });
     });
 
@@ -76,8 +80,11 @@ describe("OpenAI Text Extractor", () => {
 
       expect(spans).toHaveLength(3);
       expect(spans[0].messageIndex).toBe(0);
+      expect(spans[0].role).toBe("system");
       expect(spans[1].messageIndex).toBe(1);
+      expect(spans[1].role).toBe("user");
       expect(spans[2].messageIndex).toBe(2);
+      expect(spans[2].role).toBe("assistant");
     });
 
     test("skips null/undefined content", () => {

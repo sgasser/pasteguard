@@ -85,6 +85,16 @@ pii_detection:
     # - MEDICAL_LICENSE
     # - URL
 
+  # Which message roles to scan for PII (optional)
+  # By default, all roles are scanned. Set this to scan only user-controlled content:
+  #   - user:      User messages (primary source of PII)
+  #   - tool:      Tool/function call results (may contain user data)
+  #   - function:  Legacy function results (OpenAI)
+  # scan_roles:
+  #   - user
+  #   - tool
+  #   - function
+
 # Secrets Detection settings (Secrets Shield)
 # Detects private keys, API keys, tokens and other secret credentials in requests
 secrets_detection:
@@ -137,6 +147,16 @@ secrets_detection:
   # Log detected secret types (never logs secret content)
   # Even if logging.log_content is true, secret content is never logged
   log_detected_types: true
+
+  # Which message roles to scan for secrets (optional)
+  # By default, all roles are scanned. Set this to scan only user-controlled content:
+  #   - user:      User messages (primary source of secrets)
+  #   - tool:      Tool/function call results (may contain secrets)
+  #   - function:  Legacy function results (OpenAI)
+  # scan_roles:
+  #   - user
+  #   - tool
+  #   - function
 
 # Logging settings
 logging:

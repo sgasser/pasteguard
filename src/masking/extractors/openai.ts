@@ -33,6 +33,7 @@ export const openaiExtractor: RequestExtractor<OpenAIRequest, OpenAIResponse> = 
           path: `messages[${msgIdx}].content`,
           messageIndex: msgIdx,
           partIndex: 0,
+          role: msg.role,
         });
         continue;
       }
@@ -46,6 +47,7 @@ export const openaiExtractor: RequestExtractor<OpenAIRequest, OpenAIResponse> = 
               path: `messages[${msgIdx}].content[${partIdx}].text`,
               messageIndex: msgIdx,
               partIndex: partIdx,
+              role: msg.role,
             });
           }
         }

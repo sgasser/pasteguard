@@ -10,6 +10,7 @@ export interface TextSpan {
   messageIndex: number;
   partIndex: number;
   nestedPartIndex?: number;
+  role?: string;
 }
 
 export interface MaskedSpan {

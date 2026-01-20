@@ -54,6 +54,7 @@ const PIIDetectionSchema = z.object({
       "IP_ADDRESS",
       "LOCATION",
     ]),
+  scan_roles: z.array(z.string()).optional(),
 });
 
 const ServerSchema = z.object({
@@ -98,6 +99,7 @@ const SecretsDetectionSchema = z.object({
   entities: z.array(z.enum(SecretEntityTypes)).default(["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY"]),
   max_scan_chars: z.coerce.number().int().min(0).default(200000),
   log_detected_types: z.boolean().default(true),
+  scan_roles: z.array(z.string()).optional(),
 });
 
 const ConfigSchema = z

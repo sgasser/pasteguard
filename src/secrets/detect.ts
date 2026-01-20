@@ -95,8 +95,13 @@ export function detectSecretsInSpans(
   }
 
   // Detect secrets in each span
+  const scanRoles = config.scan_roles ? new Set(config.scan_roles) : null;
+
   const matchCounts = new Map<string, number>();
   const spanLocations: SecretLocation[][] = spans.map((span) => {
+    if (scanRoles && span.role && !scanRoles.has(span.role)) {
+      return [];
+    }
     const result = detectSecrets(span.text, config);
     for (const match of result.matches) {
       matchCounts.set(match.type, (matchCounts.get(match.type) || 0) + match.count);
