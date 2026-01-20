@@ -146,8 +146,8 @@ openaiRoutes.post(
 openaiRoutes.all("/*", (c) => {
   const config = getConfig();
   const { baseUrl } = getOpenAIInfo(config.providers.openai);
-  // /openai/v1/models -> /v1/models
-  const path = c.req.path.replace(/^\/openai/, "");
+  // /openai/v1/models -> /models (base_url already includes /v1)
+  const path = c.req.path.replace(/^\/openai\/v1/, "");
 
   return proxy(`${baseUrl}${path}`, {
     ...c.req,
