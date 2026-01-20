@@ -97,3 +97,38 @@ pii_detection:
   # score_threshold: 0.5  # More aggressive
   # score_threshold: 0.9  # More conservative
 ```
+
+## Whitelist
+
+Exclude specific text patterns from PII masking. Useful for preventing false positives on company names or product identifiers.
+
+```yaml
+masking:
+  whitelist:
+    - "Acme Corp"
+    - "Product XYZ"
+```
+
+Patterns match bidirectionally - detected text containing a whitelist entry (or vice versa) is excluded.
+
+## Scan Roles
+
+By default, all message roles are scanned. To scan only user-controlled content:
+
+```yaml
+pii_detection:
+  scan_roles:
+    - user
+    - tool
+    - function
+```
+
+| Role | Description |
+|------|-------------|
+| `user` | User messages (primary source of PII) |
+| `assistant` | Assistant responses |
+| `system` | System prompts |
+| `tool` | Tool/function call results |
+| `function` | Legacy function results (OpenAI) |
+
+This reduces Presidio API calls for large system prompts and avoids false positives on app-controlled content.
