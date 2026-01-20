@@ -3,9 +3,7 @@ title: Introduction
 description: Privacy proxy for LLMs
 ---
 
-# What is PasteGuard?
-
-PasteGuard is a privacy proxy that masks personal data and secrets before sending prompts to LLM providers.
+PasteGuard masks personal data and secrets before sending prompts to LLM providers.
 
 ```
 You send:  "Email Dr. Sarah Chen at sarah@hospital.org"
@@ -38,31 +36,6 @@ Open source (Apache 2.0). Built in public — early feedback shapes the product.
 <Card title="Join the Beta" icon="flask" href="https://tally.so/r/J9pNLr">
   Get early access to the browser extension
 </Card>
-
-## Quick Example
-
-<Steps>
-  <Step title="You send a prompt">
-    ```
-    Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)
-    ```
-  </Step>
-  <Step title="PasteGuard masks PII">
-    Detected: `Dr. Sarah Chen` → `[[PERSON_1]]`, `sarah.chen@hospital.org` → `[[EMAIL_ADDRESS_1]]`
-  </Step>
-  <Step title="LLM receives">
-    ```
-    Write a follow-up email to [[PERSON_1]] ([[EMAIL_ADDRESS_1]])
-    ```
-  </Step>
-  <Step title="You get the response (unmasked)">
-    ```
-    Dear Dr. Sarah Chen, Following up on our discussion...
-    ```
-  </Step>
-</Steps>
-
-<Note>The LLM never sees the real data. PII is masked before sending and restored in the response.</Note>
 
 ## Features
 

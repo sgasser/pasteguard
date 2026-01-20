@@ -42,13 +42,11 @@ Every code completion and chat message now goes through PasteGuard.
 
 Self-host your chat interface with built-in privacy:
 
-```yaml
-services:
-  open-webui:
-    environment:
-      - OPENAI_API_BASE_URL=http://pasteguard:3000/openai/v1
-      - OPENAI_API_KEY=your-key
+```bash
+OPENAI_API_BASE_URL=http://localhost:3000/openai/v1
 ```
+
+<Note>In Docker Compose, use the service name instead of `localhost` (e.g., `http://pasteguard:3000/openai/v1`).</Note>
 
 ### LibreChat
 
@@ -60,11 +58,11 @@ cache: true
 endpoints:
   custom:
     - name: "PasteGuard"
-      apiKey: "${OPENAI_API_KEY}"
+      apiKey: "${OPENAI_API_KEY}"  # Your API key, forwarded to provider
       baseURL: "http://localhost:3000/openai/v1"
       models:
         default: ["gpt-5.2"]
-        fetch: false
+        fetch: true
       titleConvo: true
       titleModel: "gpt-5.2"
 ```
@@ -101,8 +99,7 @@ const client = new Anthropic({
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:3000/openai/v1",
-    api_key="your-key"
+    base_url="http://localhost:3000/openai/v1"
 )
 ```
 
@@ -110,8 +107,7 @@ client = OpenAI(
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  baseURL: 'http://localhost:3000/openai/v1',
-  apiKey: 'your-key'
+  baseURL: 'http://localhost:3000/openai/v1'
 });
 ```
 
@@ -123,8 +119,7 @@ const client = new OpenAI({
 from langchain_openai import ChatOpenAI
 
 llm = ChatOpenAI(
-    base_url="http://localhost:3000/openai/v1",
-    api_key="your-key"
+    base_url="http://localhost:3000/openai/v1"
 )
 ```
 
@@ -135,7 +130,6 @@ from llama_index.llms.openai_like import OpenAILike
 
 llm = OpenAILike(
     api_base="http://localhost:3000/openai/v1",
-    api_key="your-key",
     model="gpt-5.2",
     is_chat_model=True
 )
@@ -148,7 +142,6 @@ Most tools respect the standard environment variables:
 ```bash
 # OpenAI-compatible tools
 export OPENAI_API_BASE=http://localhost:3000/openai/v1
-export OPENAI_API_KEY=your-key
 
 # Anthropic tools
 export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
