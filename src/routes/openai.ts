@@ -141,15 +141,22 @@ openaiRoutes.post(
 );
 
 /**
- * Proxy all other requests to OpenAI
+ * Wildcard proxy for /models, /embeddings, /audio/*, /images/*, etc.
  */
 openaiRoutes.all("/*", (c) => {
   const config = getConfig();
   const { baseUrl } = getOpenAIInfo(config.providers.openai);
-  const path = c.req.path.replace(/^\/openai/, "");
+  const path = c.req.path.replace(/^\/openai\/v1/, "");
   const query = c.req.url.includes("?") ? c.req.url.slice(c.req.url.indexOf("?")) : "";
 
-  return proxy(`${baseUrl}${path}${query}`, c.req);
+  return proxy(`${baseUrl}${path}${query}`, {
+    ...c.req,
+    headers: {
+      ...c.req.header(),
+      "X-Forwarded-Host": c.req.header("host"),
+      host: undefined,
+    },
+  });
 });
 
 // --- Types ---
