@@ -146,16 +146,10 @@ openaiRoutes.post(
 openaiRoutes.all("/*", (c) => {
   const config = getConfig();
   const { baseUrl } = getOpenAIInfo(config.providers.openai);
-  // /openai/v1/models -> /v1/models
   const path = c.req.path.replace(/^\/openai/, "");
+  const query = c.req.url.includes("?") ? c.req.url.slice(c.req.url.indexOf("?")) : "";
 
-  return proxy(`${baseUrl}${path}`, {
-    ...c.req,
-    headers: {
-      "Content-Type": c.req.header("Content-Type"),
-      Authorization: c.req.header("Authorization"),
-    },
-  });
+  return proxy(`${baseUrl}${path}${query}`, c.req);
 });
 
 // --- Types ---

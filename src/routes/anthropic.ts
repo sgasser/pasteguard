@@ -191,30 +191,9 @@ anthropicRoutes.all("/*", async (c) => {
   const { proxy } = await import("hono/proxy");
   const baseUrl = config.providers.anthropic.base_url || "https://api.anthropic.com";
   const path = c.req.path.replace(/^\/anthropic/, "");
+  const query = c.req.url.includes("?") ? c.req.url.slice(c.req.url.indexOf("?")) : "";
 
-  const { ANTHROPIC_VERSION } = await import("../providers/anthropic/client");
-  const headers: Record<string, string | undefined> = {
-    "Content-Type": c.req.header("Content-Type"),
-    "anthropic-version": c.req.header("anthropic-version") || ANTHROPIC_VERSION,
-    "anthropic-beta": c.req.header("anthropic-beta"),
-  };
-
-  // Transparent auth forwarding - client headers take priority
-  const clientApiKey = c.req.header("x-api-key");
-  const clientAuth = c.req.header("Authorization");
-
-  if (clientApiKey) {
-    headers["x-api-key"] = clientApiKey;
-  } else if (clientAuth) {
-    headers.Authorization = clientAuth;
-  } else if (config.providers.anthropic.api_key) {
-    headers["x-api-key"] = config.providers.anthropic.api_key;
-  }
-
-  return proxy(`${baseUrl}${path}`, {
-    ...c.req,
-    headers,
-  });
+  return proxy(`${baseUrl}${path}${query}`, c.req);
 });
 
 // --- Types ---
