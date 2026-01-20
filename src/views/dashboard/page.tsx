@@ -42,6 +42,7 @@ const DashboardPage: FC = () => {
 								--color-info: #2563eb;
 								--color-info-bg: #dbeafe;
 								--color-teal: #0d9488;
+								--color-anthropic: #d97706;
 
 								/* Code Block Colors */
 								--color-code-bg: #1c1917;
@@ -95,6 +96,8 @@ const DashboardPage: FC = () => {
 							.bg-success { background: var(--color-success); }
 							.bg-success\\/10 { background: rgba(22, 163, 74, 0.1); }
 							.bg-teal { background: var(--color-teal); }
+							.bg-anthropic { background: var(--color-anthropic); }
+							.bg-anthropic\\/10 { background: rgba(217, 119, 6, 0.1); }
 							.bg-error { background: var(--color-error); }
 							.bg-error\\/10 { background: rgba(220, 38, 38, 0.1); }
 
@@ -113,6 +116,7 @@ const DashboardPage: FC = () => {
 							.text-info { color: var(--color-info); }
 							.text-success { color: var(--color-success); }
 							.text-teal { color: var(--color-teal); }
+							.text-anthropic { color: var(--color-anthropic); }
 							.text-error { color: var(--color-error); }
 
 							/* Border radius */
@@ -592,7 +596,7 @@ async function fetchLogs() {
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' + statusBadge + '</td>' +
           '<td class="route-only text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
             '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide ' +
-              (log.provider === 'openai' ? 'bg-info/10 text-info' : 'bg-success/10 text-success') + '">' + log.provider + '</span>' +
+              (log.provider === 'openai' ? 'bg-info/10 text-info' : log.provider === 'anthropic' ? 'bg-anthropic/10 text-anthropic' : 'bg-success/10 text-success') + '">' + log.provider + '</span>' +
           '</td>' +
           '<td class="font-mono text-[0.7rem] text-text-secondary px-4 py-3 border-b border-border-subtle align-middle">' + log.model + '</td>' +
           '<td class="font-mono text-[0.65rem] font-medium px-4 py-3 border-b border-border-subtle align-middle">' + langDisplay + '</td>' +
