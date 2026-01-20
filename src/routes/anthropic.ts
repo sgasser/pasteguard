@@ -174,6 +174,8 @@ anthropicRoutes.post(
 
 /**
  * Proxy all other requests to Anthropic
+ *
+ * Transparent header forwarding - all auth headers from client are passed through.
  */
 anthropicRoutes.all("/*", async (c) => {
   const config = getConfig();
@@ -188,33 +190,25 @@ anthropicRoutes.all("/*", async (c) => {
 
   const { proxy } = await import("hono/proxy");
   const baseUrl = config.providers.anthropic.base_url || "https://api.anthropic.com";
-  // /anthropic/v1/messages -> /v1/messages, /anthropic/api/foo -> /api/foo
   const path = c.req.path.replace(/^\/anthropic/, "");
 
   const { ANTHROPIC_VERSION } = await import("../providers/anthropic/client");
   const headers: Record<string, string | undefined> = {
     "Content-Type": c.req.header("Content-Type"),
     "anthropic-version": c.req.header("anthropic-version") || ANTHROPIC_VERSION,
+    "anthropic-beta": c.req.header("anthropic-beta"),
   };
 
+  // Transparent auth forwarding - client headers take priority
   const clientApiKey = c.req.header("x-api-key");
+  const clientAuth = c.req.header("Authorization");
+
   if (clientApiKey) {
     headers["x-api-key"] = clientApiKey;
-    headers["anthropic-beta"] = c.req.header("anthropic-beta");
+  } else if (clientAuth) {
+    headers.Authorization = clientAuth;
   } else if (config.providers.anthropic.api_key) {
     headers["x-api-key"] = config.providers.anthropic.api_key;
-    headers["anthropic-beta"] = c.req.header("anthropic-beta");
-  } else {
-    const { getClaudeCodeAccessToken } = await import("../providers/anthropic/oauth");
-    const { CLAUDE_CODE_BETA } = await import("../providers/anthropic/client");
-    const accessToken = await getClaudeCodeAccessToken();
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-      headers["anthropic-beta"] = CLAUDE_CODE_BETA;
-    } else if (c.req.header("Authorization")) {
-      headers.Authorization = c.req.header("Authorization");
-      headers["anthropic-beta"] = c.req.header("anthropic-beta");
-    }
   }
 
   return proxy(`${baseUrl}${path}`, {

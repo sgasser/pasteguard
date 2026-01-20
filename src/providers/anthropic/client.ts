@@ -5,14 +5,10 @@
 import type { AnthropicProviderConfig } from "../../config";
 import { REQUEST_TIMEOUT_MS } from "../../constants/timeouts";
 import { ProviderError } from "../errors";
-import { getClaudeCodeAccessToken } from "./oauth";
 import type { AnthropicRequest, AnthropicResponse } from "./types";
 
 export const ANTHROPIC_VERSION = "2023-06-01";
 const DEFAULT_ANTHROPIC_URL = "https://api.anthropic.com";
-
-export const CLAUDE_CODE_BETA = "claude-code-20250219,oauth-2025-04-20";
-const CLAUDE_CODE_SYSTEM_PREFIX = "You are Claude Code, Anthropic's official CLI for Claude.";
 
 /**
  * Result from Anthropic client
@@ -40,6 +36,9 @@ export interface AnthropicClientHeaders {
 
 /**
  * Call Anthropic Messages API
+ *
+ * Transparent header forwarding - all auth headers from client are passed through.
+ * Config api_key is only used as fallback when no client auth headers present.
  */
 export async function callAnthropic(
   request: AnthropicRequest,
@@ -54,58 +53,25 @@ export async function callAnthropic(
     "anthropic-version": ANTHROPIC_VERSION,
   };
 
-  // Authentication priority:
-  // 1. Client's x-api-key header
-  // 2. Config API key
-  // 3. Claude Code OAuth tokens (subscription auth)
-  // 4. Client's Authorization header (passthrough)
-  let useOAuth = false;
-
+  // Transparent auth forwarding - client headers take priority
   if (clientHeaders?.apiKey) {
     headers["x-api-key"] = clientHeaders.apiKey;
+  } else if (clientHeaders?.authorization) {
+    headers.Authorization = clientHeaders.authorization;
   } else if (config.api_key) {
+    // Fallback to config only if no client auth
     headers["x-api-key"] = config.api_key;
-  } else {
-    const accessToken = await getClaudeCodeAccessToken();
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-      useOAuth = true;
-    } else if (clientHeaders?.authorization) {
-      headers.Authorization = clientHeaders.authorization;
-    }
   }
 
-  // Use Claude Code beta features for OAuth, or forward client's beta header
-  if (useOAuth) {
-    headers["anthropic-beta"] = CLAUDE_CODE_BETA;
-  } else if (clientHeaders?.beta) {
+  // Forward client's beta header unchanged
+  if (clientHeaders?.beta) {
     headers["anthropic-beta"] = clientHeaders.beta;
-  }
-
-  // For OAuth, prepend Claude Code system prompt (required by Anthropic)
-  let finalRequest = request;
-  if (useOAuth) {
-    const currentSystem = request.system;
-    const systemText = typeof currentSystem === "string" ? currentSystem : "";
-
-    if (!systemText.startsWith(CLAUDE_CODE_SYSTEM_PREFIX)) {
-      if (typeof currentSystem === "string" && currentSystem) {
-        finalRequest = { ...request, system: `${CLAUDE_CODE_SYSTEM_PREFIX}\n\n${currentSystem}` };
-      } else if (Array.isArray(currentSystem)) {
-        finalRequest = {
-          ...request,
-          system: [{ type: "text" as const, text: CLAUDE_CODE_SYSTEM_PREFIX }, ...currentSystem],
-        };
-      } else {
-        finalRequest = { ...request, system: CLAUDE_CODE_SYSTEM_PREFIX };
-      }
-    }
   }
 
   const response = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers,
-    body: JSON.stringify(finalRequest),
+    body: JSON.stringify(request),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 

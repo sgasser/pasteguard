@@ -25,10 +25,15 @@ const AnthropicProviderSchema = z.object({
   api_key: z.string().optional(), // Optional fallback if client doesn't send auth header
 });
 
+const DEFAULT_WHITELIST = ["You are Claude Code, Anthropic's official CLI for Claude."];
+
 const MaskingSchema = z.object({
   show_markers: z.boolean().default(false),
   marker_text: z.string().default("[protected]"),
-  whitelist: z.array(z.string()).default([]),
+  whitelist: z
+    .array(z.string())
+    .default([])
+    .transform((arr) => [...DEFAULT_WHITELIST, ...arr]),
 });
 
 const LanguageEnum = z.enum(SUPPORTED_LANGUAGES);
