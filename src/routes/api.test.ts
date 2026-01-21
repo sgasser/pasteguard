@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
-import type { PIIEntity } from "../pii/detect";
+import { filterWhitelistedEntities, type PIIEntity } from "../pii/detect";
 
 // Mock the PII detector to avoid needing Presidio running
 const mockDetectPII = mock<(text: string, language: string) => Promise<PIIEntity[]>>(() =>
@@ -10,6 +10,7 @@ mock.module("../pii/detect", () => ({
   getPIIDetector: () => ({
     detectPII: mockDetectPII,
   }),
+  filterWhitelistedEntities,
 }));
 
 // Mock the logger to avoid database operations
@@ -184,5 +185,38 @@ describe("POST /api/mask", () => {
     };
     expect(body.counters.PERSON).toBe(1);
     expect(body.counters.EMAIL_ADDRESS).toBe(1);
+  });
+
+  test("masks both PII and secrets in single request (default behavior)", async () => {
+    mockDetectPII.mockResolvedValueOnce([
+      { entity_type: "EMAIL_ADDRESS", start: 8, end: 24, score: 0.9 },
+    ]);
+
+    const res = await app.request("/api/mask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: "Contact john@example.com with key -----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      masked: string;
+      context: Record<string, string>;
+      entities: { type: string; placeholder: string }[];
+    };
+
+    // Both PII and secrets should be masked
+    expect(body.masked).toContain("[[EMAIL_ADDRESS_1]]");
+    expect(body.masked).toContain("[[SECRET_MASKED_PEM_PRIVATE_KEY_1]]");
+
+    // Context should contain mappings for both
+    expect(body.context["[[EMAIL_ADDRESS_1]]"]).toBe("john@example.com");
+    expect(body.context["[[SECRET_MASKED_PEM_PRIVATE_KEY_1]]"]).toBeDefined();
+
+    // Entities should include both types
+    expect(body.entities.some((e) => e.type === "EMAIL_ADDRESS")).toBe(true);
+    expect(body.entities.some((e) => e.type === "PEM_PRIVATE_KEY")).toBe(true);
   });
 });
