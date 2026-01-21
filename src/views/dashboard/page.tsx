@@ -244,7 +244,7 @@ const Header: FC = () => (
 const StatsGrid: FC = () => (
 	<div
 		id="stats-grid"
-		class="grid grid-cols-4 gap-4 mb-8 [&[data-mode='route']]:grid-cols-6"
+		class="grid grid-cols-5 gap-4 mb-8 [&[data-mode='route']]:grid-cols-7"
 	>
 		<StatCard label="Total Requests" valueId="total-requests" />
 		<StatCard
@@ -254,6 +254,7 @@ const StatsGrid: FC = () => (
 			valueId="pii-requests"
 			accent="accent"
 		/>
+		<StatCard label="API Requests" valueId="api-requests" accent="accent" />
 		<StatCard label="Avg PII Scan" valueId="avg-scan" accent="teal" />
 		<StatCard label="Requests/Hour" valueId="requests-hour" />
 		<StatCard
@@ -378,6 +379,9 @@ const LogsSection: FC = () => (
 								Time
 							</th>
 							<th class="bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
+								Source
+							</th>
+							<th class="bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
 								Status
 							</th>
 							<th class="route-only bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
@@ -402,7 +406,7 @@ const LogsSection: FC = () => (
 					</thead>
 					<tbody id="logs-body">
 						<tr>
-							<td colSpan={8}>
+							<td colSpan={9}>
 								<div class="flex flex-col justify-center items-center p-10 gap-3">
 									<div class="loader-bars">
 										<div class="loader-bar" />
@@ -439,6 +443,7 @@ async function fetchStats() {
     }
 
     document.getElementById('total-requests').textContent = data.total_requests.toLocaleString();
+    document.getElementById('api-requests').textContent = data.api_requests.toLocaleString();
     document.getElementById('avg-scan').textContent = data.avg_scan_time_ms + 'ms';
     document.getElementById('requests-hour').textContent = data.requests_last_hour.toLocaleString();
 
@@ -561,7 +566,7 @@ async function fetchLogs() {
     const tbody = document.getElementById('logs-body');
 
     if (data.logs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8"><div class="text-center py-10 text-text-muted"><div class="text-2xl mb-3 opacity-40">📋</div><div class="text-sm">No requests yet</div></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9"><div class="text-center py-10 text-text-muted"><div class="text-2xl mb-3 opacity-40">📋</div><div class="text-sm">No requests yet</div></div></td></tr>';
       return;
     }
 
@@ -587,12 +592,17 @@ async function fetchLogs() {
         ? '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide bg-error/10 text-error">' + log.status_code + '</span>'
         : '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide bg-success/10 text-success">OK</span>';
 
+      const sourceBadge = log.provider === 'api'
+        ? '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide bg-accent/10 text-accent">API</span>'
+        : '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide bg-elevated text-text-muted">PROXY</span>';
+
       const mainRow =
         '<tr id="log-' + logId + '" class="cursor-pointer transition-colors hover:bg-elevated ' + (isExpanded ? 'log-row-expanded bg-elevated' : '') + '" onclick="toggleRow(' + logId + ')">' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
             '<span id="arrow-' + logId + '" class="arrow-icon inline-flex items-center justify-center w-[18px] h-[18px] mr-2 rounded-sm bg-elevated text-text-muted text-[0.65rem] transition-transform ' + (isExpanded ? 'rotate-90 bg-accent/10 text-accent' : '') + '">▶</span>' +
             '<span class="font-mono text-[0.7rem] text-text-secondary">' + time + '</span>' +
           '</td>' +
+          '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' + sourceBadge + '</td>' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' + statusBadge + '</td>' +
           '<td class="route-only text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
             '<span class="inline-flex items-center px-2 py-1 rounded-sm font-mono text-[0.6rem] font-medium uppercase tracking-wide ' +
@@ -619,7 +629,7 @@ async function fetchLogs() {
 
       const detailRow =
         '<tr id="detail-' + logId + '" class="' + (isExpanded ? 'detail-row-visible' : 'hidden') + '">' +
-          '<td colspan="8" class="p-0 bg-detail border-b border-border-subtle">' +
+          '<td colspan="9" class="p-0 bg-detail border-b border-border-subtle">' +
             '<div class="p-4 px-5 animate-slide-down">' + detailContent + '</div>' +
           '</td>' +
         '</tr>';

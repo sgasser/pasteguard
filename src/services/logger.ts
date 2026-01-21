@@ -34,6 +34,7 @@ export interface Stats {
   pii_percentage: number;
   openai_requests: number;
   local_requests: number;
+  api_requests: number;
   avg_scan_time_ms: number;
   total_tokens: number;
   requests_last_hour: number;
@@ -169,12 +170,15 @@ export class Logger {
       .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE pii_detected = 1`)
       .get() as { count: number };
 
-    // Upstream vs Local
+    // Upstream vs Local vs API
     const openaiResult = this.db
       .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE provider = 'openai'`)
       .get() as { count: number };
     const localResult = this.db
       .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE provider = 'local'`)
+      .get() as { count: number };
+    const apiResult = this.db
+      .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE provider = 'api'`)
       .get() as { count: number };
 
     // Average scan time
@@ -208,6 +212,7 @@ export class Logger {
       pii_percentage: total > 0 ? Math.round((pii / total) * 100 * 10) / 10 : 0,
       openai_requests: openaiResult.count,
       local_requests: localResult.count,
+      api_requests: apiResult.count,
       avg_scan_time_ms: Math.round(scanTimeResult.avg || 0),
       total_tokens: tokensResult.total,
       requests_last_hour: hourResult.count,
