@@ -1,6 +1,6 @@
 {
   "name": "pasteguard",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Privacy proxy for LLMs. Masks personal data and secrets before sending to your provider.",
   "type": "module",
   "main": "src/index.ts",
