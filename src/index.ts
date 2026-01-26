@@ -66,15 +66,7 @@ app.notFound((c) => {
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
-    return c.json(
-      {
-        error: {
-          message: err.message,
-          type: err.status >= 500 ? "server_error" : "client_error",
-        },
-      },
-      err.status,
-    );
+    return err.getResponse();
   }
 
   console.error("Unhandled error:", err);
