@@ -116,7 +116,7 @@ Works with OpenAI, Anthropic, and compatible tools:
 **Secrets**
 - OpenSSH private keys
 - PEM private keys
-- OpenAI API keys
+- API keys with sk- or sk_ prefix (OpenAI, Anthropic, Stripe, etc.)
 - AWS access keys
 - GitHub tokens
 - JWT tokens

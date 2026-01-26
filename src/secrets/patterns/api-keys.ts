@@ -5,22 +5,25 @@ import { detectPattern } from "./utils";
  * API keys detector
  *
  * Detects:
- * - API_KEY_OPENAI: OpenAI API keys (sk-...)
+ * - API_KEY_SK: Secret keys with sk- or sk_ prefix (OpenAI, Anthropic, Stripe, RevenueCat)
  * - API_KEY_AWS: AWS Access Keys (AKIA...)
  * - API_KEY_GITHUB: GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_)
  */
 export const apiKeysDetector: PatternDetector = {
-  patterns: ["API_KEY_OPENAI", "API_KEY_AWS", "API_KEY_GITHUB"],
+  patterns: ["API_KEY_SK", "API_KEY_AWS", "API_KEY_GITHUB"],
 
   detect(text: string, enabledTypes: Set<string>) {
     const matches: SecretsMatch[] = [];
     const locations: SecretLocation[] = [];
 
-    // OpenAI API keys: sk-... followed by alphanumeric chars
-    // Modern format: sk-proj-... or sk-... with 48+ total chars
-    if (enabledTypes.has("API_KEY_OPENAI")) {
-      const openaiPattern = /sk-[a-zA-Z0-9_-]{45,}/g;
-      detectPattern(text, openaiPattern, "API_KEY_OPENAI", matches, locations);
+    // Secret keys with sk- or sk_ prefix:
+    // - OpenAI: sk-proj-... (48+ chars)
+    // - Anthropic: sk-ant-api03-... (~100 chars)
+    // - Stripe: sk_test_..., sk_live_... (24-32 chars after prefix)
+    // - RevenueCat, Moyasar: sk_... (various lengths)
+    if (enabledTypes.has("API_KEY_SK")) {
+      const skPattern = /sk[-_][a-zA-Z0-9_-]{20,}/g;
+      detectPattern(text, skPattern, "API_KEY_SK", matches, locations);
     }
 
     // AWS access keys: AKIA followed by 16 uppercase alphanumeric chars

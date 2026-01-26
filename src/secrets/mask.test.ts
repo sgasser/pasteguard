@@ -14,6 +14,7 @@ import {
 } from "./mask";
 
 const sampleSecret = "sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx";
+const stripeSecret = "sk_live_abc123def456ghi789jkl012";
 
 /** Helper to create a minimal request from messages */
 function createRequest(messages: OpenAIMessage[]): OpenAIRequest {
@@ -24,35 +25,35 @@ describe("secrets placeholder format", () => {
   test("uses [[TYPE_N]] format", () => {
     const text = `My API key is ${sampleSecret}`;
     const locations: SecretLocation[] = [
-      { start: 14, end: 14 + sampleSecret.length, type: "API_KEY_OPENAI" },
+      { start: 14, end: 14 + sampleSecret.length, type: "API_KEY_SK" },
     ];
     const result = maskSecrets(text, locations);
 
-    expect(result.masked).toBe("My API key is [[API_KEY_OPENAI_1]]");
+    expect(result.masked).toBe("My API key is [[API_KEY_SK_1]]");
   });
 
   test("increments counter per secret type", () => {
     const anotherSecret = "sk-proj-xyz789abc123def456ghi789jkl012mno345pqr678";
     const text = `Key1: ${sampleSecret} Key2: ${anotherSecret}`;
     const locations: SecretLocation[] = [
-      { start: 6, end: 6 + sampleSecret.length, type: "API_KEY_OPENAI" },
+      { start: 6, end: 6 + sampleSecret.length, type: "API_KEY_SK" },
       {
         start: 6 + sampleSecret.length + 7,
         end: 6 + sampleSecret.length + 7 + anotherSecret.length,
-        type: "API_KEY_OPENAI",
+        type: "API_KEY_SK",
       },
     ];
     const result = maskSecrets(text, locations);
 
-    expect(result.masked).toContain("[[API_KEY_OPENAI_1]]");
-    expect(result.masked).toContain("[[API_KEY_OPENAI_2]]");
+    expect(result.masked).toContain("[[API_KEY_SK_1]]");
+    expect(result.masked).toContain("[[API_KEY_SK_2]]");
   });
 
   test("tracks different secret types separately", () => {
     const awsKey = "AKIAIOSFODNN7EXAMPLE";
     const text = `OpenAI: ${sampleSecret} AWS: ${awsKey}`;
     const locations: SecretLocation[] = [
-      { start: 8, end: 8 + sampleSecret.length, type: "API_KEY_OPENAI" },
+      { start: 8, end: 8 + sampleSecret.length, type: "API_KEY_SK" },
       {
         start: 8 + sampleSecret.length + 6,
         end: 8 + sampleSecret.length + 6 + awsKey.length,
@@ -61,8 +62,19 @@ describe("secrets placeholder format", () => {
     ];
     const result = maskSecrets(text, locations);
 
-    expect(result.masked).toContain("[[API_KEY_OPENAI_1]]");
+    expect(result.masked).toContain("[[API_KEY_SK_1]]");
     expect(result.masked).toContain("[[API_KEY_AWS_1]]");
+  });
+
+  test("masks sk_ prefix keys (Stripe)", () => {
+    const text = `Stripe key: ${stripeSecret}`;
+    const locations: SecretLocation[] = [
+      { start: 12, end: 12 + stripeSecret.length, type: "API_KEY_SK" },
+    ];
+    const result = maskSecrets(text, locations);
+
+    expect(result.masked).toBe("Stripe key: [[API_KEY_SK_1]]");
+    expect(result.context.mapping["[[API_KEY_SK_1]]"]).toBe(stripeSecret);
   });
 });
 
@@ -74,13 +86,13 @@ describe("maskRequest with MessageSecretsResult", () => {
     ]);
     // spanLocations[0] = first message (user), spanLocations[1] = second message (assistant)
     const detection = createSecretsResultFromSpans([
-      [{ start: 10, end: 10 + sampleSecret.length, type: "API_KEY_OPENAI" }],
+      [{ start: 10, end: 10 + sampleSecret.length, type: "API_KEY_SK" }],
       [],
     ]);
 
     const { masked, context } = maskRequest(request, detection, openaiExtractor);
 
-    expect(masked.messages[0].content).toContain("[[API_KEY_OPENAI_1]]");
+    expect(masked.messages[0].content).toContain("[[API_KEY_SK_1]]");
     expect(masked.messages[0].content).not.toContain(sampleSecret);
     expect(masked.messages[1].content).toBe("I'll help you with that.");
     expect(Object.keys(context.mapping)).toHaveLength(1);
@@ -92,14 +104,14 @@ describe("maskRequest with MessageSecretsResult", () => {
       { role: "user", content: `Key2: ${sampleSecret}` },
     ]);
     const detection = createSecretsResultFromSpans([
-      [{ start: 6, end: 6 + sampleSecret.length, type: "API_KEY_OPENAI" }],
-      [{ start: 6, end: 6 + sampleSecret.length, type: "API_KEY_OPENAI" }],
+      [{ start: 6, end: 6 + sampleSecret.length, type: "API_KEY_SK" }],
+      [{ start: 6, end: 6 + sampleSecret.length, type: "API_KEY_SK" }],
     ]);
 
     const { masked, context } = maskRequest(request, detection, openaiExtractor);
 
-    expect(masked.messages[0].content).toBe("Key1: [[API_KEY_OPENAI_1]]");
-    expect(masked.messages[1].content).toBe("Key2: [[API_KEY_OPENAI_1]]");
+    expect(masked.messages[0].content).toBe("Key1: [[API_KEY_SK_1]]");
+    expect(masked.messages[1].content).toBe("Key2: [[API_KEY_SK_1]]");
     expect(Object.keys(context.mapping)).toHaveLength(1);
   });
 
@@ -115,13 +127,13 @@ describe("maskRequest with MessageSecretsResult", () => {
     ]);
     // Two spans: text content at index 0, image is skipped
     const detection = createSecretsResultFromSpans([
-      [{ start: 5, end: 5 + sampleSecret.length, type: "API_KEY_OPENAI" }],
+      [{ start: 5, end: 5 + sampleSecret.length, type: "API_KEY_SK" }],
     ]);
 
     const { masked } = maskRequest(request, detection, openaiExtractor);
 
     const content = masked.messages[0].content as Array<{ type: string; text?: string }>;
-    expect(content[0].text).toBe("Key: [[API_KEY_OPENAI_1]]");
+    expect(content[0].text).toBe("Key: [[API_KEY_SK_1]]");
     expect(content[1].type).toBe("image_url");
   });
 });
@@ -129,7 +141,7 @@ describe("maskRequest with MessageSecretsResult", () => {
 describe("streaming with secrets placeholders", () => {
   test("buffers partial [[ placeholder", () => {
     const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_OPENAI_1]]"] = sampleSecret;
+    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
 
     const { output, remainingBuffer } = unmaskSecretsStreamChunk("", "Key: [[API_KEY", context);
 
@@ -139,11 +151,11 @@ describe("streaming with secrets placeholders", () => {
 
   test("completes buffered placeholder across chunks", () => {
     const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_OPENAI_1]]"] = sampleSecret;
+    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
 
     const { output, remainingBuffer } = unmaskSecretsStreamChunk(
       "[[API_KEY",
-      "_OPENAI_1]] done",
+      "_SK_1]] done",
       context,
     );
 
@@ -169,14 +181,14 @@ Please store them securely.
       {
         start: originalText.indexOf(sampleSecret),
         end: originalText.indexOf(sampleSecret) + sampleSecret.length,
-        type: "API_KEY_OPENAI",
+        type: "API_KEY_SK",
       },
     ];
 
     const { masked, context } = maskSecrets(originalText, locations);
 
     expect(masked).not.toContain(sampleSecret);
-    expect(masked).toContain("[[API_KEY_OPENAI_1]]");
+    expect(masked).toContain("[[API_KEY_SK_1]]");
 
     const restored = unmaskSecrets(masked, context);
     expect(restored).toBe(originalText);
@@ -186,7 +198,7 @@ Please store them securely.
 describe("unmaskSecretsResponse", () => {
   test("unmasks all choices in response", () => {
     const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_OPENAI_1]]"] = sampleSecret;
+    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
 
     const response: OpenAIResponse = {
       id: "test",
@@ -198,7 +210,7 @@ describe("unmaskSecretsResponse", () => {
           index: 0,
           message: {
             role: "assistant",
-            content: "Your key is [[API_KEY_OPENAI_1]]",
+            content: "Your key is [[API_KEY_SK_1]]",
           },
           finish_reason: "stop",
         },
@@ -244,16 +256,16 @@ describe("edge cases", () => {
   test("reuses placeholder for duplicate secret values", () => {
     const text = `Key1: ${sampleSecret} Key2: ${sampleSecret}`;
     const locations: SecretLocation[] = [
-      { start: 6, end: 6 + sampleSecret.length, type: "API_KEY_OPENAI" },
+      { start: 6, end: 6 + sampleSecret.length, type: "API_KEY_SK" },
       {
         start: 6 + sampleSecret.length + 7,
         end: 6 + sampleSecret.length * 2 + 7,
-        type: "API_KEY_OPENAI",
+        type: "API_KEY_SK",
       },
     ];
     const result = maskSecrets(text, locations);
 
-    expect(result.masked).toBe("Key1: [[API_KEY_OPENAI_1]] Key2: [[API_KEY_OPENAI_1]]");
+    expect(result.masked).toBe("Key1: [[API_KEY_SK_1]] Key2: [[API_KEY_SK_1]]");
     expect(Object.keys(result.context.mapping)).toHaveLength(1);
   });
 
@@ -262,18 +274,18 @@ describe("edge cases", () => {
 
     maskSecrets(
       `Key: ${sampleSecret}`,
-      [{ start: 5, end: 5 + sampleSecret.length, type: "API_KEY_OPENAI" }],
+      [{ start: 5, end: 5 + sampleSecret.length, type: "API_KEY_SK" }],
       context,
     );
 
     const anotherSecret = "sk-proj-xyz789abc123def456ghi789jkl012mno345pqr678";
     const result2 = maskSecrets(
       `Another: ${anotherSecret}`,
-      [{ start: 9, end: 9 + anotherSecret.length, type: "API_KEY_OPENAI" }],
+      [{ start: 9, end: 9 + anotherSecret.length, type: "API_KEY_SK" }],
       context,
     );
 
-    expect(result2.masked).toBe("Another: [[API_KEY_OPENAI_2]]");
+    expect(result2.masked).toBe("Another: [[API_KEY_SK_2]]");
     expect(Object.keys(context.mapping)).toHaveLength(2);
   });
 });

@@ -117,7 +117,7 @@ secrets_detection:
   #   - PEM_PRIVATE_KEY:     PEM formats (RSA, PRIVATE KEY, ENCRYPTED PRIVATE KEY)
   #
   # API Keys (opt-in):
-  #   - API_KEY_OPENAI:      OpenAI API keys (sk-...)
+  #   - API_KEY_SK:          Secret keys with sk- or sk_ prefix (OpenAI, Anthropic, Stripe, RevenueCat)
   #   - API_KEY_AWS:         AWS Access Keys (AKIA...)
   #   - API_KEY_GITHUB:      GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_)
   #
@@ -133,7 +133,7 @@ secrets_detection:
     - OPENSSH_PRIVATE_KEY
     - PEM_PRIVATE_KEY
     # Uncomment to detect API keys and tokens:
-    # - API_KEY_OPENAI
+    # - API_KEY_SK
     # - API_KEY_AWS
     # - API_KEY_GITHUB
     # - JWT_TOKEN

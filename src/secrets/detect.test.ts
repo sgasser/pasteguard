@@ -180,8 +180,13 @@ describe("detectSecrets", () => {
   });
 });
 
-// Test data for new secret types
+// Test data for secret types
 const openaiApiKey = "sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx";
+const anthropicApiKey =
+  "sk-ant-api03-abc123def456ghi789jkl012mno345pqr678stu901vwxyz0123456789abcdefghijklmnopqrstuvwxyz";
+const stripeTestKey = "sk_test_abc123def456ghi789jkl012";
+const stripeLiveKey = "sk_live_xyz789abc123def456ghi789";
+const revenueCatKey = "sk_abcdefghijklmnopqrstuvwx";
 const awsAccessKey = "AKIAIOSFODNN7EXAMPLE";
 const githubToken = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1234";
 const githubOAuthToken = "gho_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx5678";
@@ -192,18 +197,50 @@ const bearerToken = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9abcdefghijk";
 describe("detectSecrets - API Keys", () => {
   const apiKeyConfig: SecretsDetectionConfig = {
     ...defaultConfig,
-    entities: ["API_KEY_OPENAI", "API_KEY_AWS", "API_KEY_GITHUB"],
+    entities: ["API_KEY_SK", "API_KEY_AWS", "API_KEY_GITHUB"],
   };
 
-  test("detects OpenAI API key", () => {
+  test("detects OpenAI API key (sk-proj-...)", () => {
     const text = `My API key is ${openaiApiKey}`;
     const result = detectSecrets(text, apiKeyConfig);
     expect(result.detected).toBe(true);
     expect(result.matches).toHaveLength(1);
-    expect(result.matches[0].type).toBe("API_KEY_OPENAI");
+    expect(result.matches[0].type).toBe("API_KEY_SK");
     expect(result.matches[0].count).toBe(1);
     expect(result.locations).toBeDefined();
-    expect(result.locations?.[0].type).toBe("API_KEY_OPENAI");
+    expect(result.locations?.[0].type).toBe("API_KEY_SK");
+  });
+
+  test("detects Anthropic API key (sk-ant-...)", () => {
+    const text = `Anthropic key: ${anthropicApiKey}`;
+    const result = detectSecrets(text, apiKeyConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].type).toBe("API_KEY_SK");
+  });
+
+  test("detects Stripe test key (sk_test_...)", () => {
+    const text = `STRIPE_SECRET_KEY=${stripeTestKey}`;
+    const result = detectSecrets(text, apiKeyConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].type).toBe("API_KEY_SK");
+  });
+
+  test("detects Stripe live key (sk_live_...)", () => {
+    const text = `export STRIPE_KEY="${stripeLiveKey}"`;
+    const result = detectSecrets(text, apiKeyConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].type).toBe("API_KEY_SK");
+  });
+
+  test("detects RevenueCat key (sk_...)", () => {
+    const text = `revenuecat_api_key: ${revenueCatKey}`;
+    const result = detectSecrets(text, apiKeyConfig);
+    expect(result.detected).toBe(true);
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].type).toBe("API_KEY_SK");
   });
 
   test("detects AWS access key", () => {
@@ -236,13 +273,19 @@ describe("detectSecrets - API Keys", () => {
     const result = detectSecrets(text, apiKeyConfig);
     expect(result.detected).toBe(true);
     expect(result.matches).toHaveLength(3);
-    expect(result.matches.find((m) => m.type === "API_KEY_OPENAI")).toBeDefined();
+    expect(result.matches.find((m) => m.type === "API_KEY_SK")).toBeDefined();
     expect(result.matches.find((m) => m.type === "API_KEY_AWS")).toBeDefined();
     expect(result.matches.find((m) => m.type === "API_KEY_GITHUB")).toBeDefined();
   });
 
   test("avoids false positive - sk- prefix but too short", () => {
     const text = "This sk-short is not a valid key";
+    const result = detectSecrets(text, apiKeyConfig);
+    expect(result.detected).toBe(false);
+  });
+
+  test("avoids false positive - sk_ prefix but too short", () => {
+    const text = "This sk_short is not valid";
     const result = detectSecrets(text, apiKeyConfig);
     expect(result.detected).toBe(false);
   });
@@ -611,7 +654,7 @@ describe("detectSecrets - Mixed secret types", () => {
     entities: [
       "OPENSSH_PRIVATE_KEY",
       "PEM_PRIVATE_KEY",
-      "API_KEY_OPENAI",
+      "API_KEY_SK",
       "API_KEY_AWS",
       "API_KEY_GITHUB",
       "JWT_TOKEN",

@@ -10,7 +10,7 @@ export const PLACEHOLDER_DELIMITERS = {
 /** PII placeholder format: [[TYPE_N]] e.g. [[PERSON_1]], [[EMAIL_ADDRESS_2]] */
 export const PII_PLACEHOLDER_FORMAT = "[[{TYPE}_{N}]]";
 
-/** Secrets placeholder format: [[TYPE_N]] e.g. [[API_KEY_OPENAI_1]] */
+/** Secrets placeholder format: [[TYPE_N]] e.g. [[API_KEY_SK_1]] */
 export const SECRET_PLACEHOLDER_FORMAT = "[[{N}]]";
 
 /**
@@ -22,7 +22,7 @@ export function generatePlaceholder(format: string, type: string, count: number)
 
 /**
  * Generates a secret placeholder string
- * {N} is replaced with TYPE_COUNT e.g. API_KEY_OPENAI_1
+ * {N} is replaced with TYPE_COUNT e.g. API_KEY_SK_1
  */
 export function generateSecretPlaceholder(type: string, count: number): string {
   return SECRET_PLACEHOLDER_FORMAT.replace("{N}", `${type}_${count}`);

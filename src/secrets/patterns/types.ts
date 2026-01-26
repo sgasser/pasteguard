@@ -4,7 +4,7 @@
 export type SecretEntityType =
   | "OPENSSH_PRIVATE_KEY"
   | "PEM_PRIVATE_KEY"
-  | "API_KEY_OPENAI"
+  | "API_KEY_SK"
   | "API_KEY_AWS"
   | "API_KEY_GITHUB"
   | "JWT_TOKEN"

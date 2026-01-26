@@ -41,8 +41,8 @@ describe("generatePlaceholder", () => {
 
 describe("generateSecretPlaceholder", () => {
   test("generates secret placeholder", () => {
-    const result = generateSecretPlaceholder("API_KEY_OPENAI", 1);
-    expect(result).toBe("[[API_KEY_OPENAI_1]]");
+    const result = generateSecretPlaceholder("API_KEY_SK", 1);
+    expect(result).toBe("[[API_KEY_SK_1]]");
   });
 
   test("generates secret placeholder with different type and count", () => {
