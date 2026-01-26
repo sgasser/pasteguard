@@ -117,9 +117,10 @@ async function validateStartup() {
 
   const detector = getPIIDetector();
 
-  // Wait for Presidio to be ready
+  // Wait for Presidio to be ready (multi-language setups need longer to load spaCy models)
+  const startupTimeout = Number(process.env.PASTEGUARD_STARTUP_TIMEOUT) || 180;
   console.log("[STARTUP] Connecting to Presidio...");
-  const ready = await detector.waitForReady(30, 1000);
+  const ready = await detector.waitForReady(startupTimeout, 1000);
 
   if (!ready) {
     console.error(
