@@ -1,0 +1,39 @@
+---
+title: Browser Extension
+description: Mask PII when pasting into ChatGPT, Claude, and Gemini
+---
+
+Paste customer data into ChatGPT — the AI sees `[[PERSON_1]]` and `[[EMAIL_ADDRESS_1]]`. When you copy the response, placeholders are replaced with the originals.
+
+## Supported Platforms
+
+- ChatGPT (chatgpt.com)
+- Claude (claude.ai)
+- Google Gemini (gemini.google.com)
+
+## How It Works
+
+1. **Paste** — You paste text containing PII into the chat input
+2. **Mask** — The extension detects and masks PII via your local PasteGuard server
+3. **Chat** — The masked text is inserted into the chat. The AI only sees placeholders.
+4. **Copy** — When you copy the AI's response, placeholders are replaced with the original values
+
+Placeholder numbering stays consistent across messages in the same conversation. Streamed responses are highlighted in real-time.
+
+## Requirements
+
+The extension needs PasteGuard running locally:
+
+```bash
+docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
+```
+
+See [Quickstart](/quickstart) for setup details.
+
+## Beta
+
+The browser extension is in beta. Open source (Apache 2.0).
+
+<Card title="Join the Beta" icon="flask" href="https://tally.so/r/J9pNLr">
+  Get early access to the browser extension
+</Card>

@@ -1,67 +1,64 @@
 ---
 title: Introduction
-description: Privacy proxy for OpenAI and Anthropic
+description: Masks sensitive data and secrets before they reach AI. Open-source proxy and browser extension.
 ---
 
 PasteGuard masks personal data and secrets before they reach OpenAI or Anthropic.
 
-```
-You send:  "Email Dr. Sarah Chen at sarah@hospital.org"
-LLM sees:  "Email [[PERSON_1]] at [[EMAIL_ADDRESS_1]]"
-You get:   Response with original names restored
-```
-
-PasteGuard sits between your app and the API:
-
 <Frame>
-  <img src="/images/demo.gif" alt="PasteGuard Demo" />
+  <img src="/images/comparison.png" alt="PasteGuard Comparison" />
 </Frame>
 
-Two privacy modes:
+## Where It Protects
+
+### Browser Extension (Beta)
+
+Paste customer data into ChatGPT, Claude, or Gemini — PII is masked before it reaches the AI.
+
+<Card title="Browser Extension" icon="puzzle-piece" href="/use-cases/browser-extension">
+  Set up the browser extension
+</Card>
+
+### Coding Tools
+
+Claude Code, Cursor, and other AI assistants send your codebase context to LLM providers. PasteGuard catches secrets in config files, customer data in test fixtures, and PII in code comments.
+
+<Card title="Coding Tools Setup" icon="code" href="/use-cases/coding-tools">
+  Protect your AI coding workflow
+</Card>
+
+### Apps & SDKs
+
+Your application sends user-submitted content to an LLM. PasteGuard masks PII before it reaches the provider.
+
+<Card title="Apps & SDKs Setup" icon="cube" href="/use-cases/apps-and-sdks">
+  Integrate PasteGuard into your application
+</Card>
+
+### Self-Hosted AI
+
+Running Open WebUI, LibreChat, or another chat interface? PasteGuard sits between your UI and the provider.
+
+<Card title="Self-Hosted Setup" icon="server" href="/use-cases/self-hosted">
+  Add privacy to your self-hosted setup
+</Card>
+
+## Two Privacy Modes
 
 | Mode | How it works |
 |------|--------------|
 | **Mask** | Replace PII with placeholders, send to OpenAI or Anthropic, restore in response |
 | **Route** | PII requests stay on your local LLM (Ollama, vLLM, llama.cpp), others go to OpenAI or Anthropic |
 
-## Browser Extension (Beta)
-
-An open source browser extension that brings PasteGuard protection to ChatGPT, Claude, Gemini, Copilot, and Perplexity.
-
-- Paste customer data → PII is masked before it reaches the AI
-- You see the original, AI sees `[[PERSON_1]]`, `[[EMAIL_1]]`
-
-Open source (Apache 2.0). Built in public — early feedback shapes the product.
-
-<Card title="Join the Beta" icon="flask" href="https://tally.so/r/J9pNLr">
-  Get early access to the browser extension
-</Card>
-
-## Features
-
-- **PII Detection** — Names, emails, phone numbers, credit cards, IBANs, and more
-- **Secrets Detection** — API keys, tokens, private keys caught before they reach OpenAI or Anthropic
-- **Streaming Support** — Real-time unmasking as tokens arrive
-- **24 Languages** — English, German, French, and 21 more
-- **OpenAI** — Works with OpenAI and compatible APIs (Azure, OpenRouter, Groq, Together AI, etc.)
-- **Anthropic** — Native Claude support, works with Claude Code
-- **Self-Hosted** — Your servers, your data stays yours
-- **Open Source** — Apache 2.0 license
-- **Dashboard** — See every protected request in real-time
+PasteGuard runs on your servers. Personal data never leaves your infrastructure, and the LLM provider never sees real names, emails, or secrets.
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Get running in 2 minutes
-  </Card>
-  <Card title="Mask Mode" icon="eye-slash" href="/concepts/mask-mode">
-    Replace PII with placeholders
-  </Card>
-  <Card title="Route Mode" icon="code-branch" href="/concepts/route-mode">
-    Route PII to local LLM
+    Run PasteGuard as a local proxy
   </Card>
   <Card title="Configuration" icon="gear" href="/configuration/overview">
-    Customize your setup
+    Customize detection and providers
   </Card>
 </CardGroup>

@@ -34,7 +34,16 @@
   "navigation": [
     {
       "group": "Getting Started",
-      "pages": ["introduction", "quickstart", "installation", "integrations"]
+      "pages": ["introduction", "quickstart", "installation"]
+    },
+    {
+      "group": "Use Cases",
+      "pages": [
+        "use-cases/browser-extension",
+        "use-cases/coding-tools",
+        "use-cases/apps-and-sdks",
+        "use-cases/self-hosted"
+      ]
     },
     {
       "group": "Concepts",

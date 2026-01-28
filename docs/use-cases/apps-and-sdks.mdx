@@ -1,0 +1,72 @@
+---
+title: Apps & SDKs
+description: Mask PII in your AI-powered application with OpenAI, Anthropic, LangChain, and LlamaIndex
+---
+
+Point your SDK to PasteGuard instead of the provider directly. Every request gets PII and secrets protection automatically.
+
+## OpenAI SDK
+
+<CodeGroup>
+
+```python Python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:3000/openai/v1"
+)
+```
+
+```javascript JavaScript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://localhost:3000/openai/v1'
+});
+```
+
+</CodeGroup>
+
+## Anthropic SDK
+
+<CodeGroup>
+
+```python Python
+from anthropic import Anthropic
+
+client = Anthropic(
+    base_url="http://localhost:3000/anthropic"
+)
+```
+
+```javascript JavaScript
+import Anthropic from '@anthropic-ai/sdk';
+
+const client = new Anthropic({
+  baseURL: 'http://localhost:3000/anthropic'
+});
+```
+
+</CodeGroup>
+
+## LangChain
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    base_url="http://localhost:3000/openai/v1"
+)
+```
+
+## LlamaIndex
+
+```python
+from llama_index.llms.openai_like import OpenAILike
+
+llm = OpenAILike(
+    api_base="http://localhost:3000/openai/v1",
+    model="gpt-5.2",
+    is_chat_model=True
+)
+```

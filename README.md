@@ -1,84 +1,65 @@
 <p align="center">
-  <img src="assets/wordmark-light.svg" width="220" height="44" alt="PasteGuard">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/wordmark-light.svg">
+    <img src="assets/wordmark-light.svg" width="220" height="44" alt="PasteGuard">
+  </picture>
 </p>
 
 <p align="center">
   <a href="https://github.com/sgasser/pasteguard/actions/workflows/ci.yml"><img src="https://github.com/sgasser/pasteguard/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
+  <a href="https://github.com/sgasser/pasteguard/releases"><img src="https://img.shields.io/github/v/release/sgasser/pasteguard" alt="Release"></a>
 </p>
 
 <p align="center">
-  Privacy proxy for OpenAI and Anthropic. Masks personal data and secrets before they reach the API.
+  Masks sensitive data and secrets before they reach AI.<br>
+  Open-source proxy and browser extension for OpenAI, Anthropic, and any AI system.
 </p>
 
 <p align="center">
   <a href="#quick-start"><strong>Quick Start</strong></a> ·
-  <a href="https://pasteguard.com/docs"><strong>Documentation</strong></a> ·
-  <a href="https://pasteguard.com/docs/integrations"><strong>Integrations</strong></a>
+  <a href="#coding-tools"><strong>Coding Tools</strong></a> ·
+  <a href="#browser-extension"><strong>Browser Extension</strong></a> ·
+  <a href="https://pasteguard.com/docs"><strong>Documentation</strong></a>
 </p>
 
 <br/>
 
-<img src="assets/demo.gif" width="100%" alt="PasteGuard Demo">
+<img src="assets/comparison.png" width="100%" alt="PasteGuard — Without vs. With: masks names, emails, and API keys before they reach AI">
 
-## What is PasteGuard?
+## Where it protects
 
-PasteGuard is a privacy proxy that masks personal data and secrets before they reach OpenAI or Anthropic.
+**[In the browser](https://pasteguard.com/docs/use-cases/browser-extension)** — Masks PII and secrets when you paste into ChatGPT, Claude, and Gemini. You see originals, AI sees placeholders.
 
-```
-You send:  "Email Dr. Sarah Chen at sarah@hospital.org"
-LLM sees:  "Email [[PERSON_1]] at [[EMAIL_ADDRESS_1]]"
-You get:   Response with original names restored
-```
+**[In your coding tools](https://pasteguard.com/docs/use-cases/coding-tools)** — Your codebase context and configs flow through Cursor, Claude Code, or other AI assistants to the provider. PasteGuard masks secrets and PII before they leave.
 
-**Two ways to protect your data:**
+**[In your app](https://pasteguard.com/docs/use-cases/apps-and-sdks)** — Sits between your code and OpenAI or Anthropic. Change one URL, your users' data stays protected.
 
-- **Mask Mode** — Replace PII with placeholders, send to OpenAI or Anthropic, restore in response. No local infrastructure needed.
-- **Route Mode** — Send PII requests to a local LLM (Ollama, vLLM, llama.cpp), everything else to OpenAI or Anthropic. Data never leaves your network.
-
-Just change one URL to start protecting your data.
-
-## Browser Extension (Beta)
-
-An open source browser extension that brings PasteGuard protection to ChatGPT, Claude, Gemini, Copilot, and Perplexity.
-
-- Paste customer data → PII is masked before it reaches the AI
-- You see the original, AI sees `[[PERSON_1]]`, `[[EMAIL_1]]`
-
-Open source (Apache 2.0). Built in public — early feedback shapes the product.
-
-**[Join the Beta →](https://tally.so/r/J9pNLr)**
-
-## Features
-
-- **PII Detection** — Names, emails, phone numbers, credit cards, IBANs, and more
-- **Secrets Detection** — API keys, tokens, private keys caught before they reach OpenAI or Anthropic
-- **Streaming Support** — Real-time unmasking as tokens arrive
-- **24 Languages** — English, German, French, and 21 more
-- **OpenAI** — Works with OpenAI and compatible APIs (Azure, OpenRouter, Groq, Together AI, etc.)
-- **Anthropic** — Native Claude support, works with Claude Code
-- **Self-Hosted** — Your servers, your data stays yours
-- **Open Source** — Apache 2.0 license
-- **Dashboard** — See every protected request in real-time
+**[In your AI setup](https://pasteguard.com/docs/use-cases/self-hosted)** — Masks data flowing through Open WebUI, LibreChat, or any OpenAI-compatible tool. Optionally routes sensitive requests to a local model.
 
 ## Quick Start
+
+Run PasteGuard as a local proxy:
 
 ```bash
 docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
 ```
 
-Point your app to PasteGuard:
+Point your tools or app to PasteGuard instead of the provider:
 
 | API | PasteGuard URL | Original URL |
 |----------|----------------|--------------|
 | OpenAI | `http://localhost:3000/openai/v1` | `https://api.openai.com/v1` |
 | Anthropic | `http://localhost:3000/anthropic` | `https://api.anthropic.com` |
 
-Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
+```python
+# One line to protect your data
+client = OpenAI(base_url="http://localhost:3000/openai/v1")
+```
 
-<img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
-
-### European Languages
+<details>
+<summary><strong>European Languages</strong></summary>
 
 For German, Spanish, French, Italian, Dutch, Polish, Portuguese, and Romanian:
 
@@ -88,43 +69,66 @@ docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
 
 For custom config, persistent logs, or other languages: **[Read the docs →](https://pasteguard.com/docs/installation)**
 
-## Integrations
+</details>
 
-Works with OpenAI, Anthropic, and compatible tools:
+<details>
+<summary><strong>Route Mode</strong></summary>
 
-- OpenAI SDK (Python/JS)
-- Anthropic SDK / Claude Code
-- LangChain
-- LlamaIndex
-- Cursor
-- Open WebUI
-- LibreChat
+Route Mode sends requests containing sensitive data to a local LLM (Ollama, vLLM, llama.cpp). Everything else goes to OpenAI or Anthropic. Sensitive data stays on your network.
 
-**[See all integrations →](https://pasteguard.com/docs/integrations)**
+**[Route Mode docs →](https://pasteguard.com/docs/concepts/route-mode)**
 
-## What It Detects
+</details>
 
-**PII** (powered by [Microsoft Presidio](https://microsoft.github.io/presidio/))
-- Names
-- Emails
-- Phone numbers
-- Credit cards
-- IBANs
-- IP addresses
-- Locations
+## Coding Tools
 
-**Secrets**
-- OpenSSH private keys
-- PEM private keys
-- API keys with sk- or sk_ prefix (OpenAI, Anthropic, Stripe, etc.)
-- AWS access keys
-- GitHub tokens
-- JWT tokens
-- Bearer tokens
+Protect your codebase context and secrets when using AI coding assistants.
+
+**Claude Code:**
+
+```bash
+ANTHROPIC_BASE_URL=http://localhost:3000/anthropic claude
+```
+
+**Cursor:** Settings → Models → Enable "Override OpenAI Base URL" → `http://localhost:3000/openai/v1`
+
+**[Coding Tools docs →](https://pasteguard.com/docs/use-cases/coding-tools)**
+
+## Browser Extension
+
+Open-source browser extension for ChatGPT, Claude, and Gemini.
+
+- Paste customer data → masked before it reaches the AI
+- AI responds with placeholders → you see the originals
+- Works with the same detection engine as the proxy
+
+Currently in beta. Apache 2.0.
+
+**[Join the Beta →](https://tally.so/r/J9pNLr)** · **[Browser Extension docs →](https://pasteguard.com/docs/use-cases/browser-extension)**
+
+## Dashboard
+
+Every request is logged with masking details. See what was detected, what was masked, and what reached the provider.
+
+<img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
+
+[localhost:3000/dashboard](http://localhost:3000/dashboard)
+
+## What it catches
+
+**Personal data** — Names, emails, phone numbers, credit cards, IBANs, IP addresses, locations. Powered by [Microsoft Presidio](https://microsoft.github.io/presidio/). 24 languages.
+
+**Secrets** — API keys (OpenAI, Anthropic, Stripe, AWS, GitHub), SSH and PEM private keys, JWT tokens, bearer tokens, passwords, connection strings.
+
+Both detected and masked in real time, including streaming responses.
 
 ## Tech Stack
 
 [Bun](https://bun.sh) · [Hono](https://hono.dev) · [Microsoft Presidio](https://microsoft.github.io/presidio/) · SQLite
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
 
 ## License
 

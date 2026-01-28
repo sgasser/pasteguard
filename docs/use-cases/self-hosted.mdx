@@ -1,0 +1,55 @@
+---
+title: Self-Hosted AI
+description: Protect data in Open WebUI, LibreChat, and other self-hosted AI setups
+---
+
+PasteGuard sits between your self-hosted chat interface and the LLM provider. Users interact with Open WebUI, LibreChat, or similar tools — PasteGuard handles privacy automatically in the background.
+
+## Open WebUI
+
+Point Open WebUI to PasteGuard instead of OpenAI directly:
+
+```bash
+OPENAI_API_BASE_URL=http://localhost:3000/openai/v1
+```
+
+<Note>In Docker Compose, use the service name instead of `localhost` (e.g., `http://pasteguard:3000/openai/v1`).</Note>
+
+## LibreChat
+
+Add PasteGuard as a custom endpoint in your LibreChat configuration:
+
+```yaml
+version: 1.2.8
+cache: true
+endpoints:
+  custom:
+    - name: "PasteGuard"
+      apiKey: "${OPENAI_API_KEY}"  # Your API key, forwarded to OpenAI
+      baseURL: "http://localhost:3000/openai/v1"
+      models:
+        default: ["gpt-5.2"]
+        fetch: true
+      titleConvo: true
+      titleModel: "gpt-5.2"
+```
+
+## Mask Mode vs Route Mode
+
+Self-hosted setups can use either privacy mode depending on your requirements:
+
+| Mode | Best for | How it works |
+|------|----------|--------------|
+| **Mask** | Teams using cloud LLMs (OpenAI, Anthropic) | Replaces PII with placeholders, sends to cloud provider, restores in response |
+| **Route** | Teams with a local LLM (Ollama, vLLM) | Requests containing PII stay on your local LLM, others go to the cloud provider |
+
+Route Mode requires a local LLM provider configured in `config.yaml`. See [Route Mode](/concepts/route-mode) for setup details.
+
+Mask Mode works out of the box with any provider. See [Mask Mode](/concepts/mask-mode) for how masking and unmasking works.
+
+## API Endpoints
+
+| API | PasteGuard URL |
+|----------|----------------|
+| OpenAI | `http://localhost:3000/openai/v1` |
+| Anthropic | `http://localhost:3000/anthropic` |

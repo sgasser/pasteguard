@@ -1,9 +1,7 @@
 ---
 title: Quickstart
-description: Get PasteGuard running in 2 minutes
+description: Run PasteGuard as a local proxy
 ---
-
-# Quickstart
 
 ## 1. Start PasteGuard
 
@@ -17,66 +15,27 @@ PasteGuard runs on `http://localhost:3000`. Open `http://localhost:3000/dashboar
 For custom configuration, European languages, or persistent logs, see [Installation](/installation).
 </Note>
 
-## 2. Make a Request
+## 2. API Endpoints
 
-Point your OpenAI client to PasteGuard:
+Point your tools or SDKs to PasteGuard:
 
-<CodeGroup>
+| API | PasteGuard URL |
+|----------|----------------|
+| OpenAI | `http://localhost:3000/openai/v1` |
+| Anthropic | `http://localhost:3000/anthropic` |
 
-```python Python
-from openai import OpenAI
+## 3. Verify It Works
 
-client = OpenAI(
-    base_url="http://localhost:3000/openai/v1",
-    api_key="your-openai-key"
-)
+Send a test request and check the response headers:
 
-response = client.chat.completions.create(
-    model="gpt-5.2",
-    messages=[
-        {"role": "user", "content": "Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)"}
-    ]
-)
-
-print(response.choices[0].message.content)
-```
-
-```javascript JavaScript
-import OpenAI from 'openai';
-
-const client = new OpenAI({
-  baseURL: 'http://localhost:3000/openai/v1',
-  apiKey: 'your-openai-key'
-});
-
-const response = await client.chat.completions.create({
-  model: 'gpt-5.2',
-  messages: [
-    { role: 'user', content: 'Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)' }
-  ]
-});
-
-console.log(response.choices[0].message.content);
-```
-
-```bash cURL
-curl http://localhost:3000/openai/v1/chat/completions \
+```bash
+curl -i http://localhost:3000/openai/v1/chat/completions \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-5.2",
-    "messages": [
-      {"role": "user", "content": "Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)"}
-    ]
-  }'
+  -d '{"model": "gpt-5.2", "messages": [{"role": "user", "content": "Write a follow-up email to Dr. Sarah Chen (sarah.chen@hospital.org)"}]}'
 ```
 
-</CodeGroup>
-
-## 3. Verify PII Protection
-
-Check the response headers:
-
+Look for:
 ```
 X-PasteGuard-PII-Detected: true
 X-PasteGuard-PII-Masked: true
@@ -96,19 +55,19 @@ Open `http://localhost:3000/dashboard` in your browser to see:
   <img src="/images/dashboard.png" alt="PasteGuard Dashboard" />
 </Frame>
 
-## What's Next?
+## Now Configure Your Tool
 
 <CardGroup cols={2}>
-  <Card title="Installation" icon="download" href="/installation">
-    Docker images and language options
+  <Card title="Browser Extension" icon="puzzle-piece" href="/use-cases/browser-extension">
+    ChatGPT, Claude, Gemini
   </Card>
-  <Card title="Mask Mode" icon="eye-slash" href="/concepts/mask-mode">
-    How PII masking works
+  <Card title="Coding Tools" icon="code" href="/use-cases/coding-tools">
+    Claude Code, Cursor
   </Card>
-  <Card title="Route Mode" icon="code-branch" href="/concepts/route-mode">
-    Route sensitive requests locally
+  <Card title="Apps & SDKs" icon="cube" href="/use-cases/apps-and-sdks">
+    OpenAI, Anthropic, LangChain
   </Card>
-  <Card title="Configuration" icon="gear" href="/configuration/overview">
-    Customize detection and providers
+  <Card title="Self-Hosted" icon="server" href="/use-cases/self-hosted">
+    Open WebUI, LibreChat
   </Card>
 </CardGroup>
