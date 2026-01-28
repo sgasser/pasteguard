@@ -1,0 +1,54 @@
+---
+title: Coding Tools
+description: Protect your codebase context and secrets in Claude Code, Cursor, and other AI coding assistants
+---
+
+PasteGuard protects your codebase when you use AI coding assistants. Config files with database credentials, customer data in test fixtures, API keys in environment files — all masked before reaching the provider.
+
+## What Gets Detected
+
+- **Secrets** — API keys, private keys, database passwords, tokens in config files and `.env` files
+- **PII** — Customer names, emails, phone numbers in code comments, test data, or log output
+
+PII detection supports [24 languages](/installation). Full entity lists: [PII Detection](/concepts/pii-detection), [Secrets Detection](/concepts/secrets-detection).
+
+## Claude Code
+
+One environment variable:
+
+```bash
+ANTHROPIC_BASE_URL=http://localhost:3000/anthropic claude
+```
+
+To make it permanent, add to your shell profile:
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
+```
+
+## Cursor
+
+1. Open **Settings** → **Models**
+2. Scroll to **API Keys** section
+3. Enable **Override OpenAI Base URL** toggle
+4. Enter: `http://localhost:3000/openai/v1`
+5. Add your OpenAI API key
+
+## Environment Variables
+
+Most AI coding tools respect the standard environment variables:
+
+```bash
+# OpenAI-compatible tools
+export OPENAI_API_BASE=http://localhost:3000/openai/v1
+
+# Anthropic tools (Claude Code, etc.)
+export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
+```
+
+## API Endpoints
+
+| API | PasteGuard URL |
+|----------|----------------|
+| OpenAI | `http://localhost:3000/openai/v1` |
+| Anthropic | `http://localhost:3000/anthropic` |
