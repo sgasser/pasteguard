@@ -13,30 +13,39 @@
 </p>
 
 <p align="center">
-  Masks sensitive data and secrets before they reach AI.<br>
-  Open-source proxy and browser extension for OpenAI, Anthropic, and any AI system.
+  <strong>AI gets the context. Not your secrets.</strong><br>
+  Automatically hides names, emails, and API keys before you send prompts to AI.
 </p>
 
 <p align="center">
   <a href="#quick-start"><strong>Quick Start</strong></a> ·
+  <a href="#chat"><strong>Chat</strong></a> ·
   <a href="#coding-tools"><strong>Coding Tools</strong></a> ·
-  <a href="#browser-extension"><strong>Browser Extension</strong></a> ·
   <a href="https://pasteguard.com/docs"><strong>Documentation</strong></a>
 </p>
 
 <br/>
 
-<img src="assets/comparison.png" width="100%" alt="PasteGuard — Without vs. With: masks names, emails, and API keys before they reach AI">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/comparison-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/comparison.png">
+  <img src="assets/comparison.png" width="100%" alt="PasteGuard — Without vs. With: masks names, emails, and API keys before they reach AI">
+</picture>
 
-## Where it protects
+<p align="center">
+  Detects 30+ types of sensitive data across 24 languages.<br>
+  Your data never leaves your machine.
+</p>
 
-**[In the browser](https://pasteguard.com/docs/use-cases/browser-extension)** — Masks PII and secrets when you paste into ChatGPT, Claude, and Gemini. You see originals, AI sees placeholders.
+## Works Everywhere
 
-**[In your coding tools](https://pasteguard.com/docs/use-cases/coding-tools)** — Your codebase context and configs flow through Cursor, Claude Code, or other AI assistants to the provider. PasteGuard masks secrets and PII before they leave.
+**[Chat](https://pasteguard.com/docs/use-cases/chat)** — Masks PII and secrets when you paste into ChatGPT, Claude, and Gemini. You see originals, AI sees placeholders.
 
-**[In your app](https://pasteguard.com/docs/use-cases/apps-and-sdks)** — Sits between your code and OpenAI or Anthropic. Change one URL, your users' data stays protected.
+**[Apps](https://pasteguard.com/docs/use-cases/apps)** — Open WebUI, LibreChat, or any self-hosted AI setup. Optionally routes sensitive requests to a local model.
 
-**[In your AI setup](https://pasteguard.com/docs/use-cases/self-hosted)** — Masks data flowing through Open WebUI, LibreChat, or any OpenAI-compatible tool. Optionally routes sensitive requests to a local model.
+**[Coding Tools](https://pasteguard.com/docs/use-cases/coding-tools)** — Cursor, Claude Code, Copilot, Windsurf — your codebase context flows to the provider. PasteGuard masks secrets and PII before they leave.
+
+**[API Integration](https://pasteguard.com/docs/use-cases/api-integration)** — Sits between your code and OpenAI or Anthropic. Change one URL, your users' data stays protected.
 
 ## Quick Start
 
@@ -80,6 +89,18 @@ Route Mode sends requests containing sensitive data to a local LLM (Ollama, vLLM
 
 </details>
 
+## Chat
+
+Open-source browser extension for ChatGPT, Claude, and Gemini.
+
+- Paste customer data → masked before it reaches the AI
+- AI responds with placeholders → you see the originals
+- Works with the same detection engine as the proxy
+
+Currently in beta. Apache 2.0.
+
+**[Join the Beta →](https://tally.so/r/J9pNLr)** · **[Chat docs →](https://pasteguard.com/docs/use-cases/chat)**
+
 ## Coding Tools
 
 Protect your codebase context and secrets when using AI coding assistants.
@@ -93,18 +114,6 @@ ANTHROPIC_BASE_URL=http://localhost:3000/anthropic claude
 **Cursor:** Settings → Models → Enable "Override OpenAI Base URL" → `http://localhost:3000/openai/v1`
 
 **[Coding Tools docs →](https://pasteguard.com/docs/use-cases/coding-tools)**
-
-## Browser Extension
-
-Open-source browser extension for ChatGPT, Claude, and Gemini.
-
-- Paste customer data → masked before it reaches the AI
-- AI responds with placeholders → you see the originals
-- Works with the same detection engine as the proxy
-
-Currently in beta. Apache 2.0.
-
-**[Join the Beta →](https://tally.so/r/J9pNLr)** · **[Browser Extension docs →](https://pasteguard.com/docs/use-cases/browser-extension)**
 
 ## Dashboard
 

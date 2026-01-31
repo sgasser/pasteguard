@@ -1,47 +1,33 @@
 ---
 title: Introduction
-description: Masks sensitive data and secrets before they reach AI. Open-source proxy and browser extension.
+description: AI gets the context. Not your secrets. Open-source privacy proxy for OpenAI, Anthropic, and any AI.
 ---
 
-PasteGuard masks personal data and secrets before they reach OpenAI or Anthropic.
+PasteGuard automatically hides names, emails, and API keys before you send prompts to AI. Your data never leaves your machine.
+
+Detects 30+ types of sensitive data across 24 languages.
 
 <Frame>
-  <img src="/images/comparison.png" alt="PasteGuard Comparison" />
+  <img className="block dark:hidden" src="/images/comparison-light.png" alt="PasteGuard Comparison" />
+  <img className="hidden dark:block" src="/images/comparison-dark.png" alt="PasteGuard Comparison" />
 </Frame>
 
-## Where It Protects
+## Works Everywhere
 
-### Browser Extension (Beta)
-
-Paste customer data into ChatGPT, Claude, or Gemini — PII is masked before it reaches the AI.
-
-<Card title="Browser Extension" icon="puzzle-piece" href="/use-cases/browser-extension">
-  Set up the browser extension
-</Card>
-
-### Coding Tools
-
-Claude Code, Cursor, and other AI assistants send your codebase context to LLM providers. PasteGuard catches secrets in config files, customer data in test fixtures, and PII in code comments.
-
-<Card title="Coding Tools Setup" icon="code" href="/use-cases/coding-tools">
-  Protect your AI coding workflow
-</Card>
-
-### Apps & SDKs
-
-Your application sends user-submitted content to an LLM. PasteGuard masks PII before it reaches the provider.
-
-<Card title="Apps & SDKs Setup" icon="cube" href="/use-cases/apps-and-sdks">
-  Integrate PasteGuard into your application
-</Card>
-
-### Self-Hosted AI
-
-Running Open WebUI, LibreChat, or another chat interface? PasteGuard sits between your UI and the provider.
-
-<Card title="Self-Hosted Setup" icon="server" href="/use-cases/self-hosted">
-  Add privacy to your self-hosted setup
-</Card>
+<CardGroup cols={2}>
+  <Card title="Chat" icon="comment" href="/use-cases/chat">
+    ChatGPT, Claude, Gemini
+  </Card>
+  <Card title="Apps" icon="table-columns" href="/use-cases/apps">
+    Open WebUI, LibreChat
+  </Card>
+  <Card title="Coding Tools" icon="code" href="/use-cases/coding-tools">
+    Cursor, Claude Code, Copilot, Windsurf
+  </Card>
+  <Card title="API Integration" icon="plug" href="/use-cases/api-integration">
+    OpenAI SDK, Anthropic SDK, LangChain
+  </Card>
+</CardGroup>
 
 ## Two Privacy Modes
 

@@ -39,10 +39,10 @@
     {
       "group": "Use Cases",
       "pages": [
-        "use-cases/browser-extension",
+        "use-cases/chat",
+        "use-cases/apps",
         "use-cases/coding-tools",
-        "use-cases/apps-and-sdks",
-        "use-cases/self-hosted"
+        "use-cases/api-integration"
       ]
     },
     {
