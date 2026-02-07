@@ -22,8 +22,17 @@ const ChatCompletionSchema = z
     messages: z
       .array(
         z.object({
-          role: z.enum(["system", "user", "assistant"]),
-          content: z.string(),
+          role: z.enum(["system", "user", "assistant", "tool", "developer", "function"]),
+          content: z.union([
+            z.string(),
+            z.array(
+              z
+                .object({
+                  type: z.string(),
+                })
+                .passthrough(),
+            ),
+          ]),
         }),
       )
       .min(1, "At least one message is required"),
@@ -228,5 +237,22 @@ function createLogData(
  * Format messages for logging
  */
 function formatMessagesForLog(messages: ChatMessage[]): string {
-  return messages.map((m) => `[${m.role}] ${m.content}`).join("\n");
+  return messages
+    .map((m) => {
+      if (typeof m.content === "string") {
+        return `[${m.role}] ${m.content}`;
+      }
+
+      const parts = m.content
+        .map((part) => {
+          if (part.type === "text" && typeof part.text === "string") {
+            return part.text;
+          }
+          return `[${part.type}]`;
+        })
+        .join(" ");
+
+      return `[${m.role}] ${parts}`;
+    })
+    .join("\n");
 }

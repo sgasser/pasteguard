@@ -6,6 +6,7 @@ import { logger } from "hono/logger";
 import { getConfig } from "./config";
 import { chatRoutes } from "./routes/chat";
 import { dashboardRoutes } from "./routes/dashboard";
+import { filesRoutes } from "./routes/files";
 import { healthRoutes } from "./routes/health";
 import { infoRoutes } from "./routes/info";
 import { getLogger } from "./services/logger";
@@ -34,6 +35,7 @@ app.use("*", logger());
 app.route("/", healthRoutes);
 app.route("/", infoRoutes);
 app.route("/openai/v1", chatRoutes);
+app.route("/openai/v1", filesRoutes);
 
 if (config.dashboard.enabled) {
   app.route("/dashboard", dashboardRoutes);

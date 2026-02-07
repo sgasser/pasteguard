@@ -213,10 +213,10 @@ describe("maskMessages", () => {
       { role: "user", content: "Also john@test.com" },
     ];
 
-    const entitiesByMessage: PIIEntity[][] = [
-      [{ entity_type: "EMAIL_ADDRESS", start: 12, end: 28, score: 1.0 }],
+    const entitiesByMessage: PIIEntity[][][] = [
+      [[{ entity_type: "EMAIL_ADDRESS", start: 12, end: 28, score: 1.0 }]],
       [],
-      [{ entity_type: "EMAIL_ADDRESS", start: 5, end: 18, score: 1.0 }],
+      [[{ entity_type: "EMAIL_ADDRESS", start: 5, end: 18, score: 1.0 }]],
     ];
 
     const { masked, context } = maskMessages(messages, entitiesByMessage);
@@ -239,6 +239,36 @@ describe("maskMessages", () => {
 
     expect(masked[0].role).toBe("system");
     expect(masked[1].role).toBe("user");
+  });
+
+  test("masks text parts in multimodal content", () => {
+    const messages: ChatMessage[] = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Email me at jane@example.com" },
+          { type: "image_url", image_url: { url: "https://example.com/cat.png" } },
+          { type: "text", text: "or john@example.com" },
+        ],
+      },
+    ];
+
+    const entitiesByMessage: PIIEntity[][][] = [
+      [
+        [{ entity_type: "EMAIL_ADDRESS", start: 12, end: 28, score: 1.0 }],
+        [{ entity_type: "EMAIL_ADDRESS", start: 3, end: 19, score: 1.0 }],
+      ],
+    ];
+
+    const { masked, context } = maskMessages(messages, entitiesByMessage);
+    const maskedParts = masked[0].content as Array<{ type: string; text?: string }>;
+
+    expect(maskedParts[0].text).toBe("Email me at <EMAIL_ADDRESS_1>");
+    expect(maskedParts[1].type).toBe("image_url");
+    expect(maskedParts[2].text).toBe("or <EMAIL_ADDRESS_2>");
+
+    expect(context.mapping["<EMAIL_ADDRESS_1>"]).toBe("jane@example.com");
+    expect(context.mapping["<EMAIL_ADDRESS_2>"]).toBe("john@example.com");
   });
 });
 
@@ -402,6 +432,37 @@ describe("unmaskResponse", () => {
     expect(result.created).toBe(999);
     expect(result.model).toBe("test-model");
     expect(result.usage).toEqual({ prompt_tokens: 5, completion_tokens: 10, total_tokens: 15 });
+  });
+
+  test("unmasks text parts in multimodal response", () => {
+    const context = createMaskingContext();
+    context.mapping["<EMAIL_ADDRESS_1>"] = "jane@example.com";
+
+    const response = {
+      id: "chatcmpl-789",
+      object: "chat.completion" as const,
+      created: 1234567890,
+      model: "gpt-4.1-mini",
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant" as const,
+            content: [
+              { type: "text", text: "Got it: <EMAIL_ADDRESS_1>" },
+              { type: "image_url", image_url: { url: "https://example.com/generated.png" } },
+            ],
+          },
+          finish_reason: "stop" as const,
+        },
+      ],
+    };
+
+    const result = unmaskResponse(response, context, defaultConfig);
+    const parts = result.choices[0].message.content as Array<{ type: string; text?: string }>;
+
+    expect(parts[0].text).toBe("Got it: jane@example.com");
+    expect(parts[1].type).toBe("image_url");
   });
 });
 

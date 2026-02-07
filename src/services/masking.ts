@@ -1,5 +1,5 @@
 import type { MaskingConfig } from "../config";
-import type { ChatCompletionResponse, ChatMessage } from "./llm-client";
+import type { ChatCompletionResponse, ChatContentPart, ChatMessage } from "./llm-client";
 import type { PIIEntity } from "./pii-detector";
 
 export interface MaskingContext {
@@ -111,13 +111,35 @@ export function unmask(text: string, context: MaskingContext, config: MaskingCon
  */
 export function maskMessages(
   messages: ChatMessage[],
-  entitiesByMessage: PIIEntity[][],
+  entitiesByMessage: PIIEntity[][][],
 ): { masked: ChatMessage[]; context: MaskingContext } {
   const context = createMaskingContext();
 
   const masked = messages.map((msg, i) => {
-    const entities = entitiesByMessage[i] || [];
-    const { masked: maskedContent } = mask(msg.content, entities, context);
+    const entitiesBySegment = entitiesByMessage[i] || [];
+
+    if (typeof msg.content === "string") {
+      const entities = entitiesBySegment[0] || [];
+      const { masked: maskedContent } = mask(msg.content, entities, context);
+      return { ...msg, content: maskedContent };
+    }
+
+    let segmentIndex = 0;
+    const maskedContent = msg.content.map((part) => {
+      if (part.type !== "text" || typeof part.text !== "string") {
+        return part;
+      }
+
+      const entities = entitiesBySegment[segmentIndex] || [];
+      segmentIndex++;
+
+      const { masked: maskedText } = mask(part.text, entities, context);
+      return {
+        ...part,
+        text: maskedText,
+      };
+    });
+
     return { ...msg, content: maskedContent };
   });
 
@@ -191,13 +213,30 @@ export function unmaskResponse(
   context: MaskingContext,
   config: MaskingConfig,
 ): ChatCompletionResponse {
+  const unmaskContent = (content: ChatMessage["content"]) => {
+    if (typeof content === "string") {
+      return unmask(content, context, config);
+    }
+
+    return content.map((part) => {
+      if (part.type !== "text" || typeof part.text !== "string") {
+        return part;
+      }
+
+      return {
+        ...part,
+        text: unmask(part.text, context, config),
+      } as ChatContentPart;
+    });
+  };
+
   return {
     ...response,
     choices: response.choices.map((choice) => ({
       ...choice,
       message: {
         ...choice.message,
-        content: unmask(choice.message.content, context, config),
+        content: unmaskContent(choice.message.content),
       },
     })),
   };

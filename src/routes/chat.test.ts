@@ -41,6 +41,44 @@ describe("POST /openai/v1/chat/completions", () => {
 
     expect(res.status).toBe(400);
   });
+
+  test("accepts multimodal message content", async () => {
+    const res = await app.request("/openai/v1/chat/completions", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Describe this image" },
+              { type: "image_url", image_url: { url: "https://example.com/image.png" } },
+            ],
+          },
+        ],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    // Validation should pass; downstream may still fail without configured upstream/auth.
+    expect(res.status).not.toBe(400);
+  });
+
+  test("accepts developer and tool roles", async () => {
+    const res = await app.request("/openai/v1/chat/completions", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [
+          { role: "developer", content: "You are concise." },
+          { role: "user", content: "Hi" },
+          { role: "assistant", content: "Hello" },
+          { role: "tool", content: "{}" },
+        ],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    expect(res.status).not.toBe(400);
+  });
 });
 
 describe("GET /openai/v1/models", () => {

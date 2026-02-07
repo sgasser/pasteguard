@@ -40,7 +40,7 @@ function createPIIResult(
   return {
     hasPII,
     newEntities,
-    entitiesByMessage: [newEntities],
+    entitiesByMessage: [[newEntities]],
     language: "en",
     languageFallback: false,
     scanTimeMs: 50,

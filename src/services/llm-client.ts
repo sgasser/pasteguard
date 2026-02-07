@@ -4,9 +4,17 @@ import type { LocalProvider, UpstreamProvider } from "../config";
  * OpenAI-compatible message format
  */
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
+  role: "system" | "user" | "assistant" | "tool" | "developer" | "function";
+  content: ChatMessageContent;
 }
+
+export interface ChatContentPart {
+  type: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+export type ChatMessageContent = string | ChatContentPart[];
 
 /**
  * OpenAI-compatible chat completion request
