@@ -101,10 +101,54 @@ def generate_analyzer_config(languages: list[str]) -> dict:
     return {"supported_languages": languages, "default_score_threshold": 0}
 
 
+# Global recognizers - pattern-based, work for any language
+GLOBAL_RECOGNIZERS = [
+    "CreditCardRecognizer",
+    "CryptoRecognizer",
+    "DateRecognizer",
+    "EmailRecognizer",
+    "IbanRecognizer",
+    "IpRecognizer",
+    "UrlRecognizer",
+]
+
+# Language-specific recognizers - only loaded when that language is configured
+LANGUAGE_RECOGNIZERS = {
+    "en": [
+        # US
+        "UsSsnRecognizer",
+        "UsPassportRecognizer",
+        "UsItinRecognizer",
+        "UsBankRecognizer",
+        "UsLicenseRecognizer",
+        "MedicalLicenseRecognizer",
+        # UK
+        "UkNinoRecognizer",
+        "NhsRecognizer",
+    ],
+    "es": [
+        "EsNifRecognizer",
+        "EsNieRecognizer",
+    ],
+    "it": [
+        "ItDriverLicenseRecognizer",
+        "ItFiscalCodeRecognizer",
+        "ItVatCodeRecognizer",
+        "ItIdentityCardRecognizer",
+        "ItPassportRecognizer",
+    ],
+    "pl": [
+        "PlPeselRecognizer",
+    ],
+    "ko": [
+        "KrRrnRecognizer",
+    ],
+}
+
+
 def generate_recognizers_config(languages: list[str], registry: dict) -> dict:
     """Generate recognizers-config.yaml content."""
-    # Build language entries for each recognizer type
-    spacy_langs = [{"language": lang} for lang in languages]
+    all_langs = [{"language": lang} for lang in languages]
 
     # Phone recognizer needs context words per language
     phone_langs = []
@@ -115,41 +159,42 @@ def generate_recognizers_config(languages: list[str], registry: dict) -> dict:
             entry["context"] = lang_config["phone_context"]
         phone_langs.append(entry)
 
+    recognizers = [
+        {
+            "name": "SpacyRecognizer",
+            "supported_languages": all_langs,
+            "type": "predefined",
+        },
+        {
+            "name": "PhoneRecognizer",
+            "supported_languages": phone_langs,
+            "type": "predefined",
+        },
+    ]
+
+    # Add global recognizers for all configured languages
+    for name in GLOBAL_RECOGNIZERS:
+        recognizers.append({
+            "name": name,
+            "supported_languages": all_langs,
+            "type": "predefined",
+        })
+
+    # Add language-specific recognizers only if that language is configured
+    for lang in languages:
+        if lang in LANGUAGE_RECOGNIZERS:
+            lang_entry = [{"language": lang}]
+            for name in LANGUAGE_RECOGNIZERS[lang]:
+                recognizers.append({
+                    "name": name,
+                    "supported_languages": lang_entry,
+                    "type": "predefined",
+                })
+
     return {
         "supported_languages": languages,
         "global_regex_flags": 26,
-        "recognizers": [
-            {
-                "name": "SpacyRecognizer",
-                "supported_languages": spacy_langs,
-                "type": "predefined",
-            },
-            {
-                "name": "EmailRecognizer",
-                "supported_languages": spacy_langs,
-                "type": "predefined",
-            },
-            {
-                "name": "PhoneRecognizer",
-                "supported_languages": phone_langs,
-                "type": "predefined",
-            },
-            {
-                "name": "CreditCardRecognizer",
-                "supported_languages": spacy_langs,
-                "type": "predefined",
-            },
-            {
-                "name": "IbanRecognizer",
-                "supported_languages": spacy_langs,
-                "type": "predefined",
-            },
-            {
-                "name": "IpRecognizer",
-                "supported_languages": spacy_langs,
-                "type": "predefined",
-            },
-        ],
+        "recognizers": recognizers,
     }
 
 
