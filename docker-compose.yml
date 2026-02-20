@@ -28,8 +28,8 @@ services:
       - path: .env
         required: false
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./data:/app/data
+      - ./config.yaml:/pasteguard/config.yaml:ro
+      - ./data:/pasteguard/data
     restart: unless-stopped
 
   # Development: Only Presidio (for local Bun with hot-reload)

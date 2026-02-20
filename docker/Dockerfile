@@ -2,7 +2,7 @@
 # Single container with Proxy + PII Detection
 #
 # Build: docker build -f docker/Dockerfile --build-arg LANGUAGES=en -t pasteguard:en .
-# Run:   docker run -p 3000:3000 -v ./config.yaml:/app/config.yaml -v ./data:/app/data pasteguard:en
+# Run:   docker run -p 3000:3000 -v ./config.yaml:/pasteguard/config.yaml -v ./data:/pasteguard/data pasteguard:en
 
 ARG LANGUAGES="en"
 
@@ -42,13 +42,14 @@ COPY tsconfig.json ./
 # =============================================================================
 FROM mcr.microsoft.com/presidio-analyzer:latest
 
+USER root
+
 ARG LANGUAGES
 
 # Install supervisor for process management
 RUN apt-get update && apt-get install -y --no-install-recommends \
     supervisor \
     curl \
-    unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -61,32 +62,38 @@ RUN if echo "${LANGUAGES}" | grep -q "ja"; then \
     fi
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install Bun
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="/root/.bun/bin:${PATH}"
+# Copy Bun binary from official image (uses baseline build for x64 compatibility)
+# The official oven/bun images use baseline builds which only require SSE4.2,
+# supporting older/low-power x86_64 CPUs (e.g., Intel Atom C3558R) that lack AVX2.
+# See: https://github.com/sgasser/pasteguard/issues/70
+COPY --from=bun-builder /usr/local/bin/bun /usr/local/bin/bun
+ENV PATH="/usr/local/bin:${PATH}"
 
 # Copy Presidio configuration
-COPY --from=generator /output/nlp-config.yaml /usr/bin/presidio_analyzer/conf/default.yaml
-COPY --from=generator /output/recognizers-config.yaml /usr/bin/presidio_analyzer/conf/default_recognizers.yaml
-COPY --from=generator /output/analyzer-config.yaml /usr/bin/presidio_analyzer/conf/default_analyzer.yaml
+COPY --from=generator /output/nlp-config.yaml /app/presidio_analyzer/conf/default.yaml
+COPY --from=generator /output/recognizers-config.yaml /app/presidio_analyzer/conf/default_recognizers.yaml
+COPY --from=generator /output/analyzer-config.yaml /app/presidio_analyzer/conf/default_analyzer.yaml
 
 # Install spaCy models
 COPY --from=generator /output/install-models.sh /tmp/
 RUN chmod +x /tmp/install-models.sh && /tmp/install-models.sh && rm /tmp/install-models.sh
 
-# Copy Bun application
-WORKDIR /app
+# Copy Bun application to /pasteguard (separate from Presidio's /app)
+WORKDIR /pasteguard
 COPY --from=bun-builder /app/node_modules ./node_modules
 COPY --from=bun-builder /app/src ./src
 COPY --from=bun-builder /app/package.json ./
 COPY --from=bun-builder /app/tsconfig.json ./
 COPY config.example.yaml ./
 
-# Create data directory
-RUN mkdir -p /app/data
+# Create data directory and set permissions for non-root user
+RUN mkdir -p /pasteguard/data && chown -R 1001:1001 /pasteguard
 
 # Copy supervisor configuration
 COPY docker/supervisord.conf /etc/supervisor/conf.d/pasteguard.conf
+
+# Switch back to non-root user for runtime
+USER 1001
 
 # Environment defaults
 ENV PRESIDIO_URL=http://localhost:5002

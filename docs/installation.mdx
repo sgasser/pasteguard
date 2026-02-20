@@ -50,8 +50,8 @@ mkdir -p data
 
 # Run with persistence
 docker run -d --name pasteguard --restart unless-stopped -p 3000:3000 \
-  -v ./config.yaml:/app/config.yaml:ro \
-  -v ./data:/app/data \
+  -v ./config.yaml:/pasteguard/config.yaml:ro \
+  -v ./data:/pasteguard/data \
   ghcr.io/sgasser/pasteguard:en
 ```
 
