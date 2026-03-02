@@ -86,14 +86,14 @@ COPY --from=bun-builder /app/package.json ./
 COPY --from=bun-builder /app/tsconfig.json ./
 COPY config.example.yaml ./
 
-# Create data directory and set permissions for non-root user
-RUN mkdir -p /pasteguard/data && chown -R 1001:1001 /pasteguard
+# Create data directory and set permissions for UID 1000 (matches most Linux users)
+RUN mkdir -p /pasteguard/data && chown -R 1000:1000 /pasteguard
 
 # Copy supervisor configuration
 COPY docker/supervisord.conf /etc/supervisor/conf.d/pasteguard.conf
 
-# Switch back to non-root user for runtime
-USER 1001
+# Switch to non-root user for runtime
+USER 1000
 
 # Environment defaults
 ENV PRESIDIO_URL=http://localhost:5002
