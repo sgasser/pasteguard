@@ -30,12 +30,14 @@ See [Mask Mode](/concepts/mask-mode) and [Route Mode](/concepts/route-mode) for 
 server:
   port: 3000
   host: "0.0.0.0"
+  request_timeout: 600
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `port` | `3000` | HTTP port |
 | `host` | `0.0.0.0` | Bind address |
+| `request_timeout` | `600` | Request timeout in seconds (0 = no timeout) |
 
 ## Dashboard
 

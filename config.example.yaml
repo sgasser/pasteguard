@@ -11,6 +11,7 @@ mode: mask
 server:
   port: 3000
   host: "0.0.0.0"
+  # request_timeout: 600  # Seconds (0 = no timeout, default: 600)
 
 # Providers - API endpoints
 # Can be cloud (OpenAI, Anthropic, Azure) or self-hosted (vLLM, LiteLLM proxy, etc.)

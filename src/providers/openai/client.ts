@@ -2,8 +2,7 @@
  * OpenAI client - simple functions for OpenAI API
  */
 
-import type { OpenAIProviderConfig } from "../../config";
-import { REQUEST_TIMEOUT_MS } from "../../constants/timeouts";
+import { getConfig, type OpenAIProviderConfig } from "../../config";
 import { ProviderError } from "../errors";
 import type { OpenAIRequest, OpenAIResponse } from "./types";
 
@@ -66,11 +65,12 @@ export async function callOpenAI(
     delete body.max_tokens;
   }
 
+  const timeoutMs = getConfig().server.request_timeout * 1000;
   const response = await fetch(endpoint, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined,
   });
 
   if (!response.ok) {

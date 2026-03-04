@@ -3,8 +3,8 @@
  * Used in route mode for PII-containing requests (no masking needed)
  */
 
-import type { LocalProviderConfig } from "../config";
-import { HEALTH_CHECK_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "../constants/timeouts";
+import { getConfig, type LocalProviderConfig } from "../config";
+import { HEALTH_CHECK_TIMEOUT_MS } from "../constants/timeouts";
 import type { AnthropicResult } from "./anthropic/client";
 import type { AnthropicRequest, AnthropicResponse } from "./anthropic/types";
 import { ProviderError, type ProviderResult } from "./openai/client";
@@ -27,12 +27,13 @@ export async function callLocal(
   }
 
   const isStreaming = request.stream ?? false;
+  const timeoutMs = getConfig().server.request_timeout * 1000;
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers,
     body: JSON.stringify({ ...request, model: config.model, stream: isStreaming }),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined,
   });
 
   if (!response.ok) {
@@ -70,12 +71,13 @@ export async function callLocalAnthropic(
   }
 
   const isStreaming = request.stream ?? false;
+  const timeoutMs = getConfig().server.request_timeout * 1000;
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers,
     body: JSON.stringify({ ...request, model: config.model, stream: isStreaming }),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined,
   });
 
   if (!response.ok) {

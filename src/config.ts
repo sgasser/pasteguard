@@ -72,6 +72,7 @@ const PIIDetectionSchema = z.object({
 const ServerSchema = z.object({
   port: z.coerce.number().int().min(1).max(65535).default(3000),
   host: z.string().default("0.0.0.0"),
+  request_timeout: z.coerce.number().int().min(0).default(600),
 });
 
 const LoggingSchema = z.object({
@@ -163,6 +164,7 @@ export type AnthropicProviderConfig = z.infer<typeof AnthropicProviderSchema>;
 export type LocalProviderConfig = z.infer<typeof LocalProviderSchema>;
 export type MaskingConfig = z.infer<typeof MaskingSchema>;
 export type SecretsDetectionConfig = z.infer<typeof SecretsDetectionSchema>;
+export type ServerConfig = z.infer<typeof ServerSchema>;
 
 /**
  * Replaces ${VAR} and ${VAR:-default} patterns with environment variable values

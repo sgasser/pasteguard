@@ -1,2 +1,1 @@
-export const REQUEST_TIMEOUT_MS = 120_000;
 export const HEALTH_CHECK_TIMEOUT_MS = 5_000;

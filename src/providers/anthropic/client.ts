@@ -2,8 +2,7 @@
  * Anthropic client - simple functions for Anthropic Messages API
  */
 
-import type { AnthropicProviderConfig } from "../../config";
-import { REQUEST_TIMEOUT_MS } from "../../constants/timeouts";
+import { type AnthropicProviderConfig, getConfig } from "../../config";
 import { ProviderError } from "../errors";
 import type { AnthropicRequest, AnthropicResponse } from "./types";
 
@@ -68,11 +67,12 @@ export async function callAnthropic(
     headers["anthropic-beta"] = clientHeaders.beta;
   }
 
+  const timeoutMs = getConfig().server.request_timeout * 1000;
   const response = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers,
     body: JSON.stringify(request),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined,
   });
 
   if (!response.ok) {
