@@ -298,6 +298,45 @@ describe("OpenAI Text Extractor", () => {
 
       expect(result.choices[0].message.content).toBeNull();
     });
+
+    test("unmasks text parts inside structured response content arrays", () => {
+      const response: OpenAIResponse = {
+        id: "test-id",
+        object: "chat.completion",
+        created: 123456,
+        model: "gpt-4",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: [
+                { type: "reference", reference_ids: ["ref"] },
+                { type: "text", text: "Hello [[PERSON_1]]" },
+                // biome-ignore lint/suspicious/noExplicitAny: testing structured content preservation
+              ] as any,
+            },
+            finish_reason: "stop",
+          },
+        ],
+      };
+
+      const context: PlaceholderContext = {
+        mapping: { "[[PERSON_1]]": "John" },
+        reverseMapping: { John: "[[PERSON_1]]" },
+        counters: { PERSON: 1 },
+      };
+
+      const result = openaiExtractor.unmaskResponse(response, context);
+      const content = result.choices[0].message.content as Array<{
+        type: string;
+        text?: string;
+        reference_ids?: string[];
+      }>;
+
+      expect(content[0]).toEqual({ type: "reference", reference_ids: ["ref"] });
+      expect(content[1]).toEqual({ type: "text", text: "Hello John" });
+    });
   });
 
   describe("unknown field preservation", () => {

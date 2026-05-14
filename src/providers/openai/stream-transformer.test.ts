@@ -151,4 +151,22 @@ describe("createUnmaskingStream", () => {
 
     expect(result).toContain("not-json");
   });
+
+  test("preserves structured content arrays and only unmasks text parts", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "John";
+
+    const sseData =
+      'data: {"choices":[{"delta":{"content":[{"type":"reference","reference_ids":["ref"]},{"type":"text","text":"Hello [[PERSON_1]]"}]}}]}\n\n';
+    const source = createSSEStream([sseData]);
+
+    const unmaskedStream = createUnmaskingStream(source, context, defaultConfig);
+    const result = await consumeStream(unmaskedStream);
+
+    expect(result).not.toContain("[object Object]");
+    expect(result).toContain('"type":"reference"');
+    expect(result).toContain('"reference_ids":["ref"]');
+    expect(result).toContain('"type":"text"');
+    expect(result).toContain('"text":"Hello John"');
+  });
 });

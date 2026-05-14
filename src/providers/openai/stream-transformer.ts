@@ -2,6 +2,43 @@ import type { MaskingConfig } from "../../config";
 import type { PlaceholderContext } from "../../masking/context";
 import { flushMaskingBuffer, unmaskStreamChunk } from "../../pii/mask";
 import { flushSecretsMaskingBuffer, unmaskSecretsStreamChunk } from "../../secrets/mask";
+import type { OpenAIContentPart } from "../../utils/content";
+
+function unmaskTextContent(
+  text: string,
+  piiBuffer: string,
+  piiContext: PlaceholderContext | undefined,
+  config: MaskingConfig,
+  secretsBuffer: string,
+  secretsContext?: PlaceholderContext,
+): { text: string; piiBuffer: string; secretsBuffer: string } {
+  let processedText = text;
+  let nextPiiBuffer = piiBuffer;
+  let nextSecretsBuffer = secretsBuffer;
+
+  if (piiContext) {
+    const { output, remainingBuffer } = unmaskStreamChunk(
+      nextPiiBuffer,
+      processedText,
+      piiContext,
+      config,
+    );
+    nextPiiBuffer = remainingBuffer;
+    processedText = output;
+  }
+
+  if (secretsContext && processedText) {
+    const { output, remainingBuffer } = unmaskSecretsStreamChunk(
+      nextSecretsBuffer,
+      processedText,
+      secretsContext,
+    );
+    nextSecretsBuffer = remainingBuffer;
+    processedText = output;
+  }
+
+  return { text: processedText, piiBuffer: nextPiiBuffer, secretsBuffer: nextSecretsBuffer };
+}
 
 /**
  * Creates a transform stream that unmasks SSE content
@@ -81,36 +118,49 @@ export function createUnmaskingStream(
 
               try {
                 const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content || "";
+                const content = parsed.choices?.[0]?.delta?.content;
 
-                if (content) {
-                  let processedContent = content;
+                if (typeof content === "string") {
+                  const unmasked = unmaskTextContent(
+                    content,
+                    piiBuffer,
+                    piiContext,
+                    config,
+                    secretsBuffer,
+                    secretsContext,
+                  );
+                  piiBuffer = unmasked.piiBuffer;
+                  secretsBuffer = unmasked.secretsBuffer;
 
-                  // First unmask PII if context provided
-                  if (piiContext) {
-                    const { output, remainingBuffer } = unmaskStreamChunk(
+                  if (unmasked.text) {
+                    parsed.choices[0].delta.content = unmasked.text;
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
+                  }
+                } else if (Array.isArray(content)) {
+                  const processedContent = content.flatMap((part: OpenAIContentPart) => {
+                    if (part.type !== "text" || typeof part.text !== "string") {
+                      return [part];
+                    }
+
+                    const unmasked = unmaskTextContent(
+                      part.text,
                       piiBuffer,
-                      processedContent,
                       piiContext,
                       config,
-                    );
-                    piiBuffer = remainingBuffer;
-                    processedContent = output;
-                  }
-
-                  // Then unmask secrets if context provided
-                  if (secretsContext && processedContent) {
-                    const { output, remainingBuffer } = unmaskSecretsStreamChunk(
                       secretsBuffer,
-                      processedContent,
                       secretsContext,
                     );
-                    secretsBuffer = remainingBuffer;
-                    processedContent = output;
-                  }
+                    piiBuffer = unmasked.piiBuffer;
+                    secretsBuffer = unmasked.secretsBuffer;
 
-                  if (processedContent) {
-                    // Update the parsed object with processed content
+                    if (!unmasked.text) {
+                      return [];
+                    }
+
+                    return [{ ...part, text: unmasked.text }];
+                  });
+
+                  if (processedContent.length > 0) {
                     parsed.choices[0].delta.content = processedContent;
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
                   }

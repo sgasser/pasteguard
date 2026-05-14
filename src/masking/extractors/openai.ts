@@ -14,6 +14,31 @@ import type { OpenAIRequest, OpenAIResponse } from "../../providers/openai/types
 import type { OpenAIContentPart } from "../../utils/content";
 import type { MaskedSpan, RequestExtractor, TextSpan } from "../types";
 
+function unmaskContent(
+  content: OpenAIResponse["choices"][number]["message"]["content"],
+  context: PlaceholderContext,
+  formatValue?: (original: string) => string,
+) {
+  if (typeof content === "string") {
+    return restorePlaceholders(content, context, formatValue);
+  }
+
+  if (Array.isArray(content)) {
+    return content.map((part: OpenAIContentPart) => {
+      if (part.type === "text" && typeof part.text === "string") {
+        return {
+          ...part,
+          text: restorePlaceholders(part.text, context, formatValue),
+        };
+      }
+
+      return part;
+    });
+  }
+
+  return content;
+}
+
 /**
  * OpenAI request extractor
  *
@@ -102,10 +127,7 @@ export const openaiExtractor: RequestExtractor<OpenAIRequest, OpenAIResponse> = 
         ...choice,
         message: {
           ...choice.message,
-          content:
-            typeof choice.message.content === "string"
-              ? restorePlaceholders(choice.message.content, context, formatValue)
-              : choice.message.content,
+          content: unmaskContent(choice.message.content, context, formatValue),
         },
       })),
     };
