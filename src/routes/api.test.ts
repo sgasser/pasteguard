@@ -9,6 +9,8 @@ const mockDetectPII = mock<(text: string, language: string) => Promise<PIIEntity
 mock.module("../pii/detect", () => ({
   getPIIDetector: () => ({
     detectPII: mockDetectPII,
+    healthCheck: mock(() => Promise.resolve(true)),
+    getLanguageValidation: mock(() => undefined),
   }),
   filterWhitelistedEntities,
 }));
