@@ -44,8 +44,5 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/sgasser/pasteguard"
-  },
-  "overrides": {
-    "postcss": "^8.5.15"
   }
 }
