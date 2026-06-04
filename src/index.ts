@@ -7,6 +7,7 @@ import { getConfig } from "./config";
 import { getPIIDetector } from "./pii/detect";
 import { anthropicRoutes } from "./routes/anthropic";
 import { apiRoutes } from "./routes/api";
+import { codexRoutes } from "./routes/codex";
 import { dashboardRoutes } from "./routes/dashboard";
 import { healthRoutes } from "./routes/health";
 import { infoRoutes } from "./routes/info";
@@ -46,6 +47,7 @@ app.route("/", healthRoutes);
 app.route("/", infoRoutes);
 app.route("/openai", openaiRoutes);
 app.route("/anthropic", anthropicRoutes);
+app.route("/codex", codexRoutes);
 app.route("/api", apiRoutes);
 
 if (config.dashboard.enabled) {
@@ -159,13 +161,15 @@ Routing:
 
 Providers:
   OpenAI: ${config.providers.openai.base_url}
+  Codex:  ${config.providers.codex.base_url}
   Local:  ${config.local?.type || "not configured"} → ${config.local?.model || "n/a"}`
       : `
 Masking:
   Markers: ${config.masking.show_markers ? "enabled" : "disabled"}
 
-Provider:
-  OpenAI: ${config.providers.openai.base_url}`;
+Providers:
+  OpenAI: ${config.providers.openai.base_url}
+  Codex:  ${config.providers.codex.base_url}`;
 
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
@@ -176,6 +180,7 @@ Provider:
 Server:     http://${host}:${port}
 OpenAI API: http://${host}:${port}/openai/v1/chat/completions
 Anthropic:  http://${host}:${port}/anthropic/v1/messages
+Codex:      http://${host}:${port}/codex
 Mask API:   http://${host}:${port}/api/mask
 Health:     http://${host}:${port}/health
 Info:       http://${host}:${port}/info

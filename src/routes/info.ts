@@ -20,6 +20,9 @@ infoRoutes.get("/info", (c) => {
     anthropic: {
       base_url: getAnthropicInfo(config.providers.anthropic).baseUrl,
     },
+    codex: {
+      base_url: config.providers.codex.base_url,
+    },
   };
 
   const info: Record<string, unknown> = {

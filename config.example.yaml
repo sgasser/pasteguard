@@ -14,7 +14,8 @@ server:
   # request_timeout: 600  # Seconds (0 = no timeout, default: 600)
 
 # Providers - API endpoints
-# Can be cloud (OpenAI, Anthropic, Azure) or self-hosted (vLLM, LiteLLM proxy, etc.)
+# Can be cloud (OpenAI, Anthropic, Azure) or self-hosted (vLLM, LiteLLM proxy, etc.).
+# Codex CLI uses the ChatGPT-login backend below.
 providers:
   # OpenAI-compatible endpoint (required)
   # The proxy forwards your client's Authorization header
@@ -27,6 +28,12 @@ providers:
   anthropic:
     base_url: https://api.anthropic.com
     # api_key: ${ANTHROPIC_API_KEY}  # Optional fallback if client doesn't send auth header
+
+  # Codex ChatGPT-login endpoint
+  # /codex/responses receives PII/secrets protection; support endpoints like /codex/models are proxied
+  # The proxy forwards the Codex CLI Authorization header
+  codex:
+    base_url: https://chatgpt.com/backend-api/codex
 
 # Local provider - only used when mode: route
 # Supports: ollama (native), openai (for vLLM, LocalAI, LM Studio, etc.)

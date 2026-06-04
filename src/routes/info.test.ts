@@ -16,6 +16,10 @@ describe("GET /info", () => {
     expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(body.mode).toBeDefined();
     expect(body.providers).toBeDefined();
+    expect(body.providers).toHaveProperty("codex");
+    expect(
+      ((body.providers as Record<string, { base_url: string }>).codex.base_url as string).length,
+    ).toBeGreaterThan(0);
     expect(body.pii_detection).toBeDefined();
   });
 

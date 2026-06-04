@@ -45,7 +45,7 @@
 
 **[Coding Tools](https://pasteguard.com/docs/use-cases/coding-tools)** — Cursor, Claude Code, Copilot, Windsurf — your codebase context flows to the provider. PasteGuard masks secrets and PII before they leave.
 
-**[API Integration](https://pasteguard.com/docs/use-cases/api-integration)** — Sits between your code and OpenAI or Anthropic. Change one URL, your users' data stays protected.
+**[API Integration](https://pasteguard.com/docs/use-cases/api-integration)** — Sits between your code and OpenAI-compatible or Anthropic APIs. Change one URL, your users' data stays protected.
 
 ## Quick Start
 
@@ -57,10 +57,11 @@ docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
 
 Point your tools or app to PasteGuard instead of the provider:
 
-| API | PasteGuard URL | Original URL |
+| Target | PasteGuard URL | Original URL |
 |----------|----------------|--------------|
 | OpenAI | `http://localhost:3000/openai/v1` | `https://api.openai.com/v1` |
 | Anthropic | `http://localhost:3000/anthropic` | `https://api.anthropic.com` |
+| Codex CLI | `http://localhost:3000/codex` | `https://chatgpt.com/backend-api/codex` |
 
 ```python
 # One line to protect your data
@@ -83,7 +84,7 @@ For custom config, persistent logs, or other languages: **[Read the docs →](ht
 <details>
 <summary><strong>Route Mode</strong></summary>
 
-Route Mode sends requests containing sensitive data to a local LLM (Ollama, vLLM, llama.cpp). Everything else goes to OpenAI or Anthropic. Sensitive data stays on your network.
+Route Mode sends requests containing sensitive data to a local LLM (Ollama, vLLM, llama.cpp). Everything else goes to the configured cloud provider. Sensitive data stays on your network.
 
 **[Route Mode docs →](https://pasteguard.com/docs/concepts/route-mode)**
 
@@ -112,6 +113,8 @@ ANTHROPIC_BASE_URL=http://localhost:3000/anthropic claude
 ```
 
 **Cursor:** Settings → Models → Enable "Override OpenAI Base URL" → `http://localhost:3000/openai/v1`
+
+**Codex CLI:** Configure a custom provider with `base_url = "http://127.0.0.1:3000/codex"`. See the coding tools docs for the full snippet.
 
 **[Coding Tools docs →](https://pasteguard.com/docs/use-cases/coding-tools)**
 

@@ -6,7 +6,7 @@ export interface RequestLog {
   id?: number;
   timestamp: string;
   mode: "route" | "mask";
-  provider: "openai" | "anthropic" | "local" | "api";
+  provider: "openai" | "anthropic" | "codex" | "local" | "api";
   model: string;
   pii_detected: boolean;
   entities: string;
@@ -170,10 +170,10 @@ export class Logger {
       .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE pii_detected = 1`)
       .get() as { count: number };
 
-    // Proxy (OpenAI + Anthropic) vs Local vs API
+    // Proxy (OpenAI + Anthropic + Codex) vs Local vs API
     const proxyResult = this.db
       .prepare(
-        `SELECT COUNT(*) as count FROM request_logs WHERE provider IN ('openai', 'anthropic')`,
+        `SELECT COUNT(*) as count FROM request_logs WHERE provider IN ('openai', 'anthropic', 'codex')`,
       )
       .get() as { count: number };
     const localResult = this.db
@@ -289,7 +289,7 @@ export function getLogger(): Logger {
 export interface RequestLogData {
   timestamp: string;
   mode: "route" | "mask";
-  provider: "openai" | "anthropic" | "local" | "api";
+  provider: "openai" | "anthropic" | "codex" | "local" | "api";
   model: string;
   piiDetected: boolean;
   entities: string[];

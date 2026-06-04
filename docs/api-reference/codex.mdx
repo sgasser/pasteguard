@@ -1,0 +1,60 @@
+---
+title: Codex
+description: Protected proxy for Codex CLI ChatGPT-login traffic
+---
+
+Proxy Codex CLI requests through PasteGuard with masking on Responses calls.
+
+```
+/codex/*
+```
+
+<Note>
+`POST /codex/responses` receives PII and secrets protection and appears in the dashboard. Supporting endpoints such as `/codex/models` are proxied directly.
+</Note>
+
+In route mode, clean Codex Responses requests are forwarded to Codex. Requests containing PII or secrets configured with `route_local` are blocked because PasteGuard does not convert Codex Responses traffic to a local provider format.
+
+## Codex CLI
+
+Add a custom Codex model provider to `~/.codex/config.toml`:
+
+```toml
+model_provider = "pasteguard-codex"
+
+[model_providers.pasteguard-codex]
+name = "PasteGuard Codex"
+base_url = "http://127.0.0.1:3000/codex"
+wire_api = "responses"
+requires_openai_auth = true
+supports_websockets = false
+```
+
+Then run Codex normally:
+
+```bash
+codex exec --skip-git-repo-check 'Reply with exactly: ok'
+```
+
+## Upstream
+
+By default, Codex requests forward to:
+
+```yaml
+providers:
+  codex:
+    base_url: https://chatgpt.com/backend-api/codex
+```
+
+Examples:
+
+| PasteGuard URL | Upstream URL |
+|----------------|--------------|
+| `/codex/responses` | `https://chatgpt.com/backend-api/codex/responses` |
+| `/codex/models?client_version=0.128.0` | `https://chatgpt.com/backend-api/codex/models?client_version=0.128.0` |
+
+`POST /codex/responses` is inspected and logged. Other Codex endpoints are direct pass-through.
+
+## Authentication
+
+PasteGuard forwards the Codex CLI authorization header. This is different from `/openai/v1`, which is for OpenAI API-key traffic against `https://api.openai.com/v1`.

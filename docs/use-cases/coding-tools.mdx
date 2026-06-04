@@ -26,6 +26,31 @@ To make it permanent, add to your shell profile:
 export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
 ```
 
+## Codex CLI
+
+Codex users signed in with ChatGPT should use PasteGuard's Codex endpoint, not the OpenAI API endpoint:
+
+```toml
+model_provider = "pasteguard-codex"
+
+[model_providers.pasteguard-codex]
+name = "PasteGuard Codex"
+base_url = "http://127.0.0.1:3000/codex"
+wire_api = "responses"
+requires_openai_auth = true
+supports_websockets = false
+```
+
+Run a smoke test:
+
+```bash
+codex exec --skip-git-repo-check 'Reply with exactly: ok'
+```
+
+<Note>
+Codex Responses requests are scanned, masked, unmasked, and shown in the dashboard. In route mode, sensitive Codex requests are blocked because PasteGuard does not route Codex Responses traffic to a local provider.
+</Note>
+
 ## Cursor
 
 1. Open **Settings** → **Models**
@@ -48,7 +73,8 @@ export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
 
 ## API Endpoints
 
-| API | PasteGuard URL |
+| Target | PasteGuard URL |
 |----------|----------------|
 | OpenAI | `http://localhost:3000/openai/v1` |
 | Anthropic | `http://localhost:3000/anthropic` |
+| Codex CLI | `http://localhost:3000/codex` |

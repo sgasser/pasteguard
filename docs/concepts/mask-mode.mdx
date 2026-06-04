@@ -1,9 +1,9 @@
 ---
 title: Mask Mode
-description: Replace PII with placeholders before sending to OpenAI or Anthropic
+description: Replace PII with placeholders before sending to upstream AI services
 ---
 
-Mask mode replaces PII with placeholders before sending to OpenAI or Anthropic. The response is automatically unmasked before returning to you.
+Mask mode replaces PII with placeholders before sending to the upstream AI service. The response is automatically unmasked before returning to you.
 
 ## How It Works
 
@@ -15,10 +15,10 @@ Mask mode replaces PII with placeholders before sending to OpenAI or Anthropic. 
     PasteGuard finds: `Dr. Sarah Chen` (PERSON), `sarah.chen@hospital.org` (EMAIL)
   </Step>
   <Step title="Masked request sent">
-    OpenAI/Anthropic receives: `"Write a follow-up email to [[PERSON_1]] ([[EMAIL_ADDRESS_1]])"`
+    The provider receives: `"Write a follow-up email to [[PERSON_1]] ([[EMAIL_ADDRESS_1]])"`
   </Step>
   <Step title="Response masked">
-    OpenAI/Anthropic responds: `"Dear [[PERSON_1]], Following up on our discussion..."`
+    The provider responds: `"Dear [[PERSON_1]], Following up on our discussion..."`
   </Step>
   <Step title="Response unmasked">
     You receive: `"Dear Dr. Sarah Chen, Following up on our discussion..."`
@@ -28,7 +28,7 @@ Mask mode replaces PII with placeholders before sending to OpenAI or Anthropic. 
 ## When to Use
 
 - Simple setup without local infrastructure
-- Want to use OpenAI or Anthropic while protecting PII
+- Want to use cloud AI services while protecting PII
 
 ## Configuration
 

@@ -207,7 +207,7 @@ export function toSecretsHeaderData<T>(
 }
 
 export interface CreateLogDataOptions {
-  provider: "openai" | "anthropic" | "local" | "api";
+  provider: "openai" | "anthropic" | "codex" | "local" | "api";
   model: string;
   startTime: number;
   pii?: PIILogData;
@@ -250,7 +250,7 @@ export function createLogData(options: CreateLogDataOptions): RequestLogData {
 // ============================================================================
 
 export interface ProviderErrorContext {
-  provider: "openai" | "anthropic" | "local";
+  provider: "openai" | "anthropic" | "codex" | "local";
   model: string;
   startTime: number;
   pii?: PIILogData;
