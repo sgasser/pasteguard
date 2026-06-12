@@ -92,7 +92,7 @@ Route Mode sends requests containing sensitive data to a local LLM (Ollama, vLLM
 
 ## Chat
 
-Open-source browser extension for ChatGPT, Claude, and Gemini.
+Open-source [browser extension](https://github.com/sgasser/pasteguard-extension) for ChatGPT, Claude, and Gemini.
 
 - Paste customer data → masked before it reaches the AI
 - AI responds with placeholders → you see the originals
@@ -100,7 +100,7 @@ Open-source browser extension for ChatGPT, Claude, and Gemini.
 
 Currently in beta. Apache 2.0.
 
-**[Join the Beta →](https://tally.so/r/J9pNLr)** · **[Chat docs →](https://pasteguard.com/docs/use-cases/chat)**
+**[Join the Beta →](https://tally.so/r/J9pNLr)** · **[GitHub →](https://github.com/sgasser/pasteguard-extension)** · **[Chat docs →](https://pasteguard.com/docs/use-cases/chat)**
 
 ## Coding Tools
 
