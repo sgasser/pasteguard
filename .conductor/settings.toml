@@ -1,0 +1,16 @@
+#:schema https://conductor.build/schemas/settings.repo.schema.json
+
+[scripts]
+setup = """
+bun install
+if [ ! -f config.yaml ]; then
+  sed 's/port: 3000/port: ${CONDUCTOR_PORT:-3000}/' config.example.yaml > config.yaml
+fi
+mkdir -p data
+"""
+run = """
+docker compose -p pasteguard-dev --profile dev up presidio -d
+CONDUCTOR_PORT=${CONDUCTOR_PORT:-3000} bun run dev
+"""
+archive = "true"
+run_mode = "concurrent"
