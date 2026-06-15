@@ -25,7 +25,7 @@ import {
 
 // Configuration
 const DEFAULT_THRESHOLD = 0.7;
-const PRESIDIO_URL = process.env.PRESIDIO_URL || "http://localhost:5002";
+const DETECTOR_URL = process.env.DETECTOR_URL || "http://localhost:5002";
 const TEST_DATA_DIR = import.meta.dir + "/test-data";
 
 // Parse command line arguments
@@ -34,6 +34,7 @@ const { values: args } = parseArgs({
   options: {
     threshold: { type: "string", short: "t" },
     languages: { type: "string", short: "l" },
+    split: { type: "string", short: "s" },
     verbose: { type: "boolean", short: "v", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -49,6 +50,7 @@ Usage:
 Options:
   -t, --threshold <value>    Score threshold (default: ${DEFAULT_THRESHOLD})
   -l, --languages <langs>    Comma-separated languages to test (e.g., de,en)
+  -s, --split <dev|test>     Only run cases from this split (default: all)
   -v, --verbose              Show detailed results for each test case
   -h, --help                 Show this help message
 
@@ -64,8 +66,9 @@ Examples:
 const threshold = args.threshold ? Number.parseFloat(args.threshold) : DEFAULT_THRESHOLD;
 const verbose = args.verbose ?? false;
 const languageFilter = args.languages?.split(",").map((l) => l.trim().toLowerCase());
+const splitFilter = args.split?.trim().toLowerCase();
 
-// Entity types we test for
+// Entity types requested from the detector.
 const ENTITY_TYPES = [
   "PERSON",
   "EMAIL_ADDRESS",
@@ -74,6 +77,12 @@ const ENTITY_TYPES = [
   "IBAN_CODE",
   "IP_ADDRESS",
   "LOCATION",
+  "ORGANIZATION",
+  "ADDRESS",
+  "IT_FISCAL_CODE",
+  "VAT_CODE",
+  "BIC_CODE",
+  "CRYPTO",
 ];
 
 /**
@@ -96,8 +105,10 @@ async function loadTestCases(): Promise<TestCase[]> {
     for (const testCase of data.test_cases) {
       const parsed = TestCaseSchema.safeParse(testCase);
       if (parsed.success) {
-        // Filter by language if specified
-        if (!languageFilter || languageFilter.includes(parsed.data.language)) {
+        // Filter by language and/or split if specified
+        const langOk = !languageFilter || languageFilter.includes(parsed.data.language);
+        const splitOk = !splitFilter || parsed.data.split === splitFilter;
+        if (langOk && splitOk) {
           testCases.push(parsed.data);
         }
       } else {
@@ -111,12 +122,12 @@ async function loadTestCases(): Promise<TestCase[]> {
 }
 
 /**
- * Call Presidio analyzer API
+ * Call the detector /analyze API
  */
 async function detectPII(text: string, language: string): Promise<DetectedEntity[]> {
   if (!text) return [];
 
-  const response = await fetch(`${PRESIDIO_URL}/analyze`, {
+  const response = await fetch(`${DETECTOR_URL}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -128,7 +139,7 @@ async function detectPII(text: string, language: string): Promise<DetectedEntity
   });
 
   if (!response.ok) {
-    throw new Error(`Presidio error: ${response.status} ${await response.text()}`);
+    throw new Error(`Detector error: ${response.status} ${await response.text()}`);
   }
 
   const entities = (await response.json()) as Array<{
@@ -148,11 +159,11 @@ async function detectPII(text: string, language: string): Promise<DetectedEntity
 }
 
 /**
- * Check if Presidio is available
+ * Check if the detector is available
  */
-async function checkPresidio(): Promise<boolean> {
+async function checkDetector(): Promise<boolean> {
   try {
-    const response = await fetch(`${PRESIDIO_URL}/health`);
+    const response = await fetch(`${DETECTOR_URL}/health`);
     return response.ok;
   } catch {
     return false;
@@ -196,6 +207,8 @@ async function runTestCase(testCase: TestCase): Promise<TestResult> {
     id: testCase.id,
     text: testCase.text,
     language: testCase.language,
+    category: testCase.category,
+    split: testCase.split,
     passed,
     expected: testCase.expected,
     detected,
@@ -229,6 +242,9 @@ function calculateMetrics(results: TestResult[]): AccuracyMetrics {
   const precision = tp + fp > 0 ? tp / (tp + fp) : 1;
   const recall = tp + fn > 0 ? tp / (tp + fn) : 1;
   const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+  // F2 weights recall 2x precision: for a privacy tool, a missed entity (leak)
+  // is worse than an over-mask.
+  const f2 = 4 * precision + recall > 0 ? (5 * precision * recall) / (4 * precision + recall) : 0;
 
   return {
     total: results.length,
@@ -237,6 +253,7 @@ function calculateMetrics(results: TestResult[]): AccuracyMetrics {
     precision,
     recall,
     f1,
+    f2,
     truePositives: tp,
     falsePositives: fp,
     falseNegatives: fn,
@@ -258,7 +275,8 @@ function printMetrics(label: string, metrics: AccuracyMetrics): void {
   console.log(
     `  ${label.padEnd(20)} P=${formatPercent(metrics.precision).padStart(6)}  ` +
       `R=${formatPercent(metrics.recall).padStart(6)}  ` +
-      `F1=${formatPercent(metrics.f1).padStart(6)}  ${status}`,
+      `F1=${formatPercent(metrics.f1).padStart(6)}  ` +
+      `F2=${formatPercent(metrics.f2).padStart(6)}  ${status}`,
   );
 }
 
@@ -270,19 +288,19 @@ async function main(): Promise<void> {
   console.log("║           PII Detection Accuracy Benchmark                 ║");
   console.log("╚════════════════════════════════════════════════════════════╝\n");
 
-  // Check Presidio availability
-  console.log(`Presidio URL: ${PRESIDIO_URL}`);
+  // Check detector availability
+  console.log(`Detector URL: ${DETECTOR_URL}`);
   console.log(`Threshold: ${threshold}`);
   if (languageFilter) {
     console.log(`Languages: ${languageFilter.join(", ")}`);
   }
 
-  if (!(await checkPresidio())) {
-    console.error("\n✗ Presidio is not available. Start it with:");
-    console.error("  docker compose up presidio-analyzer -d\n");
+  if (!(await checkDetector())) {
+    console.error("\n✗ Detector is not available. Start it with:");
+    console.error("  docker compose up detector -d\n");
     process.exit(1);
   }
-  console.log("Presidio: ✓ Connected\n");
+  console.log("Detector: ✓ Connected\n");
 
   // Load test cases from directory
   const testCases = await loadTestCases();
@@ -352,14 +370,22 @@ async function main(): Promise<void> {
   console.log("                         RESULTS");
   console.log("────────────────────────────────────────────────────────────\n");
 
-  console.log(`Overall: ${overall.passed}/${overall.total} passed\n`);
+  const core = results.filter((r) => r.category === "core");
+  const hard = results.filter((r) => r.category === "hard");
+  const corePassed = core.filter((r) => r.passed).length;
+  const hardPassed = hard.filter((r) => r.passed).length;
+  console.log(
+    `Overall: ${overall.passed}/${overall.total} passed  ` +
+      `(core ${corePassed}/${core.length}, hard ${hardPassed}/${hard.length})\n`,
+  );
 
   console.log("Metrics (P=Precision, R=Recall, F1=F1-Score):\n");
 
   console.log(
     `  ${"OVERALL".padEnd(20)} P=${formatPercent(overall.precision).padStart(6)}  ` +
       `R=${formatPercent(overall.recall).padStart(6)}  ` +
-      `F1=${formatPercent(overall.f1).padStart(6)}\n`,
+      `F1=${formatPercent(overall.f1).padStart(6)}  ` +
+      `F2=${formatPercent(overall.f2).padStart(6)}\n`,
   );
 
   console.log("By Entity Type:");
@@ -370,6 +396,24 @@ async function main(): Promise<void> {
   console.log("\nBy Language:");
   for (const [lang, metrics] of Object.entries(byLanguage)) {
     printMetrics(lang.toUpperCase(), metrics);
+  }
+
+  // Core = regression guard (must pass); Hard = honest measure of real limits.
+  console.log("\nBy Category:");
+  for (const cat of ["core", "hard", "eval"] as const) {
+    const catResults = results.filter((r) => r.category === cat);
+    if (catResults.length > 0) {
+      printMetrics(cat, calculateMetrics(catResults));
+    }
+  }
+
+  // Dev = tuning split; Test = held-out eval (report the headline number here).
+  console.log("\nBy Split:");
+  for (const sp of ["dev", "test"] as const) {
+    const spResults = results.filter((r) => r.split === sp);
+    if (spResults.length > 0) {
+      printMetrics(sp, calculateMetrics(spResults));
+    }
   }
 
   // Print false negatives (missed PII)
@@ -400,8 +444,11 @@ async function main(): Promise<void> {
 
   console.log("\n────────────────────────────────────────────────────────────\n");
 
-  // Exit with error code if tests failed
-  if (overall.failed > 0) {
+  // Exit non-zero only on a *core* regression. Hard/adversarial cases are an
+  // honest measure of limits, not a pass/fail gate, so their misses don't fail
+  // the run (they're already reflected in the metrics above).
+  const coreFailed = results.filter((r) => r.category === "core" && !r.passed).length;
+  if (coreFailed > 0) {
     process.exit(1);
   }
 }

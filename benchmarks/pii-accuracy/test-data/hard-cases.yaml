@@ -1,0 +1,103 @@
+# Adversarial / edge cases — the honest-limits eval (category: hard).
+#
+# These probe where the detector is expected to struggle, so the reported
+# recall/precision reflects real behaviour rather than a curated 100%. Misses
+# here are documented limitations, not regressions: they do NOT fail the run
+# (see `category` in types.ts). All identifiers are synthetic but checksum-valid.
+
+test_cases:
+  # Domestic Partita IVA without the "IT" prefix: deliberately not flagged
+  # (a single check digit is too weak without the prefix; deferred to tuning).
+  - id: hard_vat_bare_no_prefix
+    text: "La partita IVA dello studio è 00743110157, grazie."
+    language: it
+    category: hard
+    description: "Bare domestic VAT (valid checksum, no country prefix) — expected miss"
+    expected:
+      - type: VAT_CODE
+        text: "00743110157"
+
+  # Organisation without a legal-form designator: the precision-first org gate
+  # requires one (GmbH, S.r.l., …), so a bare brand name is not flagged.
+  - id: hard_org_no_legalform
+    text: "We migrated the whole client portal to Globex last quarter."
+    language: en
+    category: hard
+    description: "Brand-only organisation, no legal form — expected miss (precision gate)"
+    expected:
+      - type: ORGANIZATION
+        text: "Globex"
+
+  # Non-US English national phone format: the en region defaults to US, so a UK
+  # national number is missed (international + numbers are caught regardless).
+  - id: hard_phone_uk_national
+    text: "Call the London office on 020 7946 0958 before noon."
+    language: en
+    category: hard
+    description: "UK national phone with en/US region — expected miss"
+    expected:
+      - type: PHONE_NUMBER
+        text: "020 7946 0958"
+
+  # Lowercase IBAN: the IBAN regex is case-sensitive (so it never bleeds into
+  # following lowercase words), which means an all-lowercase IBAN is missed.
+  - id: hard_iban_lowercase
+    text: "bitte überweisen sie auf iban de89 3704 0044 0532 0130 00."
+    language: de
+    category: hard
+    description: "All-lowercase IBAN — expected miss"
+    expected:
+      - type: IBAN_CODE
+        text: "de89 3704 0044 0532 0130 00"
+
+  # Obfuscated email (common evasion): not de-obfuscated by design.
+  - id: hard_email_obfuscated
+    text: "reach me at john [at] example [dot] com anytime"
+    language: en
+    category: hard
+    description: "Obfuscated email — out of scope, expected miss"
+    expected:
+      - type: EMAIL_ADDRESS
+        text: "john [at] example [dot] com"
+
+  # Lowercase person name: NER leans on casing, so an all-lowercase name is hard.
+  - id: hard_person_lowercase
+    text: "ricorda di chiamare mario rossi per la fattura"
+    language: it
+    category: hard
+    description: "All-lowercase person name — NER may miss"
+    expected:
+      - type: PERSON
+        text: "mario rossi"
+
+  # French street address: the address floor is calibrated on DE/IT data, so a
+  # French-format address is harder.
+  - id: hard_addr_fr
+    text: "Le client habite au 12 rue de Rivoli, 75001 Paris."
+    language: fr
+    category: hard
+    description: "French-format address — calibration is DE/IT-centric"
+    expected:
+      - type: ADDRESS
+        text: "12 rue de Rivoli, 75001 Paris"
+
+  # French legal form the org gate does not know yet (it covers DE/IT/EN/NL/ES
+  # forms, not FR SARL/SAS): documents the EU-org-legal-forms gap.
+  - id: hard_org_fr_sarl
+    text: "Facture émise par Dupont SARL pour le projet."
+    language: fr
+    category: hard
+    description: "FR legal form (SARL) not in the org-designator list — expected miss"
+    expected:
+      - type: ORGANIZATION
+        text: "Dupont SARL"
+
+  # Precision probe: capitalised common nouns that NER may over-tag. "Bank" is in
+  # the org-designator list, so a stray "the Bank" could surface as a false
+  # positive. Expected empty — any detection is an honest precision hit.
+  - id: hard_precision_caps
+    text: "Please Park the van near the Bank entrance on Main."
+    language: en
+    category: hard
+    description: "Capitalised common nouns — probes false positives"
+    expected: []
