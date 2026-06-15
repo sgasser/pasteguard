@@ -14,6 +14,11 @@ RUN pip install --no-cache-dir .
 ENV DETECTOR_MODEL=urchade/gliner_multi_pii-v1
 RUN python -c "from gliner import GLiNER; GLiNER.from_pretrained('${DETECTOR_MODEL}')"
 
+# Run fully offline at startup: the model is baked in, so never reach out to the
+# Hugging Face Hub (required for air-gapped deployments).
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
+
 EXPOSE 5002
 HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=5 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5002/health').status==200 else 1)"

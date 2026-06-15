@@ -44,11 +44,14 @@ LANG_TO_REGION = {
     "pt": "PT",
 }
 
-# Local and domain parts are dot-separated alnum (+ a few local-part symbols);
-# this rejects leading/trailing/consecutive dots that the naive `[...]+` allowed.
+# Dot-separated labels for local and domain. `\w` is Unicode-aware so accented
+# names (müller@, andré.) match in full instead of leaking a partial span; the
+# structure still rejects leading/trailing/consecutive dots.
 _EMAIL_RE = re.compile(
-    r"(?<![A-Za-z0-9._%+\-])[A-Za-z0-9%+_\-]+(?:\.[A-Za-z0-9%+_\-]+)*"
-    r"@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}(?![A-Za-z0-9\-])"
+    r"(?<![\w.%+\-@])"
+    r"[\w%+\-]+(?:\.[\w%+\-]+)*"
+    r"@(?:[\w\-]+\.)+[^\W\d_]{2,}"
+    r"(?![\w\-])"
 )
 _IPV4_RE = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
 # IBAN: uppercase country+check digits then alnum groups with optional single

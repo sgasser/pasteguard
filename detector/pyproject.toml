@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pasteguard-detector"
 version = "0.1.0"
-description = "Presidio-compatible /analyze PII detector: deterministic regex/checksum + multilingual GLiNER NER."
+description = "/analyze PII detector: deterministic regex/checksum + multilingual GLiNER NER."
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 dependencies = [

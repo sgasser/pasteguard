@@ -5,7 +5,7 @@ description: Configure PII detection settings
 
 ```yaml
 pii_detection:
-  presidio_url: http://detector:5002
+  detector_url: http://detector:5002
   languages:
     - en
     - de
@@ -32,7 +32,7 @@ pii_detection:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `presidio_url` | `http://detector:5002` | Detector `/analyze` URL (Presidio-compatible; the key name is kept for compatibility) |
+| `detector_url` | `http://detector:5002` | Detector `/analyze` URL |
 | `languages` | `["en"]` | Languages the proxy auto-detects among (used as a hint, e.g. phone region) |
 | `fallback_language` | `en` | Language hint used when none is detected |
 | `score_threshold` | `0.7` | Minimum confidence for neural detections (0.0-1.0) |

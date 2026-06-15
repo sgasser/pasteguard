@@ -77,7 +77,7 @@ def test_score_threshold_drops_fuzzy_keeps_deterministic(client):
 
 def test_language_probe_never_errors(client):
     # The PasteGuard probe: any language must return 200 with an array, never
-    # the Presidio "No matching recognizers" error.
+    # an error, so every configured language is treated as supported.
     r = client.post("/analyze", json={"text": "test", "language": "xx", "entities": ["PERSON"]})
     assert r.status_code == 200
     assert isinstance(r.json(), list)

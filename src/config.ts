@@ -56,7 +56,7 @@ const LanguagesSchema = z
 
 const PIIDetectionSchema = z.object({
   enabled: z.boolean().default(true),
-  presidio_url: z.string().url(),
+  detector_url: z.string().url(),
   languages: LanguagesSchema,
   fallback_language: LanguageEnum.default("en"),
   score_threshold: z.coerce.number().min(0).max(1).default(0.7),
@@ -64,12 +64,18 @@ const PIIDetectionSchema = z.object({
     .array(z.string())
     .default([
       "PERSON",
+      "ORGANIZATION",
+      "ADDRESS",
+      "LOCATION",
       "EMAIL_ADDRESS",
       "PHONE_NUMBER",
       "CREDIT_CARD",
       "IBAN_CODE",
       "IP_ADDRESS",
-      "LOCATION",
+      "IT_FISCAL_CODE",
+      "IT_VAT_CODE",
+      "DE_TAX_CODE",
+      "DE_VAT_CODE",
     ]),
   scan_roles: z.array(z.string()).optional(),
 });

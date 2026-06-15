@@ -25,7 +25,7 @@ import {
 
 // Configuration
 const DEFAULT_THRESHOLD = 0.7;
-const PRESIDIO_URL = process.env.PRESIDIO_URL || "http://localhost:5002";
+const DETECTOR_URL = process.env.DETECTOR_URL || "http://localhost:5002";
 const TEST_DATA_DIR = import.meta.dir + "/test-data";
 
 // Parse command line arguments
@@ -65,9 +65,7 @@ const threshold = args.threshold ? Number.parseFloat(args.threshold) : DEFAULT_T
 const verbose = args.verbose ?? false;
 const languageFilter = args.languages?.split(",").map((l) => l.trim().toLowerCase());
 
-// Entity types we request, including organization/address and the
-// country-specific national IDs (Codice Fiscale, Partita IVA, Steuernummer,
-// USt-IdNr) that the detector supports.
+// Entity types requested from the detector.
 const ENTITY_TYPES = [
   "PERSON",
   "EMAIL_ADDRESS",
@@ -124,7 +122,7 @@ async function loadTestCases(): Promise<TestCase[]> {
 async function detectPII(text: string, language: string): Promise<DetectedEntity[]> {
   if (!text) return [];
 
-  const response = await fetch(`${PRESIDIO_URL}/analyze`, {
+  const response = await fetch(`${DETECTOR_URL}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -136,14 +134,7 @@ async function detectPII(text: string, language: string): Promise<DetectedEntity
   });
 
   if (!response.ok) {
-    const body = await response.text();
-    // A detector with no recognizer for this language/entity returns this
-    // sentinel. Treat it as "detected nothing" so the case is a clean false
-    // negative (red) instead of a crash — this is exactly the single-language
-    // routing gap the new detector (issue #96) must close (it always returns
-    // 200 and is language-agnostic).
-    if (body.includes("No matching recognizers")) return [];
-    throw new Error(`Detector error: ${response.status} ${body}`);
+    throw new Error(`Detector error: ${response.status} ${await response.text()}`);
   }
 
   const entities = (await response.json()) as Array<{
@@ -167,7 +158,7 @@ async function detectPII(text: string, language: string): Promise<DetectedEntity
  */
 async function checkDetector(): Promise<boolean> {
   try {
-    const response = await fetch(`${PRESIDIO_URL}/health`);
+    const response = await fetch(`${DETECTOR_URL}/health`);
     return response.ok;
   } catch {
     return false;
@@ -286,7 +277,7 @@ async function main(): Promise<void> {
   console.log("╚════════════════════════════════════════════════════════════╝\n");
 
   // Check detector availability
-  console.log(`Detector URL: ${PRESIDIO_URL}`);
+  console.log(`Detector URL: ${DETECTOR_URL}`);
   console.log(`Threshold: ${threshold}`);
   if (languageFilter) {
     console.log(`Languages: ${languageFilter.join(", ")}`);

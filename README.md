@@ -52,7 +52,7 @@
 Run PasteGuard as a local proxy:
 
 ```bash
-docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
+docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:latest
 ```
 
 Point your tools or app to PasteGuard instead of the provider:
@@ -68,18 +68,7 @@ Point your tools or app to PasteGuard instead of the provider:
 client = OpenAI(base_url="http://localhost:3000/openai/v1")
 ```
 
-<details>
-<summary><strong>European Languages</strong></summary>
-
-For German, Spanish, French, Italian, Dutch, Polish, Portuguese, and Romanian:
-
-```bash
-docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
-```
-
-For custom config, persistent logs, or other languages: **[Read the docs →](https://pasteguard.com/docs/installation)**
-
-</details>
+Detection is multilingual out of the box — no per-language images or setup. For custom config or persistent logs: **[Read the docs →](https://pasteguard.com/docs/installation)**
 
 <details>
 <summary><strong>Route Mode</strong></summary>
@@ -128,20 +117,17 @@ Every request is logged with masking details. See what was detected, what was ma
 
 ## What it catches
 
-**Personal data** — Names, organizations, addresses, and locations (multilingual), plus emails, phone numbers, credit cards, IBANs, and IP addresses (international). Country-specific national IDs are added on top — currently Italian (Codice Fiscale, Partita IVA) and German (Steuernummer, USt-IdNr), and more can be added. Detection is language-agnostic.
+**Personal data** — Names, organizations, addresses, locations, emails, phone numbers, credit cards, IBANs, and IP addresses. Plus tax IDs like the Italian Codice Fiscale and German Steuernummer. Works in many languages.
 
 **Secrets** — API keys (OpenAI, Anthropic, Stripe, AWS, GitHub), SSH and PEM private keys, JWT tokens, bearer tokens, passwords, connection strings.
 
 Both detected and masked in real time, including streaming responses.
 
-## PII detection
+## How detection works
 
-Detection runs as a small service that speaks the `/analyze` HTTP contract, so it is a drop-in for the `presidio_url` setting (PasteGuard needs no code changes). It combines two layers:
+Detection runs as a separate service that PasteGuard calls over HTTP, so you can run it wherever you like. It mixes two things: exact checks with checksums (IBANs, tax IDs, credit cards, emails, phones) and a small AI model ([GLiNER](https://github.com/urchade/GLiNER)) for names, companies, addresses, and places. It works the same in any language.
 
-- **Deterministic** — regex candidates gated by checksum/format validation ([`python-stdnum`](https://arthurdejong.org/python-stdnum/), [`python-codicefiscale`](https://github.com/fabiocaccamo/python-codicefiscale), [`phonenumbers`](https://github.com/daviddrysdale/python-phonenumbers)). International by default: IBAN (any country), credit card, email, IP, phone. Plus country-specific national IDs, currently Italian (Codice Fiscale, Partita IVA) and German (Steuernummer, USt-IdNr) — extensible to other countries. Every match is validated, not guessed.
-- **Fuzzy** — multilingual [GLiNER](https://github.com/urchade/GLiNER) NER for person, location, organization, and address, in one language-agnostic pass (verified across EN/DE/IT/FR/ES/NL/PT and more). A national ID inside text written in another language is found regardless of the request language.
-
-Source, Docker image, and tests: [`detector/`](detector/). Apache-2.0; bundles GLiNER (Apache-2.0) and the `urchade/gliner_multi_pii-v1` model (Apache-2.0), with `python-stdnum` (LGPL-2.1), `python-codicefiscale` (MIT), and `phonenumbers` (Apache-2.0) as dependencies.
+Code, Docker image, and tests are in [`detector/`](detector/).
 
 ## Tech Stack
 

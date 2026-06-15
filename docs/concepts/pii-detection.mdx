@@ -10,7 +10,7 @@ PasteGuard detects PII with a small open-source service that pairs a determinist
 - **Deterministic layer** — regex candidates validated by checksum/format (`python-stdnum`, `python-codicefiscale`, `phonenumbers`). Owns the structured identifiers; every match is validated, not guessed, and scores `1.0`.
 - **Neural layer** — multilingual [GLiNER](https://github.com/urchade/GLiNER) NER for names, locations, organizations, and addresses, in one pass over the text.
 
-The detector speaks the `/analyze` HTTP contract, so it is configured through the `presidio_url` setting and runs as a separate service (see [`detector/`](https://github.com/sgasser/pasteguard/tree/main/detector)).
+The detector speaks the `/analyze` HTTP contract, is configured through the `detector_url` setting, and runs as a separate service (see [`detector/`](https://github.com/sgasser/pasteguard/tree/main/detector)).
 
 ## Supported Entities
 

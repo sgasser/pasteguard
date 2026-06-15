@@ -1,13 +1,11 @@
-"""Presidio-compatible /analyze service.
-
-Drop-in for the `presidio_url` PasteGuard speaks (src/pii/detect.ts):
+"""The /analyze service PasteGuard speaks (src/pii/detect.ts):
   POST /analyze  {text, language, entities?, score_threshold?}
                  -> [{entity_type, start, end, score}]  (offsets into text)
   GET  /health   -> 200
 
 The service is language-agnostic: every language returns 200 with a (possibly
-empty) array and never the Presidio `"No matching recognizers"` error, so the
-PasteGuard language probe always treats configured languages as supported.
+empty) array, so the PasteGuard language probe always treats configured
+languages as supported.
 """
 
 from __future__ import annotations

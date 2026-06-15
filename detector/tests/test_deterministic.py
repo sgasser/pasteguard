@@ -110,6 +110,12 @@ def test_email_rejects_malformed():
         assert all(t != EMAIL_ADDRESS for t, _ in types_texts(f"x {bad} y"))
 
 
+def test_email_unicode_local_part_no_partial_leak():
+    # Accented local parts must match in full, not leak a partial span.
+    assert (EMAIL_ADDRESS, "müller@example.com") in types_texts("an müller@example.com")
+    assert (EMAIL_ADDRESS, "andré.muller@example.fr") in types_texts("mail andré.muller@example.fr")
+
+
 def test_ipv4():
     assert (IP_ADDRESS, "8.8.8.8") in types_texts("Server IP is 8.8.8.8")
 

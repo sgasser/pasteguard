@@ -56,9 +56,9 @@ masking:
 
 # PII Detection settings (detector service, /analyze contract)
 pii_detection:
-  # Detector URL. The key name is kept for compatibility; point it at the
-  # detector service (see detector/).
-  presidio_url: ${PRESIDIO_URL:-http://detector:5002}
+  # URL of the detector service (see detector/). Defaults to localhost for local
+  # dev; docker-compose overrides it with the in-network hostname.
+  detector_url: ${DETECTOR_URL:-http://localhost:5002}
 
   # Detection is multilingual and language-agnostic — one model finds entities
   # regardless of the language. This list is only a hint (e.g. phone-number

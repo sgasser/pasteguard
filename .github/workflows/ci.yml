@@ -37,5 +37,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Build the all-in-one image users actually run (proxy + detector).
       - name: Test Docker build
         run: docker build -f docker/Dockerfile -t pasteguard:test .

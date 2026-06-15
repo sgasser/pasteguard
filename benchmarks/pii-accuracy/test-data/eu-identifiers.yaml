@@ -1,11 +1,10 @@
-# Critical-leak fixtures: DE/IT structured identifiers + cross-language routing.
+# European national identifiers + cross-language detection.
 #
-# These cases FAIL against the current Presidio :eu setup (single-language
-# routing skips the other language's recognizers, and there are no
-# checksum-validating recognizers for Codice Fiscale / Partita IVA /
-# Steuernummer / USt-IdNr). They are the acceptance target for the
-# GLiNER + regex/checksum detector (issue #96): once it lands, the same
-# `bun run benchmarks/pii-accuracy/run.ts` must go green.
+# Checksum-validated national IDs (Italian and German are the currently
+# supported set; more countries are extensible) plus identifiers that appear in
+# text written in another language (e.g. an Italian IBAN inside a German
+# letter), which the language-agnostic detector must catch regardless of the
+# request language.
 #
 # All identifiers are synthetic but checksum-valid (generated with
 # python-stdnum / python-codicefiscale), so the deterministic layer must

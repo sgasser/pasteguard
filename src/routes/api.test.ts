@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
 import { filterWhitelistedEntities, type PIIEntity } from "../pii/detect";
 
-// Mock the PII detector to avoid needing Presidio running
+// Mock the PII detector to avoid needing the detector running
 const mockDetectPII = mock<(text: string, language: string) => Promise<PIIEntity[]>>(() =>
   Promise.resolve([]),
 );
@@ -235,7 +235,7 @@ describe("POST /api/mask", () => {
   });
 
   test("returns 503 when PII detection fails", async () => {
-    mockDetectPII.mockRejectedValueOnce(new Error("Presidio connection failed"));
+    mockDetectPII.mockRejectedValueOnce(new Error("Detector connection failed"));
 
     const res = await app.request("/api/mask", {
       method: "POST",
@@ -249,7 +249,7 @@ describe("POST /api/mask", () => {
     };
     expect(body.error.type).toBe("detection_error");
     expect(body.error.message).toBe("PII detection failed");
-    expect(body.error.details[0].message).toBe("Presidio connection failed");
+    expect(body.error.details[0].message).toBe("Detector connection failed");
   });
 
   test("includes languageFallback in response", async () => {

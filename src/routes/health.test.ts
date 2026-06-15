@@ -9,7 +9,7 @@ describe("GET /health", () => {
   test("returns health status", async () => {
     const res = await app.request("/health");
 
-    // May be 200 (healthy) or 503 (degraded) depending on Presidio
+    // May be 200 (healthy) or 503 (degraded) depending on the detector
     expect([200, 503]).toContain(res.status);
 
     const body = (await res.json()) as Record<string, unknown>;

@@ -1,14 +1,14 @@
 """Entity types and the internal span representation.
 
-Entity type strings are Presidio-compatible so the detector is a drop-in for
-the `presidio_url` PasteGuard already speaks (see src/pii/detect.ts).
+Entity type strings are the labels PasteGuard expects on the /analyze response
+(see src/pii/detect.ts).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Presidio-compatible entity type strings.
+# Entity type strings returned on the /analyze response.
 PERSON = "PERSON"
 LOCATION = "LOCATION"
 ORGANIZATION = "ORGANIZATION"

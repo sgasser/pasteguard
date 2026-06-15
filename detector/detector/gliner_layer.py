@@ -67,6 +67,33 @@ _LABEL_TO_TYPE = {
 # Capture candidates below every floor so per-label filtering has them.
 _PREDICT_FLOOR = min(PER_LABEL_FLOOR.values()) - 0.1
 
+# GLiNER (incl. urchade/gliner_multi_pii-v1) SILENTLY truncates input past its
+# word-token limit (~384), so a long document or system prompt would drop all
+# PII past the cut — a fail-open leak. Chunk into overlapping token windows.
+# Token splitter mirrors GLiNER's WhitespaceTokenSplitter so window sizes match.
+_TOKEN_RE = re.compile(r"\w+(?:[-_]\w+)*|\S")
+_MAX_TOKENS = int(os.environ.get("DETECTOR_MAX_TOKENS", "384"))
+_WINDOW = max(64, _MAX_TOKENS - 64)  # headroom under the hard limit
+_OVERLAP = 64  # >= longest expected entity, so boundary-straddling spans survive
+
+
+def _windows(text: str):
+    """Yield (char_offset, subtext) windows. One window for short text; for long
+    text, overlapping windows of <= _WINDOW word-tokens."""
+    toks = [(m.start(), m.end()) for m in _TOKEN_RE.finditer(text)]
+    if len(toks) <= _MAX_TOKENS:
+        yield 0, text
+        return
+    step = max(1, _WINDOW - _OVERLAP)
+    i = 0
+    while i < len(toks):
+        window = toks[i : i + _WINDOW]
+        cstart, cend = window[0][0], window[-1][1]
+        yield cstart, text[cstart:cend]
+        if i + _WINDOW >= len(toks):
+            break
+        i += step
+
 _model = None
 _lock = threading.Lock()
 # PasteGuard issues concurrent /analyze calls (one per text span). Torch
@@ -96,30 +123,37 @@ def detect_gliner(text: str, score_threshold: float = 0.0) -> list[Span]:
     if not text:
         return []
     load_model()
-    with _infer_lock:
-        raw = _model.predict_entities(text, _LABELS, threshold=max(0.0, _PREDICT_FLOOR))
     n = len(text)
+    # Run each window, shift spans back to absolute offsets, dedupe overlaps
+    # (same span+label) keeping the max score.
+    best: dict[tuple[int, int, str], float] = {}
+    with _infer_lock:
+        for offset, sub in _windows(text):
+            for ent in _model.predict_entities(sub, _LABELS, threshold=max(0.0, _PREDICT_FLOOR)):
+                key = (offset + int(ent["start"]), offset + int(ent["end"]), ent["label"])
+                score = float(ent["score"])
+                if score > best.get(key, -1.0):
+                    best[key] = score
+
     out: list[Span] = []
-    for ent in raw:
-        label = ent["label"]
+    for (start, end, label), score in best.items():
         etype = _LABEL_TO_TYPE.get(label)
         if etype is None:
             continue
         floor = PER_LABEL_FLOOR[label]
         if label in _TUNABLE:
             floor = max(floor, score_threshold)
-        score = float(ent["score"])
         if score < floor:
             continue
-        if ent["text"].strip().lower() in _STOPWORDS:
-            continue
-        # Organizations must carry a legal-form designator (precision-first).
-        if label == "organization" and not _ORG_DESIGNATOR.search(ent["text"]):
-            continue
-        start, end = int(ent["start"]), int(ent["end"])
         # Guard against out-of-bounds offsets from model/tokenization bugs: a bad
         # span would make PasteGuard mask the wrong text. Drop it (fail safe).
         if not 0 <= start < end <= n:
+            continue
+        span_text = text[start:end]
+        if span_text.strip().lower() in _STOPWORDS:
+            continue
+        # Organizations must carry a legal-form designator (precision-first).
+        if label == "organization" and not _ORG_DESIGNATOR.search(span_text):
             continue
         out.append(Span(etype, start, end, score))
     return out

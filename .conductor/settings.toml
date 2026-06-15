@@ -9,7 +9,7 @@ fi
 mkdir -p data
 """
 run = """
-docker compose -p pasteguard-dev --profile dev up presidio -d
+docker compose -p pasteguard-dev --profile dev up detector -d
 CONDUCTOR_PORT=${CONDUCTOR_PORT:-3000} bun run dev
 """
 archive = "true"

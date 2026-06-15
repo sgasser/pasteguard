@@ -43,20 +43,20 @@ export interface PIIDetectionResult {
 }
 
 export class PIIDetector {
-  private presidioUrl: string;
+  private detectorUrl: string;
   private scoreThreshold: number;
   private entityTypes: string[];
   private languageValidation?: { available: string[]; missing: string[] };
 
   constructor() {
     const config = getConfig();
-    this.presidioUrl = config.pii_detection.presidio_url;
+    this.detectorUrl = config.pii_detection.detector_url;
     this.scoreThreshold = config.pii_detection.score_threshold;
     this.entityTypes = config.pii_detection.entities;
   }
 
   async detectPII(text: string, language: SupportedLanguage): Promise<PIIEntity[]> {
-    const analyzeEndpoint = `${this.presidioUrl}/analyze`;
+    const analyzeEndpoint = `${this.detectorUrl}/analyze`;
 
     const request: AnalyzeRequest = {
       text,
@@ -87,7 +87,7 @@ export class PIIDetector {
       if (error instanceof Error) {
         if (error.message.includes("fetch")) {
           throw new Error(
-            `Failed to connect to the PII detector at ${this.presidioUrl}: ${error.message}`,
+            `Failed to connect to the PII detector at ${this.detectorUrl}: ${error.message}`,
           );
         }
         throw error;
@@ -148,7 +148,7 @@ export class PIIDetector {
 
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.presidioUrl}/health`, {
+      const response = await fetch(`${this.detectorUrl}/health`, {
         method: "GET",
         signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS),
       });
@@ -159,7 +159,7 @@ export class PIIDetector {
   }
 
   /**
-   * Wait for Presidio to be ready (for docker-compose startup order)
+   * Wait for the detector to be ready (for docker-compose startup order)
    */
   async waitForReady(maxRetries = 30, delayMs = 1000): Promise<boolean> {
     for (let i = 1; i <= maxRetries; i++) {
@@ -169,7 +169,7 @@ export class PIIDetector {
       if (i < maxRetries) {
         // Show initial message, then every 5 attempts
         if (i === 1) {
-          process.stdout.write("[STARTUP] Waiting for Presidio");
+          process.stdout.write("[STARTUP] Waiting for the detector");
         } else if (i % 5 === 0) {
           process.stdout.write(".");
         }
@@ -181,11 +181,13 @@ export class PIIDetector {
   }
 
   /**
-   * Test if a language is supported by trying to analyze with it
+   * Test if a language is supported by trying to analyze with it. The detector
+   * is language-agnostic and answers 200 for any language, so a successful
+   * response means supported; any error means not.
    */
   async isLanguageSupported(language: string): Promise<boolean> {
     try {
-      const response = await fetch(`${this.presidioUrl}/analyze`, {
+      const response = await fetch(`${this.detectorUrl}/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -198,14 +200,7 @@ export class PIIDetector {
         signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS),
       });
 
-      // If we get a response (even empty array), the language is supported
-      // If we get an error like "No matching recognizers", it's not supported
-      if (response.ok) {
-        return true;
-      }
-
-      const errorText = await response.text();
-      return !errorText.includes("No matching recognizers");
+      return response.ok;
     } catch {
       return false;
     }

@@ -1,39 +1,36 @@
 # PasteGuard - Docker Compose
 #
-# Production:
+# Production (all-in-one: proxy + detector in one container):
 #   docker compose up -d
 #
 # Development (detector in Docker, proxy locally with hot-reload):
 #   docker compose up detector -d
 #   bun run dev
 #
-# Detection runs as a separate service (detector/) that speaks the /analyze
-# contract. The proxy image carries no Presidio.
+# The published image bundles the proxy and the PII detector. The standalone
+# `detector` service below exists only for local development, so the proxy can
+# run from source (`bun run dev`) against it without rebuilding the full image.
 
 services:
   pasteguard:
-    image: ghcr.io/sgasser/pasteguard:proxy
+    image: ghcr.io/sgasser/pasteguard:latest
     build:
       context: .
-      dockerfile: docker/Dockerfile.proxy
+      dockerfile: docker/Dockerfile
     ports:
       - "3000:3000"
-    environment:
-      - PRESIDIO_URL=http://detector:5002
     env_file:
       - path: .env
         required: false
     volumes:
       - ./config.yaml:/pasteguard/config.yaml:ro
       - ./data:/pasteguard/data
-    depends_on:
-      detector:
-        condition: service_healthy
     restart: unless-stopped
 
-  # PII detection service — deterministic regex/checksum + multilingual GLiNER.
+  # Development only: the PII detector on its own, for `bun run dev`.
+  # Point the local proxy at it with DETECTOR_URL=http://localhost:5002.
   detector:
-    image: ghcr.io/sgasser/pasteguard-detector:latest
+    profiles: ["dev"]
     build:
       context: ./detector
     ports:
