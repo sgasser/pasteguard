@@ -14,7 +14,7 @@ def test_org_designator_matches_real_company_forms():
         "Globex Corporation",
         "Acme Holding AG",
         "Rossi e Associati",
-        "Sparkasse Bozen",
+        "Sparkasse Köln",
     ):
         assert _ORG_DESIGNATOR.search(org), org
 
