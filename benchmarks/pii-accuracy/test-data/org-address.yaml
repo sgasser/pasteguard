@@ -1,0 +1,50 @@
+# Organization and address fixtures (synthetic names only).
+#
+# These exercise the GLiNER organization/address labels added to close the gap
+# where company names and street addresses were not masked. Org uses a high
+# floor (~0.80) and a stoplist to suppress business-jargon false positives
+# (e.g. "Lieferung", "Sede legale"); addresses use a lower floor (~0.55).
+
+test_cases:
+  # --- Organizations ---
+  - id: orgaddr_org_de
+    text: "Die Rechnung kommt von der Muster Steuerberatung GmbH."
+    language: de
+    expected:
+      - type: ORGANIZATION
+        text: "Muster Steuerberatung GmbH"
+
+  - id: orgaddr_org_it
+    text: "Fattura emessa da Studio Bianchi S.r.l."
+    language: it
+    expected:
+      - type: ORGANIZATION
+        text: "Studio Bianchi S.r.l."
+
+  - id: orgaddr_org_en
+    text: "Invoice from Globex Corporation for services."
+    language: en
+    expected:
+      - type: ORGANIZATION
+        text: "Globex Corporation"
+
+  # --- Addresses ---
+  - id: orgaddr_addr_de
+    text: "Anschrift: Musterweg 4, 10115 Berlin"
+    language: de
+    expected:
+      - type: ADDRESS
+        text: "Musterweg 4, 10115 Berlin"
+
+  - id: orgaddr_addr_it
+    text: "Indirizzo: Via Garibaldi 15, 20121 Milano"
+    language: it
+    expected:
+      - type: ADDRESS
+        text: "Via Garibaldi 15, 20121 Milano"
+
+  # --- Negative: business jargon must not be flagged as org/address ---
+  - id: orgaddr_jargon_fp
+    text: "Bitte beachten Sie die Lieferung und Rechnung."
+    language: de
+    expected: []
