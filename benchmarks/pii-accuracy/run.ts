@@ -65,10 +65,9 @@ const threshold = args.threshold ? Number.parseFloat(args.threshold) : DEFAULT_T
 const verbose = args.verbose ?? false;
 const languageFilter = args.languages?.split(",").map((l) => l.trim().toLowerCase());
 
-// Entity types we test for. Includes the DE/IT structured identifiers
-// (Codice Fiscale, Partita IVA, Steuernummer, USt-IdNr) that the new detector
-// must support; vanilla Presidio has no recognizers for these, so they show as
-// false negatives until the GLiNER + regex detector (issue #96) lands.
+// Entity types we request, including organization/address and the
+// country-specific national IDs (Codice Fiscale, Partita IVA, Steuernummer,
+// USt-IdNr) that the detector supports.
 const ENTITY_TYPES = [
   "PERSON",
   "EMAIL_ADDRESS",
@@ -120,7 +119,7 @@ async function loadTestCases(): Promise<TestCase[]> {
 }
 
 /**
- * Call Presidio analyzer API
+ * Call the detector /analyze API
  */
 async function detectPII(text: string, language: string): Promise<DetectedEntity[]> {
   if (!text) return [];
@@ -164,9 +163,9 @@ async function detectPII(text: string, language: string): Promise<DetectedEntity
 }
 
 /**
- * Check if Presidio is available
+ * Check if the detector is available
  */
-async function checkPresidio(): Promise<boolean> {
+async function checkDetector(): Promise<boolean> {
   try {
     const response = await fetch(`${PRESIDIO_URL}/health`);
     return response.ok;
@@ -286,19 +285,19 @@ async function main(): Promise<void> {
   console.log("║           PII Detection Accuracy Benchmark                 ║");
   console.log("╚════════════════════════════════════════════════════════════╝\n");
 
-  // Check Presidio availability
-  console.log(`Presidio URL: ${PRESIDIO_URL}`);
+  // Check detector availability
+  console.log(`Detector URL: ${PRESIDIO_URL}`);
   console.log(`Threshold: ${threshold}`);
   if (languageFilter) {
     console.log(`Languages: ${languageFilter.join(", ")}`);
   }
 
-  if (!(await checkPresidio())) {
-    console.error("\n✗ Presidio is not available. Start it with:");
-    console.error("  docker compose up presidio-analyzer -d\n");
+  if (!(await checkDetector())) {
+    console.error("\n✗ Detector is not available. Start it with:");
+    console.error("  docker compose up detector -d\n");
     process.exit(1);
   }
-  console.log("Presidio: ✓ Connected\n");
+  console.log("Detector: ✓ Connected\n");
 
   // Load test cases from directory
   const testCases = await loadTestCases();

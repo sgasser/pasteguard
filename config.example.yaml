@@ -54,19 +54,15 @@ masking:
   # whitelist:
   #   - "Company Name Inc."
 
-# PII Detection settings (Microsoft Presidio)
+# PII Detection settings (detector service, /analyze contract)
 pii_detection:
-  presidio_url: ${PRESIDIO_URL:-http://localhost:5002}
+  # Detector URL. The key name is kept for compatibility; point it at the
+  # detector service (see detector/).
+  presidio_url: ${PRESIDIO_URL:-http://detector:5002}
 
-  # Supported languages for PII detection
-  # Auto-detects language from input text and uses appropriate model
-  #
-  # Docker: Uses PASTEGUARD_LANGUAGES env var (auto-configured per image)
-  # Local:  Uncomment the array below and comment out the env var line
-  #
-  # Available (24 languages): ca, zh, hr, da, nl, en, fi, fr, de, el,
-  #   it, ja, ko, lt, mk, nb, pl, pt, ro, ru, sl, es, sv, uk
-  # See docker/presidio/languages.yaml for full list with details
+  # Detection is multilingual and language-agnostic — one model finds entities
+  # regardless of the language. This list is only a hint (e.g. phone-number
+  # region) and the language reported in headers; it does not gate detection.
   languages: ${PASTEGUARD_LANGUAGES:-en}
   # languages:
   #   - en
@@ -80,22 +76,22 @@ pii_detection:
 
   score_threshold: 0.7  # Minimum confidence score (0.0 - 1.0)
 
-  # Entity types to detect
-  # See: https://microsoft.github.io/presidio/supported_entities/
+  # Entity types to return
   entities:
     - PERSON
+    - ORGANIZATION
+    - ADDRESS
+    - LOCATION
     - EMAIL_ADDRESS
     - PHONE_NUMBER
     - CREDIT_CARD
     - IBAN_CODE
     - IP_ADDRESS
-    - LOCATION
-    # - US_SSN
-    # - US_PASSPORT
-    # - CRYPTO
-    # - NRP  # National Registration Number
-    # - MEDICAL_LICENSE
-    # - URL
+    # Country-specific national IDs (checksum-validated; more can be added):
+    - IT_FISCAL_CODE  # Italian Codice Fiscale
+    - IT_VAT_CODE     # Italian Partita IVA
+    - DE_TAX_CODE     # German Steuernummer
+    - DE_VAT_CODE     # German USt-IdNr
 
   # Which message roles to scan for PII (optional)
   # By default, all roles are scanned. Set this to scan only user-controlled content:

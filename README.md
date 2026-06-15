@@ -128,7 +128,7 @@ Every request is logged with masking details. See what was detected, what was ma
 
 ## What it catches
 
-**Personal data** — Names, organizations, addresses, locations, emails, phone numbers, credit cards, IBANs, IP addresses, and EU tax identifiers (Italian Codice Fiscale and Partita IVA, German Steuernummer and USt-IdNr). Multilingual and language-agnostic.
+**Personal data** — Names, organizations, addresses, and locations (multilingual), plus emails, phone numbers, credit cards, IBANs, and IP addresses (international). Country-specific national IDs are added on top — currently Italian (Codice Fiscale, Partita IVA) and German (Steuernummer, USt-IdNr), and more can be added. Detection is language-agnostic.
 
 **Secrets** — API keys (OpenAI, Anthropic, Stripe, AWS, GitHub), SSH and PEM private keys, JWT tokens, bearer tokens, passwords, connection strings.
 
@@ -138,8 +138,8 @@ Both detected and masked in real time, including streaming responses.
 
 Detection runs as a small service that speaks the `/analyze` HTTP contract, so it is a drop-in for the `presidio_url` setting (PasteGuard needs no code changes). It combines two layers:
 
-- **Deterministic** — regex candidates gated by checksum/format validation ([`python-stdnum`](https://arthurdejong.org/python-stdnum/), [`python-codicefiscale`](https://github.com/fabiocaccamo/python-codicefiscale), [`phonenumbers`](https://github.com/daviddrysdale/python-phonenumbers)): IBAN, Codice Fiscale, Partita IVA, Steuernummer, USt-IdNr, credit card, email, IP, phone. Every match is validated, not guessed.
-- **Fuzzy** — multilingual [GLiNER](https://github.com/urchade/GLiNER) NER for person, location, organization, and address, in one language-agnostic pass. An Italian Codice Fiscale inside German text is found regardless of the request language.
+- **Deterministic** — regex candidates gated by checksum/format validation ([`python-stdnum`](https://arthurdejong.org/python-stdnum/), [`python-codicefiscale`](https://github.com/fabiocaccamo/python-codicefiscale), [`phonenumbers`](https://github.com/daviddrysdale/python-phonenumbers)). International by default: IBAN (any country), credit card, email, IP, phone. Plus country-specific national IDs, currently Italian (Codice Fiscale, Partita IVA) and German (Steuernummer, USt-IdNr) — extensible to other countries. Every match is validated, not guessed.
+- **Fuzzy** — multilingual [GLiNER](https://github.com/urchade/GLiNER) NER for person, location, organization, and address, in one language-agnostic pass (verified across EN/DE/IT/FR/ES/NL/PT and more). A national ID inside text written in another language is found regardless of the request language.
 
 Source, Docker image, and tests: [`detector/`](detector/). Apache-2.0; bundles GLiNER (Apache-2.0) and the `urchade/gliner_multi_pii-v1` model (Apache-2.0), with `python-stdnum` (LGPL-2.1), `python-codicefiscale` (MIT), and `phonenumbers` (Apache-2.0) as dependencies.
 

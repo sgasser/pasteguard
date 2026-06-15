@@ -1,58 +1,51 @@
 ---
 title: PII Detection
-description: Personal data detection powered by Microsoft Presidio
+description: Personal data detection via a deterministic checksum layer plus multilingual GLiNER NER
 ---
 
-PasteGuard uses Microsoft Presidio for PII detection, supporting 24 languages with automatic language detection.
+PasteGuard detects PII with a small open-source service that pairs a deterministic regex/checksum layer with a multilingual neural model. Detection is **language-agnostic**: an Italian Codice Fiscale inside German text is found regardless of the request language.
+
+## How it works
+
+- **Deterministic layer** — regex candidates validated by checksum/format (`python-stdnum`, `python-codicefiscale`, `phonenumbers`). Owns the structured identifiers; every match is validated, not guessed, and scores `1.0`.
+- **Neural layer** — multilingual [GLiNER](https://github.com/urchade/GLiNER) NER for names, locations, organizations, and addresses, in one pass over the text.
+
+The detector speaks the `/analyze` HTTP contract, so it is configured through the `presidio_url` setting and runs as a separate service (see [`detector/`](https://github.com/sgasser/pasteguard/tree/main/detector)).
 
 ## Supported Entities
 
 | Entity | Examples |
 |--------|----------|
 | `PERSON` | Dr. Sarah Chen, John Smith |
+| `ORGANIZATION` | Muster Steuerberatung GmbH, Studio Bianchi S.r.l. |
+| `LOCATION` | New York, München, Milano |
+| `ADDRESS` | Musterweg 4, 10115 Berlin |
 | `EMAIL_ADDRESS` | sarah.chen@hospital.org |
-| `PHONE_NUMBER` | +1-555-123-4567 |
-| `CREDIT_CARD` | 4111-1111-1111-1111 |
+| `PHONE_NUMBER` | +49 171 1234567 |
 | `IBAN_CODE` | DE89 3704 0044 0532 0130 00 |
+| `CREDIT_CARD` | 4111 1111 1111 1111 |
 | `IP_ADDRESS` | 192.168.1.1 |
-| `LOCATION` | New York, 123 Main St |
-| `US_SSN` | 123-45-6789 |
-| `US_PASSPORT` | 123456789 |
-| `CRYPTO` | Bitcoin addresses |
-| `URL` | https://example.com |
+| `IT_FISCAL_CODE` | Italian Codice Fiscale |
+| `IT_VAT_CODE` | Italian Partita IVA |
+| `DE_TAX_CODE` | German Steuernummer |
+| `DE_VAT_CODE` | German USt-IdNr |
 
-## Language Support
+Names, organizations, locations, and addresses are detected by the multilingual model (verified across EN/DE/IT/FR/ES/NL/PT and more). IBAN, credit card, phone, email, and IP work internationally. National tax/fiscal IDs are country-specific — currently Italian (Codice Fiscale, Partita IVA) and German (Steuernummer, USt-IdNr), with more easily added. All structured identifiers are checksum-validated, so they are caught with high precision and without false positives on lookalike numbers.
 
-PasteGuard supports 24 languages. The language is auto-detected from your input text.
+## Languages
 
-**Available languages:** Catalan, Chinese, Croatian, Danish, Dutch, English, Finnish, French, German, Greek, Italian, Japanese, Korean, Lithuanian, Macedonian, Norwegian, Polish, Portuguese, Romanian, Russian, Slovenian, Spanish, Swedish, Ukrainian
-
-### Docker Images
-
-Languages are auto-configured per image — no config changes needed:
-
-- **`:en` image** → English only
-- **`:eu` image** → English, German, Spanish, French, Italian, Dutch, Polish, Portuguese, Romanian
-
-For custom languages, build locally:
-
-```bash
-LANGUAGES=en,de,ja docker compose up -d --build
-```
-
-If only one language is configured, language detection is skipped for better performance.
+Detection is multilingual and **language-agnostic** — one pass over the text finds entities regardless of the language it is written in, so mixed-language documents (for example Italian client identifiers in a German letter) are handled correctly. The `language` field in a request is used only as a hint, e.g. to pick a phone-number region; it does not gate detection.
 
 ## Confidence Scoring
 
-Each detected entity has a confidence score (0.0 - 1.0). The default threshold is 0.7.
-
-- **Higher threshold** = fewer false positives, might miss some PII
-- **Lower threshold** = catches more PII, more false positives
+Neural detections carry a confidence score (0.0–1.0); checksum-validated identifiers are always `1.0`. The default request threshold is `0.7`:
 
 ```yaml
 pii_detection:
   score_threshold: 0.7
 ```
+
+Each neural label also has a calibrated floor (person, location, organization, address) so high-precision labels and faint-but-important ones can coexist. Tune them per deployment via `DETECTOR_FLOOR_*` environment variables on the detector.
 
 ## Response Headers
 

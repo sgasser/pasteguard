@@ -78,7 +78,7 @@ export class PIIDetector {
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(
-          `Presidio API error: ${response.status} ${response.statusText} - ${errorText}`,
+          `Detector API error: ${response.status} ${response.statusText} - ${errorText}`,
         );
       }
 
@@ -86,7 +86,9 @@ export class PIIDetector {
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes("fetch")) {
-          throw new Error(`Failed to connect to Presidio at ${this.presidioUrl}: ${error.message}`);
+          throw new Error(
+            `Failed to connect to the PII detector at ${this.presidioUrl}: ${error.message}`,
+          );
         }
         throw error;
       }

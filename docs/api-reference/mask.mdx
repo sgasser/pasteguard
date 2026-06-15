@@ -190,7 +190,7 @@ const unmasked = unmask(llmResponse, context);
 
 ### Detection Error (503)
 
-Returned when Presidio or secrets detection is unavailable:
+Returned when the PII detector or secrets detection is unavailable:
 
 ```json
 {
@@ -198,7 +198,7 @@ Returned when Presidio or secrets detection is unavailable:
     "message": "PII detection failed",
     "type": "detection_error",
     "details": [
-      { "message": "Failed to connect to Presidio..." }
+      { "message": "Failed to connect to the PII detector..." }
     ]
   }
 }

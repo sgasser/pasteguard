@@ -5,69 +5,53 @@ description: Configure PII detection settings
 
 ```yaml
 pii_detection:
-  presidio_url: http://localhost:5002
-  languages: ${PASTEGUARD_LANGUAGES:-en}  # Auto-configured per Docker image
+  presidio_url: http://detector:5002
+  languages:
+    - en
+    - de
+    - it
   fallback_language: en
   score_threshold: 0.7
   entities:
     - PERSON
+    - ORGANIZATION
+    - ADDRESS
+    - LOCATION
     - EMAIL_ADDRESS
     - PHONE_NUMBER
     - CREDIT_CARD
     - IBAN_CODE
     - IP_ADDRESS
-    - LOCATION
+    - IT_FISCAL_CODE
+    - IT_VAT_CODE
+    - DE_TAX_CODE
+    - DE_VAT_CODE
 ```
 
 ## Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `presidio_url` | `http://localhost:5002` | Presidio analyzer URL |
-| `languages` | (per image) | Languages to detect. Auto-configured in Docker images |
-| `fallback_language` | `en` | Fallback if detected language not in list |
-| `score_threshold` | `0.7` | Minimum confidence (0.0-1.0) |
-| `entities` | See below | Entity types to detect |
+| `presidio_url` | `http://detector:5002` | Detector `/analyze` URL (Presidio-compatible; the key name is kept for compatibility) |
+| `languages` | `["en"]` | Languages the proxy auto-detects among (used as a hint, e.g. phone region) |
+| `fallback_language` | `en` | Language hint used when none is detected |
+| `score_threshold` | `0.7` | Minimum confidence for neural detections (0.0-1.0) |
+| `entities` | See below | Entity types to return |
 
 ## Languages
 
-Languages are auto-configured per Docker image:
+Detection is **multilingual and language-agnostic** — one model finds entities regardless of the language the text is written in, so an Italian Codice Fiscale inside a German letter is caught. There are no per-language images and no spaCy models to load.
 
-- **`:en` image** → English only
-- **`:eu` image** → English, German, Spanish, French, Italian, Dutch, Polish, Portuguese, Romanian
-
-Each language adds ~10s to startup time as spaCy models are loaded.
-
-For custom language builds:
-
-```bash
-LANGUAGES=en,de,ja docker compose up -d --build
-```
-
-Available languages (24):
-`ca`, `zh`, `hr`, `da`, `nl`, `en`, `fi`, `fr`, `de`, `el`, `it`, `ja`, `ko`, `lt`, `mk`, `nb`, `pl`, `pt`, `ro`, `ru`, `sl`, `es`, `sv`, `uk`
-
-### Override Languages
-
-For local development or custom setups, override via config:
+The `languages` list and `fallback_language` only control the language *hint* the proxy sends with each request (which the detector uses for things like phone-number region); they do not gate detection.
 
 ```yaml
 pii_detection:
   languages:
     - en
     - de
+    - it
+  fallback_language: de
 ```
-
-### Fallback Language
-
-If the detected language isn't in your configured list, the fallback is used:
-
-```yaml
-pii_detection:
-  fallback_language: en  # Used for unsupported languages
-```
-
-### Performance
 
 If only one language is configured, language detection is skipped for better performance.
 
@@ -76,20 +60,24 @@ If only one language is configured, language detection is skipped for better per
 | Entity | Examples |
 |--------|----------|
 | `PERSON` | Dr. Sarah Chen, John Smith |
+| `ORGANIZATION` | Muster Steuerberatung GmbH, Studio Bianchi S.r.l. |
+| `ADDRESS` | Musterweg 4, 10115 Berlin |
+| `LOCATION` | New York, München |
 | `EMAIL_ADDRESS` | sarah.chen@hospital.org |
-| `PHONE_NUMBER` | +1-555-123-4567 |
-| `CREDIT_CARD` | 4111-1111-1111-1111 |
+| `PHONE_NUMBER` | +49 171 1234567 |
+| `CREDIT_CARD` | 4111 1111 1111 1111 |
 | `IBAN_CODE` | DE89 3704 0044 0532 0130 00 |
 | `IP_ADDRESS` | 192.168.1.1 |
-| `LOCATION` | New York, 123 Main St |
-| `US_SSN` | 123-45-6789 |
-| `US_PASSPORT` | 123456789 |
-| `CRYPTO` | Bitcoin addresses |
-| `URL` | https://example.com |
+| `IT_FISCAL_CODE` | Italian Codice Fiscale |
+| `IT_VAT_CODE` | Italian Partita IVA |
+| `DE_TAX_CODE` | German Steuernummer |
+| `DE_VAT_CODE` | German USt-IdNr |
+
+Names, organizations, locations, and addresses are multilingual. IBAN, credit card, phone, email, and IP are international. National tax/fiscal IDs are country-specific (currently Italy and Germany, extensible). All structured identifiers are checksum-validated, so they are caught with high precision and without false positives on lookalike numbers.
 
 ## Score Threshold
 
-Higher = fewer false positives, might miss some PII. Lower = catches more PII, more false positives.
+Higher = fewer false positives, might miss some PII. Lower = catches more PII, more false positives. Checksum-validated identifiers are always reported (score `1.0`).
 
 ```yaml
 pii_detection:
@@ -97,6 +85,8 @@ pii_detection:
   # score_threshold: 0.5  # More aggressive
   # score_threshold: 0.9  # More conservative
 ```
+
+Each neural label also has a calibrated floor; tune per deployment via `DETECTOR_FLOOR_*` environment variables on the detector service (e.g. `DETECTOR_FLOOR_ADDRESS=0.6`).
 
 ## Whitelist
 
@@ -131,4 +121,4 @@ pii_detection:
 | `tool` | Tool/function call results |
 | `function` | Legacy function results (OpenAI) |
 
-This reduces Presidio API calls for large system prompts and avoids false positives on app-controlled content.
+This reduces detector calls for large system prompts and avoids false positives on app-controlled content.
