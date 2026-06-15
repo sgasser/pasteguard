@@ -1,40 +1,40 @@
 ---
 title: Installation
-description: Docker images and deployment options
+description: Docker image and deployment options
 ---
 
-PasteGuard provides prebuilt Docker images for quick deployment. No build step required.
+PasteGuard ships as a single all-in-one Docker image — the Bun proxy and the PII
+detector (deterministic regex/checksum + multilingual GLiNER) run together in one
+container. No build step required.
 
 ## Docker Image
-
-PasteGuard is a single all-in-one container that includes both the proxy and PII detection:
 
 ```
 ghcr.io/sgasser/pasteguard
 ```
 
-| Tag | Languages | Size | Use Case |
-|-----|-----------|------|----------|
-| `en` / `latest` | English | ~2.7GB | Default, English-only teams |
-| `eu` | en, de, es, fr, it, nl, pl, pt, ro | ~12GB | European businesses |
+| Tag | Description |
+|-----|-------------|
+| `latest` | Latest release |
+| `vX.Y.Z` | Pinned release version |
+
+Detection is multilingual and language-agnostic — one model finds entities
+regardless of the language the text is written in, so there are no per-language
+image variants.
 
 ## Quick Start
 
 ```bash
-docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
+docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:latest
 ```
 
-Dashboard: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
+PasteGuard runs on `http://localhost:3000`. Open
+[http://localhost:3000/dashboard](http://localhost:3000/dashboard) for the dashboard.
 
-## European Languages
-
-For German, Spanish, French, Italian, Dutch, Polish, Portuguese, and Romanian:
-
-```bash
-docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
-```
-
-Languages are auto-configured per image — no config changes needed. The EU image automatically enables all 9 European languages.
+<Note>
+The first start loads the detection model and can take a little longer; the
+container reports healthy once both the proxy and the detector are ready.
+</Note>
 
 ## Production Setup
 
@@ -52,55 +52,33 @@ mkdir -p data
 docker run -d --name pasteguard --restart unless-stopped -p 3000:3000 \
   -v ./config.yaml:/pasteguard/config.yaml:ro \
   -v ./data:/pasteguard/data \
-  ghcr.io/sgasser/pasteguard:en
+  ghcr.io/sgasser/pasteguard:latest
 ```
 
 This gives you:
 - **Custom config** — edit `config.yaml` to change detection settings
 - **Persistent logs** — request history in `data/pasteguard.db` survives restarts
-- **Auto-restart** — container restarts automatically
+- **Auto-restart** — the container restarts automatically
 
-## Custom Language Builds
-
-For languages not in prebuilt images (Nordic, Asian, Eastern European), clone and build:
+Or with Docker Compose:
 
 ```bash
-git clone https://github.com/sgasser/pasteguard.git
-cd pasteguard
-LANGUAGES=en,de,ja docker compose up -d --build
+curl -O https://raw.githubusercontent.com/sgasser/pasteguard/main/docker-compose.yml
+docker compose up -d
 ```
 
-### Available Languages (24)
+## Languages
 
-| Code | Language | Code | Language |
-|------|----------|------|----------|
-| `en` | English | `ja` | Japanese |
-| `de` | German | `ko` | Korean |
-| `fr` | French | `zh` | Chinese |
-| `es` | Spanish | `sv` | Swedish |
-| `it` | Italian | `da` | Danish |
-| `nl` | Dutch | `nb` | Norwegian |
-| `pt` | Portuguese | `fi` | Finnish |
-| `pl` | Polish | `el` | Greek |
-| `ru` | Russian | `ro` | Romanian |
-| `uk` | Ukrainian | `hr` | Croatian |
-| `ca` | Catalan | `sl` | Slovenian |
-| `lt` | Lithuanian | `mk` | Macedonian |
+Detection is multilingual and needs no per-language configuration. The `languages`
+and `fallback_language` settings only set a hint sent with each request (e.g. for
+phone-number region) — see [PII Detection Config](/configuration/pii-detection).
 
 ## Environment Variables
 
-**Runtime (docker run):**
-
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PASTEGUARD_LANGUAGES` | (per image) | Override enabled languages at runtime |
-
-**Build-time (docker compose build):**
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PASTEGUARD_TAG` | `en` | Image tag for docker compose |
-| `LANGUAGES` | `en` | Languages to include when building locally |
+| `DETECTOR_URL` | `http://localhost:5002` | Where the proxy reaches the detector. In the all-in-one image this is in-container and rarely changed; override it to point at an external detector. |
+| `PASTEGUARD_STARTUP_TIMEOUT` | `180` | Seconds to wait for the detector to become ready at startup |
 
 ## Next Steps
 

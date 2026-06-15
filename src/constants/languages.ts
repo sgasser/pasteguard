@@ -1,6 +1,6 @@
 /**
- * All 24 spaCy languages with trained pipelines
- * See docker/presidio/languages.yaml for full list
+ * Languages the proxy can detect and send as a hint to the detector.
+ * Detection itself is language-agnostic; this list only gates the hint.
  */
 export const SUPPORTED_LANGUAGES = [
   "ca", // Catalan

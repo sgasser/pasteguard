@@ -31,6 +31,9 @@ logs/
 *.swo
 .DS_Store
 
+# Agent tooling
+.gstack/
+
 # Bun
 bun.lockb
 

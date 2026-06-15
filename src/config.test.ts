@@ -23,7 +23,7 @@ providers:
   openai: {}
   anthropic: {}
 pii_detection:
-  presidio_url: http://localhost:5002
+  detector_url: http://localhost:5002
 `);
 
     try {
@@ -44,7 +44,7 @@ providers:
   codex:
     base_url: http://localhost:4000/codex
 pii_detection:
-  presidio_url: http://localhost:5002
+  detector_url: http://localhost:5002
 `);
 
     try {

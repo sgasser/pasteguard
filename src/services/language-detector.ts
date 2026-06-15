@@ -11,8 +11,8 @@ export interface LanguageDetectionResult {
   confidence?: number;
 }
 
-// Special case mapping: Norwegian detected as "no" but Presidio expects "nb"
-const ISO_TO_PRESIDIO_OVERRIDES: Record<string, SupportedLanguage> = {
+// Map detected ISO codes onto the supported-language list where they differ.
+const ISO_TO_SUPPORTED_OVERRIDES: Record<string, SupportedLanguage> = {
   no: "nb", // Norwegian (generic) → Norwegian Bokmål
 };
 
@@ -33,12 +33,12 @@ export class LanguageDetector {
     const confidence = scores[detectedIso] ?? 0;
 
     // Use override if exists, otherwise use the detected code as-is (most are 1:1)
-    const presidioLang = (ISO_TO_PRESIDIO_OVERRIDES[detectedIso] ||
+    const mappedLang = (ISO_TO_SUPPORTED_OVERRIDES[detectedIso] ||
       detectedIso) as SupportedLanguage;
 
-    if (presidioLang && this.configuredLanguages.includes(presidioLang)) {
+    if (mappedLang && this.configuredLanguages.includes(mappedLang)) {
       return {
-        language: presidioLang,
+        language: mappedLang,
         usedFallback: false,
         detectedLanguage: detectedIso,
         confidence,

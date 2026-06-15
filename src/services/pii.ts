@@ -62,7 +62,7 @@ export type { PIIDetectionResult, PIIEntity } from "../pii/detect";
 export { createMaskingContext } from "../pii/mask";
 
 /**
- * Check if Presidio is healthy
+ * Check if the detector is healthy
  */
 export async function healthCheck(): Promise<boolean> {
   const detector = getPIIDetector();

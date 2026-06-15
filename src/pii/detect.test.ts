@@ -5,7 +5,7 @@ import { filterWhitelistedEntities, PIIDetector } from "./detect";
 
 const originalFetch = globalThis.fetch;
 
-function mockPresidio(
+function mockDetector(
   responses: Record<
     string,
     Array<{ entity_type: string; start: number; end: number; score: number }>
@@ -52,7 +52,7 @@ describe("PIIDetector", () => {
 
   describe("analyzeRequest", () => {
     test("scans all message roles", async () => {
-      mockPresidio({
+      mockDetector({
         "system-pii": [{ entity_type: "PERSON", start: 0, end: 10, score: 0.9 }],
         "user-pii": [{ entity_type: "EMAIL_ADDRESS", start: 0, end: 8, score: 0.9 }],
         "assistant-pii": [{ entity_type: "PHONE_NUMBER", start: 0, end: 13, score: 0.9 }],
@@ -75,7 +75,7 @@ describe("PIIDetector", () => {
     });
 
     test("detects PII in system message when user message has none", async () => {
-      mockPresidio({
+      mockDetector({
         "John Doe": [{ entity_type: "PERSON", start: 18, end: 26, score: 0.95 }],
       });
 
@@ -93,7 +93,7 @@ describe("PIIDetector", () => {
     });
 
     test("detects PII in earlier user message", async () => {
-      mockPresidio({
+      mockDetector({
         "secret@email.com": [{ entity_type: "EMAIL_ADDRESS", start: 12, end: 28, score: 0.99 }],
       });
 
@@ -111,7 +111,7 @@ describe("PIIDetector", () => {
     });
 
     test("returns empty result for no messages", async () => {
-      mockPresidio({});
+      mockDetector({});
 
       const detector = new PIIDetector();
       const request = createRequest([]);
@@ -124,7 +124,7 @@ describe("PIIDetector", () => {
     });
 
     test("handles multimodal content", async () => {
-      mockPresidio({
+      mockDetector({
         "Hans Müller": [{ entity_type: "PERSON", start: 0, end: 11, score: 0.9 }],
       });
 
@@ -148,7 +148,7 @@ describe("PIIDetector", () => {
     });
 
     test("skips messages with empty content", async () => {
-      mockPresidio({
+      mockDetector({
         test: [{ entity_type: "PERSON", start: 0, end: 4, score: 0.9 }],
       });
 
@@ -167,8 +167,8 @@ describe("PIIDetector", () => {
   });
 
   describe("detectPII", () => {
-    test("returns entities from Presidio", async () => {
-      mockPresidio({
+    test("returns entities from the detector", async () => {
+      mockDetector({
         "test@example.com": [{ entity_type: "EMAIL_ADDRESS", start: 0, end: 16, score: 0.99 }],
       });
 
@@ -180,7 +180,7 @@ describe("PIIDetector", () => {
     });
 
     test("returns empty array for text without PII", async () => {
-      mockPresidio({});
+      mockDetector({});
 
       const detector = new PIIDetector();
       const entities = await detector.detectPII("Hello world", "en");
@@ -190,8 +190,8 @@ describe("PIIDetector", () => {
   });
 
   describe("healthCheck", () => {
-    test("returns true when Presidio is healthy", async () => {
-      mockPresidio({});
+    test("returns true when the detector is healthy", async () => {
+      mockDetector({});
 
       const detector = new PIIDetector();
       const healthy = await detector.healthCheck();
@@ -199,7 +199,7 @@ describe("PIIDetector", () => {
       expect(healthy).toBe(true);
     });
 
-    test("returns false when Presidio is unavailable", async () => {
+    test("returns false when the detector is unavailable", async () => {
       globalThis.fetch = mock(async () => {
         throw new Error("Connection refused");
       }) as unknown as typeof fetch;

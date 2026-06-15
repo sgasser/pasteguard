@@ -111,44 +111,22 @@ async function validateStartup() {
 
   const detector = getPIIDetector();
 
-  // Wait for Presidio to be ready (multi-language setups need longer to load spaCy models)
+  // Wait for the detector to be ready (model load can take a while on first start)
   const startupTimeout = Number(process.env.PASTEGUARD_STARTUP_TIMEOUT) || 180;
-  console.log("[STARTUP] Connecting to Presidio...");
+  console.log("[STARTUP] Connecting to the detector...");
   const ready = await detector.waitForReady(startupTimeout, 1000);
 
   if (!ready) {
     console.error(
-      `[STARTUP] ✗ Could not connect to Presidio at ${config.pii_detection.presidio_url}`,
+      `[STARTUP] ✗ Could not connect to the detector at ${config.pii_detection.detector_url}`,
     );
-    console.error(
-      "          Make sure Presidio is running: docker compose up presidio-analyzer -d",
-    );
+    console.error("          Make sure the detector is running: docker compose up detector -d");
     process.exit(1);
   }
 
-  console.log("[STARTUP] ✓ Presidio connected");
-
-  // Validate configured languages
-  console.log(`[STARTUP] Validating languages: ${config.pii_detection.languages.join(", ")}`);
-  const validation = await detector.validateLanguages(config.pii_detection.languages);
-
-  if (validation.missing.length > 0) {
-    console.error("\n❌ Language mismatch detected!\n");
-    console.error(`   Configured: ${config.pii_detection.languages.join(", ")}`);
-    console.error(
-      `   Available:  ${validation.available.length > 0 ? validation.available.join(", ") : "(none)"}`,
-    );
-    console.error(`   Missing:    ${validation.missing.join(", ")}\n`);
-    console.error("   To fix, either:");
-    console.error(
-      `   1. Rebuild: LANGUAGES=${config.pii_detection.languages.join(",")} docker compose build presidio-analyzer`,
-    );
-    console.error(`   2. Update config.yaml languages to: [${validation.available.join(", ")}]\n`);
-    console.error("[STARTUP] ✗ Language configuration mismatch. Exiting for safety.");
-    process.exit(1);
-  } else {
-    console.log("[STARTUP] ✓ All configured languages available");
-  }
+  console.log("[STARTUP] ✓ Detector connected");
+  // Language config is validated at load time (config.ts LanguageEnum); the
+  // detector is language-agnostic, so there is no runtime language gate.
 }
 
 function printStartupBanner(config: ReturnType<typeof getConfig>, host: string, port: number) {

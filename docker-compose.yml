@@ -1,27 +1,22 @@
-# PasteGuard - Docker Compose (All-in-One Image)
+# PasteGuard - Docker Compose
 #
-# Production:
+# Production (all-in-one: proxy + detector in one container):
 #   docker compose up -d
 #
-# Development (only Presidio, run Bun locally with hot-reload):
-#   docker compose up presidio -d
+# Development (detector in Docker, proxy locally with hot-reload):
+#   docker compose up detector -d
 #   bun run dev
 #
-# European languages:
-#   PASTEGUARD_TAG=eu docker compose up -d
-#
-# Custom languages (local build):
-#   LANGUAGES=en,de,ja docker compose up -d --build
+# The published image bundles the proxy and the PII detector. The standalone
+# `detector` service below exists only for local development, so the proxy can
+# run from source (`bun run dev`) against it without rebuilding the full image.
 
 services:
-  # Production: Full all-in-one
   pasteguard:
-    image: ghcr.io/sgasser/pasteguard:${PASTEGUARD_TAG:-en}
+    image: ghcr.io/sgasser/pasteguard:latest
     build:
       context: .
       dockerfile: docker/Dockerfile
-      args:
-        LANGUAGES: ${LANGUAGES:-en}
     ports:
       - "3000:3000"
     env_file:
@@ -32,21 +27,12 @@ services:
       - ./data:/pasteguard/data
     restart: unless-stopped
 
-  # Development: Only Presidio (for local Bun with hot-reload)
-  presidio:
+  # Development only: the PII detector on its own, for `bun run dev`.
+  # Point the local proxy at it with DETECTOR_URL=http://localhost:5002.
+  detector:
     profiles: ["dev"]
-    image: ghcr.io/sgasser/pasteguard:${PASTEGUARD_TAG:-en}
     build:
-      context: .
-      dockerfile: docker/Dockerfile
-      args:
-        LANGUAGES: ${LANGUAGES:-en}
+      context: ./detector
     ports:
       - "5002:5002"
-    environment:
-      - START_APP=false
-      - PORT=5002
-      - WORKERS=1
-    healthcheck:
-      disable: true
     restart: unless-stopped
