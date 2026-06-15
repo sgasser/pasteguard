@@ -1,0 +1,122 @@
+# Critical-leak fixtures: DE/IT structured identifiers + cross-language routing.
+#
+# These cases FAIL against the current Presidio :eu setup (single-language
+# routing skips the other language's recognizers, and there are no
+# checksum-validating recognizers for Codice Fiscale / Partita IVA /
+# Steuernummer / USt-IdNr). They are the acceptance target for the
+# GLiNER + regex/checksum detector (issue #96): once it lands, the same
+# `bun run benchmarks/pii-accuracy/run.ts` must go green.
+#
+# All identifiers are synthetic but checksum-valid (generated with
+# python-stdnum / python-codicefiscale), so the deterministic layer must
+# ACCEPT the positives and REJECT the invalid-checksum negatives.
+
+test_cases:
+  # --- Italian Codice Fiscale (checksum-valid) ---
+  - id: crit_it_codice_fiscale
+    text: "Il codice fiscale del cliente Mario Rossi è RSSMRA85T10H501O."
+    language: it
+    description: "Codice Fiscale + person; Presidio :eu misses the CF"
+    expected:
+      - type: PERSON
+        text: "Mario Rossi"
+      - type: IT_FISCAL_CODE
+        text: "RSSMRA85T10H501O"
+
+  # --- Italian Partita IVA (Luhn-valid) ---
+  - id: crit_it_partita_iva
+    text: "La fattura riporta la partita IVA 00743110157 dello studio."
+    language: it
+    description: "Partita IVA; Presidio :eu returns no match"
+    expected:
+      - type: IT_VAT_CODE
+        text: "00743110157"
+
+  # --- Italian IBAN, spaced (the misclassified-as-LOCATION case) ---
+  - id: crit_it_iban_spaced
+    text: "Bonifico sull'IBAN IT60 X054 2811 1010 0000 0123 456 entro lunedì."
+    language: it
+    description: "Spaced IBAN; Presidio misclassifies as LOCATION"
+    expected:
+      - type: IBAN_CODE
+        text: "IT60 X054 2811 1010 0000 0123 456"
+
+  # --- Italian IBAN, unspaced ---
+  - id: crit_it_iban_plain
+    text: "IBAN del cliente: IT60X0542811101000000123456"
+    language: it
+    expected:
+      - type: IBAN_CODE
+        text: "IT60X0542811101000000123456"
+
+  # --- Realistic Italian advisory prompt: person + CF + PIVA + IBAN ---
+  - id: crit_it_mixed
+    text: "Riepilogo cliente: Giulia Bianchi, codice fiscale BNCGLI90C62F205S, partita IVA 00743110157, IBAN IT60 X054 2811 1010 0000 0123 456."
+    language: it
+    expected:
+      - type: PERSON
+        text: "Giulia Bianchi"
+      - type: IT_FISCAL_CODE
+        text: "BNCGLI90C62F205S"
+      - type: IT_VAT_CODE
+        text: "00743110157"
+      - type: IBAN_CODE
+        text: "IT60 X054 2811 1010 0000 0123 456"
+
+  # --- German USt-IdNr (ISO 7064 mod 11,10 valid) ---
+  - id: crit_de_ustidnr
+    text: "Die Umsatzsteuer-Identifikationsnummer lautet DE136695976."
+    language: de
+    expected:
+      - type: DE_VAT_CODE
+        text: "DE136695976"
+
+  # --- German Steuernummer ---
+  - id: crit_de_steuernummer
+    text: "Steuernummer des Mandanten: 2893081508152"
+    language: de
+    expected:
+      - type: DE_TAX_CODE
+        text: "2893081508152"
+
+  # --- German IBAN, spaced ---
+  - id: crit_de_iban_spaced
+    text: "Bitte überweisen Sie auf IBAN DE89 3704 0044 0532 0130 00."
+    language: de
+    expected:
+      - type: IBAN_CODE
+        text: "DE89 3704 0044 0532 0130 00"
+
+  # --- THE routing case: Italian identifiers inside German text, language=de ---
+  # This is the exact single-language-routing failure: German routing skips
+  # the Italian recognizers, so Presidio loses the CF and the IBAN.
+  - id: crit_de_routing_italian
+    text: "Der Mandant Mario Rossi (Codice Fiscale RSSMRA85T10H501O) überweist von IBAN IT60 X054 2811 1010 0000 0123 456."
+    language: de
+    description: "IT data in DE text; the multilingual detector must catch all three"
+    expected:
+      - type: PERSON
+        text: "Mario Rossi"
+      - type: IT_FISCAL_CODE
+        text: "RSSMRA85T10H501O"
+      - type: IBAN_CODE
+        text: "IT60 X054 2811 1010 0000 0123 456"
+
+  # --- Negatives: invalid checksums must NOT be flagged (FP guards) ---
+  - id: crit_it_cf_invalid_fp
+    text: "Codice fiscale non valido nel sistema: RSSMRA85T10H501A"
+    language: it
+    description: "Wrong CF check char; deterministic layer must reject"
+    expected: []
+
+  - id: crit_it_iban_invalid_fp
+    text: "IBAN con cifra di controllo errata: IT60X0542811101000000123457"
+    language: it
+    description: "Bad IBAN mod-97; must not be flagged"
+    expected: []
+
+  - id: crit_it_piva_invalid_fp
+    text: "Partita IVA errata: 00743110158"
+    language: it
+    description: "Bad Partita IVA check digit; must not be flagged"
+    expected: []

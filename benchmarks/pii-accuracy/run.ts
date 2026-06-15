@@ -65,7 +65,10 @@ const threshold = args.threshold ? Number.parseFloat(args.threshold) : DEFAULT_T
 const verbose = args.verbose ?? false;
 const languageFilter = args.languages?.split(",").map((l) => l.trim().toLowerCase());
 
-// Entity types we test for
+// Entity types we test for. Includes the DE/IT structured identifiers
+// (Codice Fiscale, Partita IVA, Steuernummer, USt-IdNr) that the new detector
+// must support; vanilla Presidio has no recognizers for these, so they show as
+// false negatives until the GLiNER + regex detector (issue #96) lands.
 const ENTITY_TYPES = [
   "PERSON",
   "EMAIL_ADDRESS",
@@ -74,6 +77,12 @@ const ENTITY_TYPES = [
   "IBAN_CODE",
   "IP_ADDRESS",
   "LOCATION",
+  "ORGANIZATION",
+  "ADDRESS",
+  "IT_FISCAL_CODE",
+  "IT_VAT_CODE",
+  "DE_TAX_CODE",
+  "DE_VAT_CODE",
 ];
 
 /**
@@ -128,7 +137,14 @@ async function detectPII(text: string, language: string): Promise<DetectedEntity
   });
 
   if (!response.ok) {
-    throw new Error(`Presidio error: ${response.status} ${await response.text()}`);
+    const body = await response.text();
+    // A detector with no recognizer for this language/entity returns this
+    // sentinel. Treat it as "detected nothing" so the case is a clean false
+    // negative (red) instead of a crash — this is exactly the single-language
+    // routing gap the new detector (issue #96) must close (it always returns
+    // 200 and is language-agnostic).
+    if (body.includes("No matching recognizers")) return [];
+    throw new Error(`Detector error: ${response.status} ${body}`);
   }
 
   const entities = (await response.json()) as Array<{

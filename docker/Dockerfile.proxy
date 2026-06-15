@@ -1,0 +1,29 @@
+# PasteGuard proxy — masking + provider forwarding only.
+#
+# PII detection is a separate service (see detector/). This image does NOT
+# bundle Presidio; set PRESIDIO_URL to point at the detector's /analyze.
+#
+# Build: docker build -f docker/Dockerfile.proxy -t pasteguard:proxy .
+
+FROM oven/bun:1-slim
+
+WORKDIR /pasteguard
+
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+
+COPY src ./src
+COPY tsconfig.json config.example.yaml ./
+
+RUN mkdir -p /pasteguard/data && chown -R 1000:1000 /pasteguard
+USER 1000
+
+# Point at the detector service by default (overridable).
+ENV PRESIDIO_URL=http://detector:5002
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD bun -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["bun", "run", "src/index.ts"]

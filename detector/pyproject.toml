@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pasteguard-detector"
+version = "0.1.0"
+description = "Presidio-compatible /analyze PII detector: deterministic regex/checksum + multilingual GLiNER NER."
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2",
+    "gliner>=0.2.13",
+    "python-stdnum>=1.20",
+    "python-codicefiscale>=0.12",
+    "phonenumbers>=8.13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[tool.setuptools]
+packages = ["detector"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
