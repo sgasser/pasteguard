@@ -1,0 +1,257 @@
+cases:
+  - id: eval_de_mixed_contact
+    suite: eval
+    category: eval
+    split: test
+    language: de
+    text: "Maria Keller aus Berlin ist unter maria.keller@example.de erreichbar."
+    expected:
+      - entity: PERSON
+        text: Maria Keller
+        match: contains
+      - entity: LOCATION
+        text: Berlin
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: maria.keller@example.de
+        match: exact
+
+  - id: eval_it_mixed_contact
+    suite: eval
+    category: eval
+    split: test
+    language: it
+    text: "Luca Bianchi lavora a Roma e usa luca.bianchi@example.it."
+    expected:
+      - entity: PERSON
+        text: Luca Bianchi
+        match: contains
+      - entity: LOCATION
+        text: Roma
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: luca.bianchi@example.it
+        match: exact
+
+  - id: eval_fr_mixed_contact
+    suite: eval
+    category: eval
+    split: test
+    language: fr
+    text: "Claire Martin vit a Paris et son email est claire.martin@example.fr."
+    expected:
+      - entity: PERSON
+        text: Claire Martin
+        match: contains
+      - entity: LOCATION
+        text: Paris
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: claire.martin@example.fr
+        match: exact
+
+  - id: eval_es_mixed_contact
+    suite: eval
+    category: eval
+    split: test
+    language: es
+    text: "Carlos Garcia vive en Madrid y responde en carlos.garcia@example.es."
+    expected:
+      - entity: PERSON
+        text: Carlos Garcia
+        match: contains
+      - entity: LOCATION
+        text: Madrid
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: carlos.garcia@example.es
+        match: exact
+
+  - id: eval_nl_phone_email
+    suite: eval
+    category: eval
+    split: test
+    language: nl
+    text: "Sanne de Vries gebruikt sanne@example.nl en telefoon +31 20 123 4567."
+    expected:
+      - entity: EMAIL_ADDRESS
+        text: sanne@example.nl
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +31 20 123 4567
+        match: contains
+
+  - id: eval_nl_person_location
+    suite: eval
+    category: eval
+    split: test
+    language: nl
+    text: "Jan de Vries woont in Rotterdam en gebruikt jan.devries@example.nl."
+    expected:
+      - entity: PERSON
+        text: Jan de Vries
+        match: contains
+      - entity: LOCATION
+        text: Rotterdam
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: jan.devries@example.nl
+        match: exact
+
+  - id: eval_pt_phone_email
+    suite: eval
+    category: eval
+    split: test
+    language: pt
+    text: "Joao Silva usa joao.silva@example.pt e telefone +351 21 123 4567."
+    expected:
+      - entity: EMAIL_ADDRESS
+        text: joao.silva@example.pt
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +351 21 123 4567
+        match: contains
+
+  - id: eval_pt_person_location
+    suite: eval
+    category: eval
+    split: test
+    language: pt
+    text: "Tiago Costa mora no Porto e usa tiago.costa@example.pt."
+    expected:
+      - entity: PERSON
+        text: Tiago Costa
+        match: contains
+      - entity: LOCATION
+        text: Porto
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: tiago.costa@example.pt
+        match: exact
+
+  - id: eval_pl_mixed_contact
+    suite: eval
+    category: eval
+    split: test
+    language: pl
+    text: "Anna Kowalska z Warszawy używa adresu anna.kowalska@example.pl."
+    expected:
+      - entity: PERSON
+        text: Anna Kowalska
+        match: contains
+      - entity: LOCATION
+        text: Warszawy
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: anna.kowalska@example.pl
+        match: exact
+
+  - id: eval_ro_mixed_contact
+    suite: eval
+    category: eval
+    split: test
+    language: ro
+    text: "Andrei Popescu din București folosește adresa andrei.popescu@example.ro."
+    expected:
+      - entity: PERSON
+        text: Andrei Popescu
+        match: contains
+      - entity: LOCATION
+        text: București
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: andrei.popescu@example.ro
+        match: exact
+
+  - id: eval_en_security_event
+    suite: eval
+    category: eval
+    split: test
+    language: en
+    text: "Alice Brown signed in from 8.8.8.8 and confirmed alice.brown@example.com."
+    expected:
+      - entity: PERSON
+        text: Alice Brown
+        match: contains
+      - entity: IP_ADDRESS
+        text: 8.8.8.8
+        match: exact
+      - entity: EMAIL_ADDRESS
+        text: alice.brown@example.com
+        match: exact
+
+  - id: eval_de_payment_contact
+    suite: eval
+    category: eval
+    split: test
+    language: de
+    text: "Max Berger aus Hamburg nutzt das Konto DE89370400440532013000 und max.berger@example.de."
+    expected:
+      - entity: PERSON
+        text: Max Berger
+        match: contains
+      - entity: LOCATION
+        text: Hamburg
+        match: contains
+      - entity: IBAN_CODE
+        text: DE89370400440532013000
+        match: exact
+      - entity: EMAIL_ADDRESS
+        text: max.berger@example.de
+        match: exact
+
+  - id: eval_de_spaced_iban
+    suite: eval
+    category: eval
+    split: test
+    language: de
+    text: "Bitte ueberweisen Sie auf IBAN DE89 3704 0044 0532 0130 00."
+    expected:
+      - entity: IBAN_CODE
+        text: DE89 3704 0044 0532 0130 00
+        match: exact
+
+  - id: eval_it_payment_contact
+    suite: eval
+    category: eval
+    split: test
+    language: it
+    text: "Giulia Rossi vive a Milano e usa il conto IT60X0542811101000000123456."
+    expected:
+      - entity: PERSON
+        text: Giulia Rossi
+        match: contains
+      - entity: LOCATION
+        text: Milano
+        match: contains
+      - entity: IBAN_CODE
+        text: IT60X0542811101000000123456
+        match: exact
+
+  - id: eval_it_spaced_iban
+    suite: eval
+    category: eval
+    split: test
+    language: it
+    text: "Bonifico sull'IBAN IT60 X054 2811 1010 0000 0123 456 entro lunedi."
+    expected:
+      - entity: IBAN_CODE
+        text: IT60 X054 2811 1010 0000 0123 456
+        match: exact
+
+  - id: eval_fr_payment_contact
+    suite: eval
+    category: eval
+    split: test
+    language: fr
+    text: "Nicolas Bernard à Lyon utilise le compte FR1420041010050500013M02606."
+    expected:
+      - entity: PERSON
+        text: Nicolas Bernard
+        match: contains
+      - entity: LOCATION
+        text: Lyon
+        match: contains
+      - entity: IBAN_CODE
+        text: FR1420041010050500013M02606
+        match: exact

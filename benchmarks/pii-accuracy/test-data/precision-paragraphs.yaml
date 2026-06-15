@@ -1,0 +1,60 @@
+cases:
+  - id: precision_paragraph_release_numbers
+    suite: precision-paragraphs
+    category: precision
+    split: test
+    language: en
+    gate: false
+    entities: [CREDIT_CARD, PHONE_NUMBER, IP_ADDRESS]
+    text: "The release checklist mentions build 4111-1111, ticket 5552671, version 12.4.8, shard 10.24, and rollout window 20:30. None of these strings is a payment card, phone number, or IP address."
+    expected: []
+
+  - id: precision_paragraph_email_lookalikes
+    suite: precision-paragraphs
+    category: precision
+    split: test
+    language: en
+    gate: false
+    entities: [EMAIL_ADDRESS]
+    text: "The onboarding guide says to contact support [at] example [dot] com, use the placeholder user@@example..com only in screenshots, and never paste a real mailbox into templates."
+    expected: []
+
+  - id: precision_paragraph_invalid_accounts
+    suite: precision-paragraphs
+    category: precision
+    split: test
+    language: de
+    gate: false
+    entities: [IBAN_CODE, CREDIT_CARD]
+    text: "Der Testlauf enthaelt die Beispielwerte DE001234, DE89370400440532013001 und 4111 1111 1111 1112. Diese Werte sind absichtlich ungueltig und sollen nicht als echte Konten oder Karten gelten."
+    expected: []
+
+  - id: precision_paragraph_operational_locations
+    suite: precision-paragraphs
+    category: precision
+    split: test
+    language: en
+    gate: false
+    entities: [LOCATION, PERSON]
+    text: "The deployment moved from eu-west-1 to us-east-1, the owner field stayed empty, and the runbook only refers to customer, administrator, reviewer, and approver roles."
+    expected: []
+
+  - id: precision_paragraph_multilingual_roles
+    suite: precision-paragraphs
+    category: precision
+    split: test
+    language: es
+    gate: false
+    entities: [PERSON, LOCATION]
+    text: "El cliente solicita una factura, el administrador revisa la cola y el equipo confirma que no hay nombres de personas ni ciudades reales en este parrafo."
+    expected: []
+
+  - id: precision_paragraph_log_noise
+    suite: precision-paragraphs
+    category: precision
+    split: test
+    language: en
+    gate: false
+    entities: [EMAIL_ADDRESS, PHONE_NUMBER, IP_ADDRESS, LOCATION, PERSON]
+    text: "Log sample: user=anonymous, host=local-dev, route=/api/v1/orders, status=204, latency=123ms, trace=abc123def456, region=staging-west, retry=0. The sample intentionally avoids direct personal data."
+    expected: []

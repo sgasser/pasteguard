@@ -1,0 +1,261 @@
+cases:
+  - id: paragraph_en_customer_handoff
+    suite: multilingual-paragraphs
+    category: eval
+    split: test
+    language: en
+    text: "The support handoff says Oliver Bennett is based in Manchester and should be contacted at oliver.bennett@example.com. The ticket also lists +44 161 496 0123, card 4242 4242 4242 4242, settlement IBAN GB82WEST12345698765432, and the last portal login from 203.0.113.77."
+    expected:
+      - entity: PERSON
+        text: Oliver Bennett
+        match: contains
+      - entity: LOCATION
+        text: Manchester
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: oliver.bennett@example.com
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +44 161 496 0123
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4242 4242 4242 4242
+        match: exact
+      - entity: IBAN_CODE
+        text: GB82WEST12345698765432
+        match: exact
+      - entity: IP_ADDRESS
+        text: 203.0.113.77
+        match: exact
+
+  - id: paragraph_de_vendor_review
+    suite: multilingual-paragraphs
+    category: eval
+    split: test
+    language: de
+    text: "Im Lieferantenprotokoll steht, dass Nora Weber in München arbeitet und nora.weber@example.de nutzt. Fuer den Rueckruf ist +49 89 1234 5678 hinterlegt, die Karte lautet 4111 1111 1111 1111, das Konto DE89370400440532013000 und der Zugriff kam von 198.51.100.21."
+    expected:
+      - entity: PERSON
+        text: Nora Weber
+        match: contains
+      - entity: LOCATION
+        text: München
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: nora.weber@example.de
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +49 89 1234 5678
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4111 1111 1111 1111
+        match: exact
+      - entity: IBAN_CODE
+        text: DE89370400440532013000
+        match: exact
+      - entity: IP_ADDRESS
+        text: 198.51.100.21
+        match: exact
+
+  - id: paragraph_es_refund_case
+    suite: multilingual-paragraphs
+    category: eval
+    split: test
+    language: es
+    text: "La solicitud de reembolso indica que Mateo Ruiz vive en Sevilla y responde en mateo.ruiz@example.es. En la nota aparecen el telefono +34 95 123 45 67, la tarjeta 4012 8888 8888 1881, el IBAN ES9121000418450200051332 y la IP 192.0.2.34 usada en el portal."
+    expected:
+      - entity: PERSON
+        text: Mateo Ruiz
+        match: contains
+      - entity: LOCATION
+        text: Sevilla
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: mateo.ruiz@example.es
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +34 95 123 45 67
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4012 8888 8888 1881
+        match: exact
+      - entity: IBAN_CODE
+        text: ES9121000418450200051332
+        match: exact
+      - entity: IP_ADDRESS
+        text: 192.0.2.34
+        match: exact
+
+  - id: paragraph_fr_payment_case
+    suite: multilingual-paragraphs
+    category: eval
+    split: test
+    language: fr
+    text: "Le dossier client mentionne Sophie Lambert, rattachee au bureau de Marseille, avec l'adresse sophie.lambert@example.fr. Le suivi contient aussi le telephone +33 4 91 12 34 56, la carte 5555 5555 5555 4444, l'IBAN FR1420041010050500013M02606 et l'adresse IP 10.44.12.8."
+    expected:
+      - entity: PERSON
+        text: Sophie Lambert
+        match: contains
+      - entity: LOCATION
+        text: Marseille
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: sophie.lambert@example.fr
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +33 4 91 12 34 56
+        match: contains
+      - entity: CREDIT_CARD
+        text: 5555 5555 5555 4444
+        match: exact
+      - entity: IBAN_CODE
+        text: FR1420041010050500013M02606
+        match: exact
+      - entity: IP_ADDRESS
+        text: 10.44.12.8
+        match: exact
+
+  - id: paragraph_it_booking_case
+    suite: multilingual-paragraphs
+    category: eval
+    split: test
+    language: it
+    text: "Nel riepilogo prenotazione, Chiara Ferri risulta a Bologna e usa chiara.ferri@example.it. Il record include il telefono +39 051 123 4567, la carta 4242 4242 4242 4242, l'IBAN IT60X0542811101000000123456 e l'IP 172.20.4.9."
+    expected:
+      - entity: PERSON
+        text: Chiara Ferri
+        match: contains
+      - entity: LOCATION
+        text: Bologna
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: chiara.ferri@example.it
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +39 051 123 4567
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4242 4242 4242 4242
+        match: exact
+      - entity: IBAN_CODE
+        text: IT60X0542811101000000123456
+        match: exact
+      - entity: IP_ADDRESS
+        text: 172.20.4.9
+        match: exact
+
+  - id: paragraph_nl_account_case
+    suite: multilingual-paragraphs
+    category: eval
+    split: test
+    language: nl
+    text: "Het accountoverzicht noemt Eva Bakker in Haarlem met e-mailadres eva.bakker@example.nl. Voor verificatie staan telefoon +31 23 123 4567, kaart 4111 1111 1111 1111, IBAN NL91ABNA0417164300 en IP-adres 8.8.8.8 in hetzelfde bericht."
+    expected:
+      - entity: PERSON
+        text: Eva Bakker
+        match: contains
+      - entity: LOCATION
+        text: Haarlem
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: eva.bakker@example.nl
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +31 23 123 4567
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4111 1111 1111 1111
+        match: exact
+      - entity: IBAN_CODE
+        text: NL91ABNA0417164300
+        match: exact
+      - entity: IP_ADDRESS
+        text: 8.8.8.8
+        match: exact
+
+  - id: paragraph_pl_support_case
+    suite: multilingual-paragraphs
+    category: eval
+    split: test
+    language: pl
+    text: "W zgłoszeniu serwisowym Marta Zielinska podaje Kraków jako lokalizację i adres marta.zielinska@example.pl. W dalszej części są telefon +48 12 123 45 67, karta 5555 5555 5555 4444, IBAN PL61109010140000071219812874 oraz IP 1.0.0.1."
+    expected:
+      - entity: PERSON
+        text: Marta Zielinska
+        match: contains
+      - entity: LOCATION
+        text: Kraków
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: marta.zielinska@example.pl
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +48 12 123 45 67
+        match: contains
+      - entity: CREDIT_CARD
+        text: 5555 5555 5555 4444
+        match: exact
+      - entity: IBAN_CODE
+        text: PL61109010140000071219812874
+        match: exact
+      - entity: IP_ADDRESS
+        text: 1.0.0.1
+        match: exact
+
+  - id: paragraph_pt_invoice_case
+    suite: multilingual-paragraphs
+    category: eval
+    split: test
+    language: pt
+    text: "A fatura pendente pertence a Bruno Costa no Porto, com contacto bruno.costa@example.pt. O mesmo paragrafo inclui telefone +351 22 123 4567, cartao 4242 4242 4242 4242, IBAN PT50000201231234567890154 e IP 45.33.32.156."
+    expected:
+      - entity: PERSON
+        text: Bruno Costa
+        match: contains
+      - entity: LOCATION
+        text: Porto
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: bruno.costa@example.pt
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +351 22 123 4567
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4242 4242 4242 4242
+        match: exact
+      - entity: IBAN_CODE
+        text: PT50000201231234567890154
+        match: exact
+      - entity: IP_ADDRESS
+        text: 45.33.32.156
+        match: exact
+
+  - id: paragraph_ro_contract_case
+    suite: multilingual-paragraphs
+    category: eval
+    split: test
+    language: ro
+    text: "Contractul intern il mentioneaza pe Mihai Stan din Cluj-Napoca si adresa mihai.stan@example.ro. Pentru validare apar telefonul +40 264 123 456, cardul 4012 8888 8888 1881, IBAN RO49AAAA1B31007593840000 si IP 185.199.109.153."
+    expected:
+      - entity: PERSON
+        text: Mihai Stan
+        match: contains
+      - entity: LOCATION
+        text: Cluj-Napoca
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: mihai.stan@example.ro
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +40 264 123 456
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4012 8888 8888 1881
+        match: exact
+      - entity: IBAN_CODE
+        text: RO49AAAA1B31007593840000
+        match: exact
+      - entity: IP_ADDRESS
+        text: 185.199.109.153
+        match: exact

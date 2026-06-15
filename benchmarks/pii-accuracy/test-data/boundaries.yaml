@@ -1,0 +1,88 @@
+cases:
+  - id: boundary_email_parentheses
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    text: "Primary contact (zoe.parker+legal@example.co.uk) approved the change."
+    expected:
+      - entity: EMAIL_ADDRESS
+        text: zoe.parker+legal@example.co.uk
+        match: exact
+
+  - id: boundary_phone_quotes
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    text: "The note says call '+1 212-555-0199' after the legal review."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +1 212-555-0199
+        match: contains
+
+  - id: boundary_credit_card_commas
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    text: "The escrow record has card 4111 1111 1111 1111, but the invoice does not."
+    expected:
+      - entity: CREDIT_CARD
+        text: 4111 1111 1111 1111
+        match: exact
+
+  - id: boundary_iban_brackets
+    suite: boundaries
+    category: hard
+    split: test
+    language: de
+    text: "Das Konto [DE89370400440532013000] wurde nur im Audit-Log genannt."
+    expected:
+      - entity: IBAN_CODE
+        text: DE89370400440532013000
+        match: exact
+
+  - id: boundary_ip_brackets
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    text: "The firewall event recorded src=[198.51.100.44] and no destination owner."
+    expected:
+      - entity: IP_ADDRESS
+        text: 198.51.100.44
+        match: exact
+
+  - id: boundary_person_sentence_start
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    text: "Priya Shah approved access. The rest of the sentence is generic."
+    expected:
+      - entity: PERSON
+        text: Priya Shah
+        match: contains
+
+  - id: boundary_location_with_punctuation
+    suite: boundaries
+    category: hard
+    split: test
+    language: fr
+    text: "Le bureau concerne Lyon; aucune autre ville n'est dans le message."
+    expected:
+      - entity: LOCATION
+        text: Lyon
+        match: contains
+
+  - id: boundary_repeated_context_single_email
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    text: "Email the customer email owner at customer.owner@example.com; do not email the team alias."
+    expected:
+      - entity: EMAIL_ADDRESS
+        text: customer.owner@example.com
+        match: exact

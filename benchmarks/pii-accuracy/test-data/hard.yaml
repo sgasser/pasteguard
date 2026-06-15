@@ -1,0 +1,88 @@
+cases:
+  - id: hard_ipv6_full
+    suite: hard
+    category: hard
+    split: test
+    language: en
+    text: "The IPv6 source address was 2001:0db8:85a3:0000:0000:8a2e:0370:7334."
+    expected:
+      - entity: IP_ADDRESS
+        text: 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+        match: exact
+
+  - id: hard_ipv6_compressed
+    suite: hard
+    category: hard
+    split: test
+    language: en
+    text: "The compressed IPv6 address is 2001:db8::8a2e:370:7334."
+    expected:
+      - entity: IP_ADDRESS
+        text: 2001:db8::8a2e:370:7334
+        match: exact
+
+  - id: hard_email_inside_sentence
+    suite: hard
+    category: hard
+    split: test
+    language: en
+    text: "Please email alice.smith+billing@example.co.uk, not the shared inbox."
+    expected:
+      - entity: EMAIL_ADDRESS
+        text: alice.smith+billing@example.co.uk
+        match: exact
+
+  - id: hard_name_lowercase
+    suite: hard
+    category: hard
+    split: test
+    language: en
+    text: "The note says john smith can approve only read-only access."
+    expected:
+      - entity: PERSON
+        text: john smith
+        match: contains
+
+  - id: hard_name_lowercase_it
+    suite: hard
+    category: hard
+    split: test
+    language: it
+    text: "ricorda di chiamare mario rossi per la fattura"
+    expected:
+      - entity: PERSON
+        text: mario rossi
+        match: contains
+
+  - id: hard_person_hyphenated
+    suite: hard
+    category: hard
+    split: test
+    language: en
+    text: "Anne-Marie Johnson approved the vendor exception."
+    expected:
+      - entity: PERSON
+        text: Anne-Marie Johnson
+        match: contains
+
+  - id: hard_phone_national_uk
+    suite: hard
+    category: hard
+    split: test
+    language: en
+    text: "The London callback number is 020 7946 0958."
+    expected:
+      - entity: PHONE_NUMBER
+        text: 020 7946 0958
+        match: contains
+
+  - id: hard_location_ambiguous_city
+    suite: hard
+    category: hard
+    split: test
+    language: en
+    text: "The request mentions Reading as the office location."
+    expected:
+      - entity: LOCATION
+        text: Reading
+        match: contains

@@ -1,412 +1,634 @@
-#!/usr/bin/env bun
-/**
- * PII Detection Accuracy Benchmark
- *
- * Measures precision, recall, and F1 score of the PII detection system.
- *
- * Usage:
- *   bun run benchmarks/pii-accuracy/run.ts
- *   bun run benchmarks/pii-accuracy/run.ts --threshold 0.5
- *   bun run benchmarks/pii-accuracy/run.ts --languages de,en
- *   bun run benchmarks/pii-accuracy/run.ts --verbose
- */
-
-import { parseArgs } from "util";
-import { Glob } from "bun";
+import { readdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { parse as parseYaml } from "yaml";
+import { isKnownSuite, SUITES, suiteNames } from "./taxonomy";
 import {
-  TestCaseSchema,
-  type AccuracyMetrics,
-  type DetectedEntity,
-  type ExpectedEntity,
-  type TestCase,
+  type BenchmarkCase,
+  BenchmarkFileSchema,
+  type Detection,
+  type ExpectedSpan,
   type TestResult,
 } from "./types";
 
-// Configuration
+const DEFAULT_ANALYZE_URL = "http://localhost:3000/analyze";
 const DEFAULT_THRESHOLD = 0.7;
-const PRESIDIO_URL = process.env.PRESIDIO_URL || "http://localhost:5002";
-const TEST_DATA_DIR = import.meta.dir + "/test-data";
+const MAX_FAILURES_TO_PRINT = 40;
+const MAX_CONTAINS_EDGE_CHARS = 2;
 
-// Parse command line arguments
-const { values: args } = parseArgs({
-  args: Bun.argv.slice(2),
+type Filters = {
+  suites?: Set<string>;
+  categories?: Set<string>;
+  languages?: Set<string>;
+  split?: Set<string>;
+};
+
+type Metrics = {
+  cases: number;
+  passed: number;
+  errors: number;
+  tp: number;
+  fp: number;
+  fn: number;
+};
+
+const argv = parseArgs({
   options: {
-    threshold: { type: "string", short: "t" },
-    languages: { type: "string", short: "l" },
-    verbose: { type: "boolean", short: "v", default: false },
-    help: { type: "boolean", short: "h", default: false },
+    url: { type: "string" },
+    threshold: { type: "string" },
+    suite: { type: "string" },
+    category: { type: "string" },
+    languages: { type: "string" },
+    split: { type: "string" },
+    verbose: { type: "boolean", default: false },
+    "list-suites": { type: "boolean", default: false },
+    help: { type: "boolean", default: false },
   },
+  allowPositionals: false,
 });
 
-if (args.help) {
-  console.log(`
-PII Detection Accuracy Benchmark
-
-Usage:
-  bun run benchmarks/pii-accuracy/run.ts [options]
-
-Options:
-  -t, --threshold <value>    Score threshold (default: ${DEFAULT_THRESHOLD})
-  -l, --languages <langs>    Comma-separated languages to test (e.g., de,en)
-  -v, --verbose              Show detailed results for each test case
-  -h, --help                 Show this help message
-
-Examples:
-  bun run benchmarks/pii-accuracy/run.ts
-  bun run benchmarks/pii-accuracy/run.ts --threshold 0.5
-  bun run benchmarks/pii-accuracy/run.ts --languages de,en
-  bun run benchmarks/pii-accuracy/run.ts --verbose
-`);
+if (argv.values.help) {
+  printHelp();
   process.exit(0);
 }
 
-const threshold = args.threshold ? Number.parseFloat(args.threshold) : DEFAULT_THRESHOLD;
-const verbose = args.verbose ?? false;
-const languageFilter = args.languages?.split(",").map((l) => l.trim().toLowerCase());
+if (argv.values["list-suites"]) {
+  for (const name of suiteNames()) {
+    console.log(`${name}: ${SUITES[name].description}`);
+  }
+  process.exit(0);
+}
 
-// Entity types we test for
-const ENTITY_TYPES = [
-  "PERSON",
-  "EMAIL_ADDRESS",
-  "PHONE_NUMBER",
-  "CREDIT_CARD",
-  "IBAN_CODE",
-  "IP_ADDRESS",
-  "LOCATION",
-];
+const analyzeUrl = argv.values.url ?? process.env.PII_BENCHMARK_ANALYZE_URL ?? DEFAULT_ANALYZE_URL;
+const threshold = parseThreshold(argv.values.threshold ?? String(DEFAULT_THRESHOLD));
+const filters = buildFilters(argv.values);
+const verbose = Boolean(argv.values.verbose);
 
-/**
- * Load test cases from YAML files in test-data directory
- */
-async function loadTestCases(): Promise<TestCase[]> {
-  const testCases: TestCase[] = [];
-  const glob = new Glob("*.yaml");
+const benchmarkDir = dirname(fileURLToPath(import.meta.url));
+const testDataDir = join(benchmarkDir, "test-data");
 
-  for await (const file of glob.scan(TEST_DATA_DIR)) {
-    const filePath = `${TEST_DATA_DIR}/${file}`;
-    const content = await Bun.file(filePath).text();
-    const data = parseYaml(content) as { test_cases: unknown[] };
+const allCases = await loadCases(testDataDir);
+validateCorpus(allCases);
 
-    if (!data.test_cases || !Array.isArray(data.test_cases)) {
-      console.warn(`Warning: ${file} has no test_cases array`);
-      continue;
+const cases = applyFilters(allCases, filters);
+
+if (cases.length === 0) {
+  console.error("No benchmark cases matched the selected filters.");
+  process.exit(1);
+}
+
+const results: TestResult[] = [];
+
+for (const testCase of cases) {
+  results.push(await runCase(testCase, analyzeUrl, threshold));
+}
+
+printReport(results, analyzeUrl, threshold, verbose);
+
+const gatingFailures = results.filter((result) => result.gating && !result.passed);
+const errors = results.filter((result) => result.error);
+
+if (gatingFailures.length > 0 || errors.length > 0) {
+  process.exitCode = 1;
+}
+
+async function loadCases(dir: string): Promise<BenchmarkCase[]> {
+  const files = (await readdir(dir)).filter((file) => file.endsWith(".yaml")).sort();
+  const casesFromFiles = await Promise.all(
+    files.map(async (file) => {
+      const raw = await readFile(join(dir, file), "utf8");
+      const parsed = BenchmarkFileSchema.safeParse(parseYaml(raw));
+
+      if (!parsed.success) {
+        const details = parsed.error.errors
+          .map((error) => `${error.path.join(".")}: ${error.message}`)
+          .join("; ");
+        throw new Error(`Invalid benchmark file ${file}: ${details}`);
+      }
+
+      return parsed.data.cases;
+    }),
+  );
+
+  return casesFromFiles.flat();
+}
+
+function validateCorpus(casesToValidate: BenchmarkCase[]) {
+  const errors: string[] = [];
+  const seenIds = new Set<string>();
+
+  for (const testCase of casesToValidate) {
+    if (seenIds.has(testCase.id)) {
+      errors.push(`Duplicate case id: ${testCase.id}`);
+    }
+    seenIds.add(testCase.id);
+
+    if (!isKnownSuite(testCase.suite)) {
+      errors.push(`Unknown suite in ${testCase.id}: ${testCase.suite}`);
     }
 
-    for (const testCase of data.test_cases) {
-      const parsed = TestCaseSchema.safeParse(testCase);
-      if (parsed.success) {
-        // Filter by language if specified
-        if (!languageFilter || languageFilter.includes(parsed.data.language)) {
-          testCases.push(parsed.data);
-        }
-      } else {
-        console.warn(`Warning: Invalid test case in ${file}:`, parsed.error.format());
+    for (const expected of testCase.expected) {
+      if (!testCase.text.includes(expected.text)) {
+        errors.push(
+          `Expected text is not present in ${testCase.id}: ${expected.entity}(${expected.text})`,
+        );
       }
     }
   }
 
-  // Sort by ID for deterministic output
-  return testCases.sort((a, b) => a.id.localeCompare(b.id));
+  if (errors.length > 0) {
+    console.error(`Invalid benchmark corpus:\n${errors.map((error) => `- ${error}`).join("\n")}`);
+    process.exit(1);
+  }
 }
 
-/**
- * Call Presidio analyzer API
- */
-async function detectPII(text: string, language: string): Promise<DetectedEntity[]> {
-  if (!text) return [];
+function applyFilters(casesToFilter: BenchmarkCase[], activeFilters: Filters): BenchmarkCase[] {
+  return casesToFilter.filter((testCase) => {
+    if (activeFilters.suites && !activeFilters.suites.has(testCase.suite)) {
+      return false;
+    }
+    if (activeFilters.categories && !activeFilters.categories.has(testCase.category)) {
+      return false;
+    }
+    if (activeFilters.languages && !activeFilters.languages.has(testCase.language)) {
+      return false;
+    }
+    if (activeFilters.split && !activeFilters.split.has(testCase.split)) {
+      return false;
+    }
+    return true;
+  });
+}
 
-  const response = await fetch(`${PRESIDIO_URL}/analyze`, {
+async function runCase(
+  testCase: BenchmarkCase,
+  endpoint: string,
+  globalThreshold: number,
+): Promise<TestResult> {
+  const gating = isGatingCase(testCase);
+
+  try {
+    const detections = await analyze(testCase, endpoint, globalThreshold);
+    const { matched, missing, unexpected } = scoreDetections(testCase, detections);
+
+    return {
+      case: testCase,
+      passed: missing.length === 0 && unexpected.length === 0,
+      gating,
+      detections,
+      matched,
+      missing,
+      unexpected,
+    };
+  } catch (error) {
+    return {
+      case: testCase,
+      passed: false,
+      gating,
+      detections: [],
+      matched: [],
+      missing: testCase.expected,
+      unexpected: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function analyze(
+  testCase: BenchmarkCase,
+  endpoint: string,
+  globalThreshold: number,
+): Promise<Detection[]> {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      text,
-      language,
-      entities: ENTITY_TYPES,
-      score_threshold: threshold,
+      text: testCase.text,
+      language: testCase.language,
+      entities: entitiesForCase(testCase),
+      score_threshold: globalThreshold,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`Presidio error: ${response.status} ${await response.text()}`);
+    const body = await response.text();
+    throw new Error(`HTTP ${response.status}: ${body || response.statusText}`);
   }
 
-  const entities = (await response.json()) as Array<{
-    entity_type: string;
-    start: number;
-    end: number;
-    score: number;
-  }>;
+  const payload = await response.json();
 
-  return entities.map((e) => ({
-    type: e.entity_type,
-    text: text.slice(e.start, e.end),
-    start: e.start,
-    end: e.end,
-    score: e.score,
-  }));
-}
-
-/**
- * Check if Presidio is available
- */
-async function checkPresidio(): Promise<boolean> {
-  try {
-    const response = await fetch(`${PRESIDIO_URL}/health`);
-    return response.ok;
-  } catch {
-    return false;
+  if (!Array.isArray(payload)) {
+    throw new Error(`Expected analyzer array response, got ${typeof payload}`);
   }
+
+  return payload.map((item) => normalizeDetection(testCase, item));
 }
 
-/**
- * Run a single test case and compare results
- */
-async function runTestCase(testCase: TestCase): Promise<TestResult> {
-  const detected = await detectPII(testCase.text, testCase.language);
+function normalizeDetection(testCase: BenchmarkCase, item: unknown): Detection {
+  if (!item || typeof item !== "object") {
+    throw new Error("Analyzer returned a non-object detection");
+  }
 
-  // Match expected entities with detected ones
-  const truePositives: ExpectedEntity[] = [];
-  const falseNegatives: ExpectedEntity[] = [];
-  const matchedDetected = new Set<number>();
+  const record = item as Record<string, unknown>;
+  const entity = record.entity_type ?? record.entity;
+  const start = record.start;
+  const end = record.end;
+  const score = record.score;
+
+  if (typeof entity !== "string") {
+    throw new Error("Analyzer detection is missing entity_type");
+  }
+  if (typeof start !== "number" || typeof end !== "number") {
+    throw new Error(`Analyzer detection ${entity} is missing numeric offsets`);
+  }
+
+  return {
+    entity,
+    start,
+    end,
+    score: typeof score === "number" ? score : 0,
+    text: testCase.text.slice(start, end),
+  };
+}
+
+function scoreDetections(testCase: BenchmarkCase, detections: Detection[]) {
+  const unmatched = [...detections];
+  const matched: Array<{ expected: ExpectedSpan; detection: Detection }> = [];
+  const missing: ExpectedSpan[] = [];
 
   for (const expected of testCase.expected) {
-    // Find a matching detected entity
-    const matchIndex = detected.findIndex(
-      (d, i) =>
-        !matchedDetected.has(i) &&
-        d.type === expected.type &&
-        normalizeText(d.text).includes(normalizeText(expected.text)),
+    const matchIndex = unmatched.findIndex((detection) =>
+      detectionMatchesExpected(testCase, detection, expected),
     );
 
-    if (matchIndex !== -1) {
-      truePositives.push(expected);
-      matchedDetected.add(matchIndex);
-    } else {
-      falseNegatives.push(expected);
+    if (matchIndex === -1) {
+      missing.push(expected);
+      continue;
     }
+
+    const [detection] = unmatched.splice(matchIndex, 1);
+    matched.push({ expected, detection });
   }
 
-  // Remaining detected entities are false positives
-  const falsePositives = detected.filter((_, i) => !matchedDetected.has(i));
-
-  const passed = falseNegatives.length === 0 && falsePositives.length === 0;
-
-  return {
-    id: testCase.id,
-    text: testCase.text,
-    language: testCase.language,
-    passed,
-    expected: testCase.expected,
-    detected,
-    falseNegatives,
-    falsePositives,
-    truePositives,
-  };
+  return { matched, missing, unexpected: unmatched };
 }
 
-/**
- * Normalize text for comparison (lowercase, trim)
- */
-function normalizeText(text: string): string {
-  return text.toLowerCase().trim();
+function detectionMatchesExpected(
+  testCase: BenchmarkCase,
+  detection: Detection,
+  expected: ExpectedSpan,
+): boolean {
+  if (!entityMatches(detection.entity, expected)) {
+    return false;
+  }
+
+  if (expected.match === "exact") {
+    return normalized(detection.text) === normalized(expected.text);
+  }
+
+  if (expected.match === "overlap") {
+    return spansOverlap(testCase, detection, expected);
+  }
+
+  return boundedContainsMatch(testCase, detection, expected);
 }
 
-/**
- * Calculate accuracy metrics from results
- */
-function calculateMetrics(results: TestResult[]): AccuracyMetrics {
-  let tp = 0;
-  let fp = 0;
-  let fn = 0;
+function entityMatches(entity: string, expected: ExpectedSpan): boolean {
+  return entity === expected.entity || expected.aliases.includes(entity);
+}
+
+function boundedContainsMatch(
+  testCase: BenchmarkCase,
+  detection: Detection,
+  expected: ExpectedSpan,
+): boolean {
+  const expectedStart = testCase.text.indexOf(expected.text);
+
+  if (expectedStart === -1) {
+    return false;
+  }
+
+  const expectedEnd = expectedStart + expected.text.length;
+  const detectionCoversExpected = detection.start <= expectedStart && detection.end >= expectedEnd;
+
+  if (!detectionCoversExpected || !normalizedContains(detection.text, expected.text)) {
+    return false;
+  }
+
+  const leadingExtraChars = expectedStart - detection.start;
+  const trailingExtraChars = detection.end - expectedEnd;
+
+  return (
+    leadingExtraChars <= MAX_CONTAINS_EDGE_CHARS && trailingExtraChars <= MAX_CONTAINS_EDGE_CHARS
+  );
+}
+
+function normalizedContains(detectedText: string, expectedText: string): boolean {
+  const detected = normalized(detectedText);
+  const expected = normalized(expectedText);
+
+  return detected.includes(expected);
+}
+
+function spansOverlap(
+  testCase: BenchmarkCase,
+  detection: Detection,
+  expected: ExpectedSpan,
+): boolean {
+  const expectedStart = testCase.text.indexOf(expected.text);
+
+  if (expectedStart === -1) {
+    return false;
+  }
+
+  const expectedEnd = expectedStart + expected.text.length;
+  return detection.start < expectedEnd && detection.end > expectedStart;
+}
+
+function normalized(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/^[\s"'([<{]+/g, "")
+    .replace(/[\s"').,;:!?>\]}]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function entitiesForCase(testCase: BenchmarkCase): string[] {
+  if (testCase.entities) {
+    return testCase.entities;
+  }
+
+  if (testCase.expected.length > 0) {
+    return [...new Set(testCase.expected.map((expected) => expected.entity))];
+  }
+
+  return [...(SUITES[testCase.suite]?.defaultEntities ?? [])];
+}
+
+function isGatingCase(testCase: BenchmarkCase): boolean {
+  return testCase.gate ?? (testCase.category === "core" || testCase.category === "precision");
+}
+
+function printReport(
+  results: TestResult[],
+  endpoint: string,
+  activeThreshold: number,
+  printVerbose: boolean,
+) {
+  const gatingResults = results.filter((result) => result.gating);
+  const reportOnlyResults = results.filter((result) => !result.gating);
+  const failed = results.filter((result) => !result.passed);
+  const gatingFailures = gatingResults.filter((result) => !result.passed);
+  const errors = results.filter((result) => result.error);
+
+  console.log("PII accuracy benchmark");
+  console.log(`Endpoint: ${endpoint}`);
+  console.log(`Default threshold: ${activeThreshold}`);
+  console.log(
+    `Cases: ${results.length} (${gatingResults.length} gating, ${reportOnlyResults.length} report-only)`,
+  );
+  console.log("");
+
+  printMetrics("Overall", [["all", aggregate(results)]]);
+  printMetrics(
+    "By suite",
+    groupMetrics(results, (result) => result.case.suite),
+  );
+  printMetrics(
+    "By category",
+    groupMetrics(results, (result) => result.case.category),
+  );
+  printMetrics(
+    "By language",
+    groupMetrics(results, (result) => result.case.language),
+  );
+  printMetrics("By entity", entityMetrics(results));
+
+  if (failed.length > 0) {
+    console.log("");
+    console.log(
+      `Failures: ${failed.length} total, ${gatingFailures.length} gating, ${errors.length} errors`,
+    );
+
+    const failuresToPrint = printVerbose ? failed : failed.slice(0, MAX_FAILURES_TO_PRINT);
+    for (const result of failuresToPrint) {
+      printFailure(result);
+    }
+
+    if (!printVerbose && failed.length > failuresToPrint.length) {
+      console.log(`... ${failed.length - failuresToPrint.length} more failures hidden`);
+      console.log("Run with --verbose to print all failure details.");
+    }
+  }
+}
+
+function printMetrics(title: string, rows: Array<[string, Metrics]>) {
+  console.log(title);
+  console.log(
+    [
+      "name".padEnd(24),
+      "cases".padStart(5),
+      "pass".padStart(7),
+      "P".padStart(7),
+      "R".padStart(7),
+      "F1".padStart(7),
+      "F2".padStart(7),
+      "err".padStart(5),
+    ].join(" "),
+  );
+
+  for (const [name, metrics] of rows) {
+    console.log(
+      [
+        name.slice(0, 24).padEnd(24),
+        String(metrics.cases).padStart(5),
+        percent(metrics.passed, metrics.cases).padStart(7),
+        percent(metrics.tp, metrics.tp + metrics.fp).padStart(7),
+        percent(metrics.tp, metrics.tp + metrics.fn).padStart(7),
+        fScore(metrics.tp, metrics.fp, metrics.fn, 1).padStart(7),
+        fScore(metrics.tp, metrics.fp, metrics.fn, 2).padStart(7),
+        String(metrics.errors).padStart(5),
+      ].join(" "),
+    );
+  }
+  console.log("");
+}
+
+function groupMetrics(
+  results: TestResult[],
+  keyFn: (result: TestResult) => string,
+): Array<[string, Metrics]> {
+  const groups = new Map<string, TestResult[]>();
 
   for (const result of results) {
-    tp += result.truePositives.length;
-    fp += result.falsePositives.length;
-    fn += result.falseNegatives.length;
+    const key = keyFn(result);
+    groups.set(key, [...(groups.get(key) ?? []), result]);
   }
 
-  const precision = tp + fp > 0 ? tp / (tp + fp) : 1;
-  const recall = tp + fn > 0 ? tp / (tp + fn) : 1;
-  const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+  return [...groups.entries()]
+    .map(([key, group]) => [key, aggregate(group)] as [string, Metrics])
+    .sort(([left], [right]) => left.localeCompare(right));
+}
 
+function entityMetrics(results: TestResult[]): Array<[string, Metrics]> {
+  const entities = new Map<string, Metrics>();
+
+  for (const result of results) {
+    const seenEntities = new Set(entitiesForCase(result.case));
+    for (const expected of result.case.expected) {
+      seenEntities.add(expected.entity);
+    }
+    for (const detection of result.unexpected) {
+      seenEntities.add(detection.entity);
+    }
+
+    for (const entity of seenEntities) {
+      if (!entities.has(entity)) {
+        entities.set(entity, emptyMetrics());
+      }
+    }
+
+    for (const entity of seenEntities) {
+      const bucket = entities.get(entity);
+
+      if (!bucket) {
+        continue;
+      }
+
+      bucket.cases += 1;
+      bucket.errors += result.error ? 1 : 0;
+      const tp = result.matched.filter((match) => match.expected.entity === entity).length;
+      const fn = result.missing.filter((missing) => missing.entity === entity).length;
+      const fp = result.unexpected.filter((unexpected) => unexpected.entity === entity).length;
+
+      bucket.tp += tp;
+      bucket.fn += fn;
+      bucket.fp += fp;
+      bucket.passed += result.error || fn > 0 || fp > 0 ? 0 : 1;
+    }
+  }
+
+  return [...entities.entries()].sort(([left], [right]) => left.localeCompare(right));
+}
+
+function aggregate(results: TestResult[]): Metrics {
+  const metrics = emptyMetrics();
+
+  for (const result of results) {
+    metrics.cases += 1;
+    metrics.passed += result.passed ? 1 : 0;
+    metrics.errors += result.error ? 1 : 0;
+    metrics.tp += result.matched.length;
+    metrics.fp += result.unexpected.length;
+    metrics.fn += result.error ? result.case.expected.length : result.missing.length;
+  }
+
+  return metrics;
+}
+
+function emptyMetrics(): Metrics {
   return {
-    total: results.length,
-    passed: results.filter((r) => r.passed).length,
-    failed: results.filter((r) => !r.passed).length,
-    precision,
-    recall,
-    f1,
-    truePositives: tp,
-    falsePositives: fp,
-    falseNegatives: fn,
+    cases: 0,
+    passed: 0,
+    errors: 0,
+    tp: 0,
+    fp: 0,
+    fn: 0,
   };
 }
 
-/**
- * Format percentage for display
- */
-function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(1)}%`;
-}
+function printFailure(result: TestResult) {
+  const mode = result.gating ? "gating" : "report-only";
+  console.log(`- ${result.case.id} [${result.case.suite}/${result.case.category}/${mode}]`);
 
-/**
- * Print metrics in a formatted way
- */
-function printMetrics(label: string, metrics: AccuracyMetrics): void {
-  const status = metrics.failed === 0 ? "✓" : "⚠";
-  console.log(
-    `  ${label.padEnd(20)} P=${formatPercent(metrics.precision).padStart(6)}  ` +
-      `R=${formatPercent(metrics.recall).padStart(6)}  ` +
-      `F1=${formatPercent(metrics.f1).padStart(6)}  ${status}`,
-  );
-}
-
-/**
- * Main benchmark execution
- */
-async function main(): Promise<void> {
-  console.log("\n╔════════════════════════════════════════════════════════════╗");
-  console.log("║           PII Detection Accuracy Benchmark                 ║");
-  console.log("╚════════════════════════════════════════════════════════════╝\n");
-
-  // Check Presidio availability
-  console.log(`Presidio URL: ${PRESIDIO_URL}`);
-  console.log(`Threshold: ${threshold}`);
-  if (languageFilter) {
-    console.log(`Languages: ${languageFilter.join(", ")}`);
+  if (result.error) {
+    console.log(`  error: ${result.error}`);
+    return;
   }
 
-  if (!(await checkPresidio())) {
-    console.error("\n✗ Presidio is not available. Start it with:");
-    console.error("  docker compose up presidio-analyzer -d\n");
-    process.exit(1);
-  }
-  console.log("Presidio: ✓ Connected\n");
-
-  // Load test cases from directory
-  const testCases = await loadTestCases();
-
-  if (testCases.length === 0) {
-    console.error("No test cases found in", TEST_DATA_DIR);
-    process.exit(1);
+  if (result.missing.length > 0) {
+    console.log(
+      `  missing: ${result.missing
+        .map((expected) => `${expected.entity}(${expected.text})`)
+        .join(", ")}`,
+    );
   }
 
-  console.log(`Running ${testCases.length} test cases...\n`);
-
-  // Run all test cases
-  const results: TestResult[] = [];
-  for (const testCase of testCases) {
-    try {
-      const result = await runTestCase(testCase);
-      results.push(result);
-
-      if (verbose) {
-        const icon = result.passed ? "✓" : "✗";
-        console.log(`${icon} ${result.id}`);
-        if (!result.passed) {
-          if (result.falseNegatives.length > 0) {
-            console.log(`    Missed: ${result.falseNegatives.map((e) => `${e.type}:"${e.text}"`).join(", ")}`);
-          }
-          if (result.falsePositives.length > 0) {
-            console.log(
-              `    Wrong:  ${result.falsePositives.map((e) => `${e.type}:"${e.text}" (${e.score.toFixed(2)})`).join(", ")}`,
-            );
-          }
-        }
-      }
-    } catch (error) {
-      console.error(`Error in test ${testCase.id}:`, error);
-    }
-  }
-
-  // Calculate overall metrics
-  const overall = calculateMetrics(results);
-
-  // Calculate metrics by entity type
-  const byEntityType: Record<string, AccuracyMetrics> = {};
-  for (const entityType of ENTITY_TYPES) {
-    const filtered = results.map((r) => ({
-      ...r,
-      expected: r.expected.filter((e) => e.type === entityType),
-      truePositives: r.truePositives.filter((e) => e.type === entityType),
-      falseNegatives: r.falseNegatives.filter((e) => e.type === entityType),
-      falsePositives: r.falsePositives.filter((e) => e.type === entityType),
-    }));
-    // Only include if there are test cases for this type
-    const hasTestCases = filtered.some((r) => r.expected.length > 0 || r.falsePositives.length > 0);
-    if (hasTestCases) {
-      byEntityType[entityType] = calculateMetrics(filtered);
-    }
-  }
-
-  // Calculate metrics by language
-  const languages = [...new Set(results.map((r) => r.language))];
-  const byLanguage: Record<string, AccuracyMetrics> = {};
-  for (const lang of languages) {
-    byLanguage[lang] = calculateMetrics(results.filter((r) => r.language === lang));
-  }
-
-  // Print report
-  console.log("\n────────────────────────────────────────────────────────────");
-  console.log("                         RESULTS");
-  console.log("────────────────────────────────────────────────────────────\n");
-
-  console.log(`Overall: ${overall.passed}/${overall.total} passed\n`);
-
-  console.log("Metrics (P=Precision, R=Recall, F1=F1-Score):\n");
-
-  console.log(
-    `  ${"OVERALL".padEnd(20)} P=${formatPercent(overall.precision).padStart(6)}  ` +
-      `R=${formatPercent(overall.recall).padStart(6)}  ` +
-      `F1=${formatPercent(overall.f1).padStart(6)}\n`,
-  );
-
-  console.log("By Entity Type:");
-  for (const [type, metrics] of Object.entries(byEntityType)) {
-    printMetrics(type, metrics);
-  }
-
-  console.log("\nBy Language:");
-  for (const [lang, metrics] of Object.entries(byLanguage)) {
-    printMetrics(lang.toUpperCase(), metrics);
-  }
-
-  // Print false negatives (missed PII)
-  const allFalseNegatives = results.flatMap((r) =>
-    r.falseNegatives.map((fn) => ({ testId: r.id, text: r.text, entity: fn })),
-  );
-  if (allFalseNegatives.length > 0) {
-    console.log("\n────────────────────────────────────────────────────────────");
-    console.log(`False Negatives (Missed PII): ${allFalseNegatives.length}`);
-    console.log("────────────────────────────────────────────────────────────");
-    for (const { testId, entity } of allFalseNegatives) {
-      console.log(`  ✗ "${entity.text}" (${entity.type}) in ${testId}`);
-    }
-  }
-
-  // Print false positives (wrong detections)
-  const allFalsePositives = results.flatMap((r) =>
-    r.falsePositives.map((fp) => ({ testId: r.id, text: r.text, entity: fp })),
-  );
-  if (allFalsePositives.length > 0) {
-    console.log("\n────────────────────────────────────────────────────────────");
-    console.log(`False Positives (Wrong Detections): ${allFalsePositives.length}`);
-    console.log("────────────────────────────────────────────────────────────");
-    for (const { testId, entity } of allFalsePositives) {
-      console.log(`  ✗ "${entity.text}" (${entity.type}, score=${entity.score.toFixed(2)}) in ${testId}`);
-    }
-  }
-
-  console.log("\n────────────────────────────────────────────────────────────\n");
-
-  // Exit with error code if tests failed
-  if (overall.failed > 0) {
-    process.exit(1);
+  if (result.unexpected.length > 0) {
+    console.log(
+      `  unexpected: ${result.unexpected
+        .map((detection) => `${detection.entity}(${detection.text}, ${detection.score.toFixed(2)})`)
+        .join(", ")}`,
+    );
   }
 }
 
-main().catch((error) => {
-  console.error("Benchmark failed:", error);
-  process.exit(1);
-});
+function percent(numerator: number, denominator: number): string {
+  if (denominator === 0) {
+    return "n/a";
+  }
+
+  return `${((numerator / denominator) * 100).toFixed(1)}%`;
+}
+
+function fScore(tp: number, fp: number, fn: number, beta: number): string {
+  const betaSquared = beta * beta;
+  const denominator = (1 + betaSquared) * tp + betaSquared * fn + fp;
+
+  if (denominator === 0) {
+    return "n/a";
+  }
+
+  return `${(((1 + betaSquared) * tp) / denominator).toFixed(3)}`;
+}
+
+function buildFilters(values: typeof argv.values): Filters {
+  return {
+    suites: csvSet(values.suite),
+    categories: csvSet(values.category),
+    languages: csvSet(values.languages),
+    split: csvSet(values.split),
+  };
+}
+
+function csvSet(value: string | boolean | undefined): Set<string> | undefined {
+  if (typeof value !== "string" || value.trim() === "") {
+    return undefined;
+  }
+
+  return new Set(
+    value
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean),
+  );
+}
+
+function parseThreshold(value: string): number {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(`Invalid threshold: ${value}`);
+  }
+
+  return parsed;
+}
+
+function printHelp() {
+  console.log(`Usage: bun run benchmarks/pii-accuracy/run.ts [options]
+
+Options:
+  --url <url>              Analyze endpoint. Default: ${DEFAULT_ANALYZE_URL}
+  --threshold <0..1>       Default score threshold. Default: ${DEFAULT_THRESHOLD}
+  --suite <csv>            Filter suites, e.g. core,precision
+  --category <csv>         Filter categories: core,precision,eval,hard
+  --languages <csv>        Filter languages, e.g. en,de,it
+  --split <csv>            Filter split: dev,test
+  --list-suites            Print suites and exit
+  --verbose                Print all failure details
+  --help                   Print this help
+`);
+}

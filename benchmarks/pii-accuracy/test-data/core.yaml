@@ -1,0 +1,297 @@
+cases:
+  - id: core_email_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "Email Alice at alice.smith@example.com before noon."
+    expected:
+      - entity: EMAIL_ADDRESS
+        text: alice.smith@example.com
+        match: exact
+
+  - id: core_email_de
+    suite: core
+    category: core
+    split: test
+    language: de
+    text: "Schreibe an max.mueller@example.de, wenn der Export fertig ist."
+    expected:
+      - entity: EMAIL_ADDRESS
+        text: max.mueller@example.de
+        match: exact
+
+  - id: core_email_plus_subdomain
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "Send invoices to alice.billing+eu@sub.example.co.uk today."
+    expected:
+      - entity: EMAIL_ADDRESS
+        text: alice.billing+eu@sub.example.co.uk
+        match: exact
+
+  - id: core_email_uppercase
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "The backup mailbox is SECURITY.ALERTS@EXAMPLE.ORG."
+    expected:
+      - entity: EMAIL_ADDRESS
+        text: SECURITY.ALERTS@EXAMPLE.ORG
+        match: exact
+
+  - id: core_phone_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "The customer phone number is +1 415-555-2671."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +1 415-555-2671
+        match: contains
+
+  - id: core_phone_de
+    suite: core
+    category: core
+    split: test
+    language: de
+    text: "Die Telefonnummer des Kontakts ist +49 30 12345678."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +49 30 12345678
+        match: contains
+
+  - id: core_phone_fr
+    suite: core
+    category: core
+    split: test
+    language: fr
+    text: "Le numéro de téléphone est +33 1 42 68 53 00."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +33 1 42 68 53 00
+        match: contains
+
+  - id: core_phone_es
+    suite: core
+    category: core
+    split: test
+    language: es
+    text: "El teléfono de soporte es +34 91 123 45 67."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +34 91 123 45 67
+        match: contains
+
+  - id: core_phone_it
+    suite: core
+    category: core
+    split: test
+    language: it
+    text: "Il numero di telefono è +39 06 1234 5678."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +39 06 1234 5678
+        match: contains
+
+  - id: core_phone_nl
+    suite: core
+    category: core
+    split: test
+    language: nl
+    text: "Het telefoonnummer is +31 20 123 4567."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +31 20 123 4567
+        match: contains
+
+  - id: core_phone_pt
+    suite: core
+    category: core
+    split: test
+    language: pt
+    text: "O número de telefone é +351 21 123 4567."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +351 21 123 4567
+        match: contains
+
+  - id: core_phone_pl
+    suite: core
+    category: core
+    split: test
+    language: pl
+    text: "Numer telefonu kontaktowego to +48 22 123 45 67."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +48 22 123 45 67
+        match: contains
+
+  - id: core_phone_ro
+    suite: core
+    category: core
+    split: test
+    language: ro
+    text: "Numărul de telefon este +40 21 123 4567."
+    expected:
+      - entity: PHONE_NUMBER
+        text: +40 21 123 4567
+        match: contains
+
+  - id: core_credit_card_spaces
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "Use test card 4111 1111 1111 1111 for the checkout sandbox."
+    expected:
+      - entity: CREDIT_CARD
+        text: 4111 1111 1111 1111
+        match: exact
+
+  - id: core_credit_card_hyphen
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "Use card 4012-8888-8888-1881 for the payment test."
+    expected:
+      - entity: CREDIT_CARD
+        text: 4012-8888-8888-1881
+        match: exact
+
+  - id: core_iban_de
+    suite: core
+    category: core
+    split: test
+    language: de
+    text: "Das Auszahlungskonto lautet DE89370400440532013000."
+    expected:
+      - entity: IBAN_CODE
+        text: DE89370400440532013000
+        match: exact
+
+  - id: core_iban_it
+    suite: core
+    category: core
+    split: test
+    language: it
+    text: "Il conto del fornitore e IT60X0542811101000000123456."
+    expected:
+      - entity: IBAN_CODE
+        text: IT60X0542811101000000123456
+        match: exact
+
+  - id: core_iban_fr
+    suite: core
+    category: core
+    split: test
+    language: fr
+    text: "Le compte fournisseur est FR1420041010050500013M02606."
+    expected:
+      - entity: IBAN_CODE
+        text: FR1420041010050500013M02606
+        match: exact
+
+  - id: core_iban_es
+    suite: core
+    category: core
+    split: test
+    language: es
+    text: "La cuenta de pago es ES9121000418450200051332."
+    expected:
+      - entity: IBAN_CODE
+        text: ES9121000418450200051332
+        match: exact
+
+  - id: core_iban_nl
+    suite: core
+    category: core
+    split: test
+    language: nl
+    text: "De betaalrekening is NL91ABNA0417164300."
+    expected:
+      - entity: IBAN_CODE
+        text: NL91ABNA0417164300
+        match: exact
+
+  - id: core_iban_pt
+    suite: core
+    category: core
+    split: test
+    language: pt
+    text: "A conta de pagamento e PT50000201231234567890154."
+    expected:
+      - entity: IBAN_CODE
+        text: PT50000201231234567890154
+        match: exact
+
+  - id: core_iban_pl
+    suite: core
+    category: core
+    split: test
+    language: pl
+    text: "Rachunek płatności to PL61109010140000071219812874."
+    expected:
+      - entity: IBAN_CODE
+        text: PL61109010140000071219812874
+        match: exact
+
+  - id: core_iban_ro
+    suite: core
+    category: core
+    split: test
+    language: ro
+    text: "Contul de plată este RO49AAAA1B31007593840000."
+    expected:
+      - entity: IBAN_CODE
+        text: RO49AAAA1B31007593840000
+        match: exact
+
+  - id: core_ipv4_public
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "The last login came from IP address 203.0.113.42."
+    expected:
+      - entity: IP_ADDRESS
+        text: 203.0.113.42
+        match: exact
+
+  - id: core_ipv4_private
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "The admin panel is reachable at private IP 10.24.8.5."
+    expected:
+      - entity: IP_ADDRESS
+        text: 10.24.8.5
+        match: exact
+
+  - id: core_person_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "John Smith approved the access request yesterday."
+    expected:
+      - entity: PERSON
+        text: John Smith
+        match: contains
+
+  - id: core_location_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "The backup office is located in Berlin."
+    expected:
+      - entity: LOCATION
+        text: Berlin
+        match: contains

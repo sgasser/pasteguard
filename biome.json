@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["src/**/*.ts"]
+    "includes": ["src/**/*.ts", "benchmarks/pii-accuracy/*.ts"]
   },
   "formatter": {
     "enabled": true,

@@ -1,0 +1,261 @@
+cases:
+  - id: sentence_en_all_entities
+    suite: multilingual-sentences
+    category: eval
+    split: test
+    language: en
+    text: "Emma Carter in London uses emma.carter@example.com, phone +44 20 7946 0958, card 4111 1111 1111 1111, IBAN GB82WEST12345698765432, and IP 203.0.113.42."
+    expected:
+      - entity: PERSON
+        text: Emma Carter
+        match: contains
+      - entity: LOCATION
+        text: London
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: emma.carter@example.com
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +44 20 7946 0958
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4111 1111 1111 1111
+        match: exact
+      - entity: IBAN_CODE
+        text: GB82WEST12345698765432
+        match: exact
+      - entity: IP_ADDRESS
+        text: 203.0.113.42
+        match: exact
+
+  - id: sentence_de_all_entities
+    suite: multilingual-sentences
+    category: eval
+    split: test
+    language: de
+    text: "Lena Fischer in Berlin nutzt lena.fischer@example.de, Telefon +49 30 12345678, Karte 4012 8888 8888 1881, IBAN DE89370400440532013000 und IP 198.51.100.17."
+    expected:
+      - entity: PERSON
+        text: Lena Fischer
+        match: contains
+      - entity: LOCATION
+        text: Berlin
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: lena.fischer@example.de
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +49 30 12345678
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4012 8888 8888 1881
+        match: exact
+      - entity: IBAN_CODE
+        text: DE89370400440532013000
+        match: exact
+      - entity: IP_ADDRESS
+        text: 198.51.100.17
+        match: exact
+
+  - id: sentence_es_all_entities
+    suite: multilingual-sentences
+    category: eval
+    split: test
+    language: es
+    text: "Lucia Romero en Madrid usa lucia.romero@example.es, telefono +34 91 123 45 67, tarjeta 5555 5555 5555 4444, IBAN ES9121000418450200051332 e IP 192.0.2.88."
+    expected:
+      - entity: PERSON
+        text: Lucia Romero
+        match: contains
+      - entity: LOCATION
+        text: Madrid
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: lucia.romero@example.es
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +34 91 123 45 67
+        match: contains
+      - entity: CREDIT_CARD
+        text: 5555 5555 5555 4444
+        match: exact
+      - entity: IBAN_CODE
+        text: ES9121000418450200051332
+        match: exact
+      - entity: IP_ADDRESS
+        text: 192.0.2.88
+        match: exact
+
+  - id: sentence_fr_all_entities
+    suite: multilingual-sentences
+    category: eval
+    split: test
+    language: fr
+    text: "Camille Durand a Paris utilise camille.durand@example.fr, telephone +33 1 42 68 53 00, carte 4242 4242 4242 4242, IBAN FR1420041010050500013M02606 et IP 10.24.8.5."
+    expected:
+      - entity: PERSON
+        text: Camille Durand
+        match: contains
+      - entity: LOCATION
+        text: Paris
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: camille.durand@example.fr
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +33 1 42 68 53 00
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4242 4242 4242 4242
+        match: exact
+      - entity: IBAN_CODE
+        text: FR1420041010050500013M02606
+        match: exact
+      - entity: IP_ADDRESS
+        text: 10.24.8.5
+        match: exact
+
+  - id: sentence_it_all_entities
+    suite: multilingual-sentences
+    category: eval
+    split: test
+    language: it
+    text: "Marco Conti a Torino usa marco.conti@example.it, telefono +39 06 1234 5678, carta 4111 1111 1111 1111, IBAN IT60X0542811101000000123456 e IP 172.16.4.20."
+    expected:
+      - entity: PERSON
+        text: Marco Conti
+        match: contains
+      - entity: LOCATION
+        text: Torino
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: marco.conti@example.it
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +39 06 1234 5678
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4111 1111 1111 1111
+        match: exact
+      - entity: IBAN_CODE
+        text: IT60X0542811101000000123456
+        match: exact
+      - entity: IP_ADDRESS
+        text: 172.16.4.20
+        match: exact
+
+  - id: sentence_nl_all_entities
+    suite: multilingual-sentences
+    category: eval
+    split: test
+    language: nl
+    text: "Daan Jansen in Utrecht gebruikt daan.jansen@example.nl, telefoon +31 20 123 4567, kaart 5555 5555 5555 4444, IBAN NL91ABNA0417164300 en IP 8.8.4.4."
+    expected:
+      - entity: PERSON
+        text: Daan Jansen
+        match: contains
+      - entity: LOCATION
+        text: Utrecht
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: daan.jansen@example.nl
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +31 20 123 4567
+        match: contains
+      - entity: CREDIT_CARD
+        text: 5555 5555 5555 4444
+        match: exact
+      - entity: IBAN_CODE
+        text: NL91ABNA0417164300
+        match: exact
+      - entity: IP_ADDRESS
+        text: 8.8.4.4
+        match: exact
+
+  - id: sentence_pl_all_entities
+    suite: multilingual-sentences
+    category: eval
+    split: test
+    language: pl
+    text: "Piotr Nowak w Warszawie używa piotr.nowak@example.pl, telefonu +48 22 123 45 67, karty 4111 1111 1111 1111, IBAN PL61109010140000071219812874 i IP 1.1.1.1."
+    expected:
+      - entity: PERSON
+        text: Piotr Nowak
+        match: contains
+      - entity: LOCATION
+        text: Warszawie
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: piotr.nowak@example.pl
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +48 22 123 45 67
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4111 1111 1111 1111
+        match: exact
+      - entity: IBAN_CODE
+        text: PL61109010140000071219812874
+        match: exact
+      - entity: IP_ADDRESS
+        text: 1.1.1.1
+        match: exact
+
+  - id: sentence_pt_all_entities
+    suite: multilingual-sentences
+    category: eval
+    split: test
+    language: pt
+    text: "Ana Pereira em Lisboa usa ana.pereira@example.pt, telefone +351 21 123 4567, cartao 4012 8888 8888 1881, IBAN PT50000201231234567890154 e IP 45.67.89.10."
+    expected:
+      - entity: PERSON
+        text: Ana Pereira
+        match: contains
+      - entity: LOCATION
+        text: Lisboa
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: ana.pereira@example.pt
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +351 21 123 4567
+        match: contains
+      - entity: CREDIT_CARD
+        text: 4012 8888 8888 1881
+        match: exact
+      - entity: IBAN_CODE
+        text: PT50000201231234567890154
+        match: exact
+      - entity: IP_ADDRESS
+        text: 45.67.89.10
+        match: exact
+
+  - id: sentence_ro_all_entities
+    suite: multilingual-sentences
+    category: eval
+    split: test
+    language: ro
+    text: "Elena Ionescu din Bucuresti foloseste elena.ionescu@example.ro, telefon +40 21 123 4567, card 5555 5555 5555 4444, IBAN RO49AAAA1B31007593840000 si IP 185.199.108.153."
+    expected:
+      - entity: PERSON
+        text: Elena Ionescu
+        match: contains
+      - entity: LOCATION
+        text: Bucuresti
+        match: contains
+      - entity: EMAIL_ADDRESS
+        text: elena.ionescu@example.ro
+        match: exact
+      - entity: PHONE_NUMBER
+        text: +40 21 123 4567
+        match: contains
+      - entity: CREDIT_CARD
+        text: 5555 5555 5555 4444
+        match: exact
+      - entity: IBAN_CODE
+        text: RO49AAAA1B31007593840000
+        match: exact
+      - entity: IP_ADDRESS
+        text: 185.199.108.153
+        match: exact

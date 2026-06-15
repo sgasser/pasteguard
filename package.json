@@ -10,9 +10,10 @@
     "build": "bun build src/index.ts --outdir dist --target bun --external lightningcss",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "lint": "biome lint src",
-    "format": "biome format src --write",
-    "check": "biome check src",
+    "typecheck:benchmarks": "tsc --noEmit --project tsconfig.benchmarks.json",
+    "lint": "biome lint src benchmarks/pii-accuracy/*.ts",
+    "format": "biome format src benchmarks/pii-accuracy/*.ts --write",
+    "check": "biome check src benchmarks/pii-accuracy/*.ts",
     "benchmark:accuracy": "bun run benchmarks/pii-accuracy/run.ts"
   },
   "dependencies": {

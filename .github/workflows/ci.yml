@@ -24,6 +24,9 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Benchmark type check
+        run: bun run typecheck:benchmarks
+
       - name: Lint & format check
         run: bun run check
 

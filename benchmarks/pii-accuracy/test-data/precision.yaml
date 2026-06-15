@@ -1,0 +1,144 @@
+cases:
+  - id: precision_obfuscated_email
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [EMAIL_ADDRESS]
+    text: "Reach support at support [at] example [dot] com."
+    expected: []
+
+  - id: precision_malformed_email
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [EMAIL_ADDRESS]
+    text: "The placeholder alice@@example..com is not a valid mailbox."
+    expected: []
+
+  - id: precision_invalid_credit_card
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [CREDIT_CARD]
+    text: "The internal test number 4111 1111 1111 1112 is invalid."
+    expected: []
+
+  - id: precision_short_iban
+    suite: precision
+    category: precision
+    split: test
+    language: de
+    entities: [IBAN_CODE]
+    text: "Die Zeichenfolge DE001234 ist keine IBAN."
+    expected: []
+
+  - id: precision_invalid_iban_checksum
+    suite: precision
+    category: precision
+    split: test
+    language: de
+    entities: [IBAN_CODE]
+    text: "Die Beispielnummer DE89370400440532013001 hat keine gueltige Pruefsumme."
+    expected: []
+
+  - id: precision_invalid_iban_it_checksum
+    suite: precision
+    category: precision
+    split: test
+    language: it
+    entities: [IBAN_CODE]
+    text: "IBAN con cifra di controllo errata: IT60X0542811101000000123457."
+    expected: []
+
+  - id: precision_version_not_phone
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [PHONE_NUMBER]
+    text: "Release 12.4.8 shipped before ticket 5552671 was closed."
+    expected: []
+
+  - id: precision_order_id_not_phone
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [PHONE_NUMBER]
+    text: "Order 5552671 was closed after release 12.4.8."
+    expected: []
+
+  - id: precision_invalid_ip
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [IP_ADDRESS]
+    text: "The release number 999.12.3.456 is not an IP address."
+    expected: []
+
+  - id: precision_common_words_not_person
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [PERSON]
+    text: "The administrator role approved only read access."
+    expected: []
+
+  - id: precision_fr_roles_not_person_location
+    suite: precision
+    category: precision
+    split: test
+    language: fr
+    entities: [PERSON, LOCATION]
+    text: "Le client souhaite un rendez-vous la semaine prochaine."
+    expected: []
+
+  - id: precision_es_roles_not_person_location
+    suite: precision
+    category: precision
+    split: test
+    language: es
+    entities: [PERSON, LOCATION]
+    text: "El cliente solicita la factura del mes corriente."
+    expected: []
+
+  - id: precision_it_roles_not_person_location
+    suite: precision
+    category: precision
+    split: test
+    language: it
+    entities: [PERSON, LOCATION]
+    text: "Il cliente ha richiesto la fattura entro venerdi."
+    expected: []
+
+  - id: precision_nl_roles_not_person_location
+    suite: precision
+    category: precision
+    split: test
+    language: nl
+    entities: [PERSON, LOCATION]
+    text: "De klant vraagt om een snelle levering deze week."
+    expected: []
+
+  - id: precision_pt_roles_not_person_location
+    suite: precision
+    category: precision
+    split: test
+    language: pt
+    entities: [PERSON, LOCATION]
+    text: "O cliente pediu a fatura ate sexta-feira."
+    expected: []
+
+  - id: precision_cloud_region_not_location
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [LOCATION]
+    text: "The workload moved from eu-west-1 to us-east-1 during the test."
+    expected: []
