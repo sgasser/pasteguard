@@ -24,6 +24,9 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Type check benchmarks
+        run: bun run typecheck:benchmarks
+
       - name: Lint & format check
         run: bun run check
 
@@ -49,6 +52,7 @@ jobs:
           # CPU-only torch so the gliner dependency does not pull the CUDA build.
           .venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
           .venv/bin/pip install -e ".[dev]"
+          .venv/bin/pip install -r ../benchmarks/pii-accuracy/requirements.txt
 
       - name: Lint
         working-directory: detector
@@ -65,6 +69,9 @@ jobs:
       - name: Run tests
         working-directory: detector
         run: .venv/bin/python -m pytest -q
+
+      - name: Check generated benchmark corpus
+        run: detector/.venv/bin/python benchmarks/pii-accuracy/generate.py --check
 
   docker-build:
     name: Docker Build Test

@@ -40,13 +40,14 @@ export interface TestResult {
   falseNegatives: ExpectedEntity[]; // Expected but not detected
   falsePositives: DetectedEntity[]; // Detected but not expected
   truePositives: ExpectedEntity[]; // Correctly detected
+  error?: string; // Detector/API error while running this case
 }
 
 export interface DetectedEntity {
   type: string;
   text: string;
-  start: number;
-  end: number;
+  start?: number;
+  end?: number;
   score: number;
 }
 

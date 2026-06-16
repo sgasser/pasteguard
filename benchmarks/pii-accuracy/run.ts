@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+
 /**
  * PII Detection Accuracy Benchmark
  *
@@ -8,25 +9,28 @@
  *   bun run benchmarks/pii-accuracy/run.ts
  *   bun run benchmarks/pii-accuracy/run.ts --threshold 0.5
  *   bun run benchmarks/pii-accuracy/run.ts --languages de,en
+ *   bun run benchmarks/pii-accuracy/run.ts --mode api --target-url https://pasteguard.eu
  *   bun run benchmarks/pii-accuracy/run.ts --verbose
  */
 
-import { parseArgs } from "util";
+import { parseArgs } from "node:util";
 import { Glob } from "bun";
 import { parse as parseYaml } from "yaml";
 import {
-  TestCaseSchema,
   type AccuracyMetrics,
   type DetectedEntity,
   type ExpectedEntity,
   type TestCase,
+  TestCaseSchema,
   type TestResult,
 } from "./types";
 
-// Configuration
 const DEFAULT_THRESHOLD = 0.7;
-const DETECTOR_URL = process.env.DETECTOR_URL || "http://localhost:5002";
-const TEST_DATA_DIR = import.meta.dir + "/test-data";
+const DEFAULT_DETECTOR_URL = "http://localhost:5002";
+const DEFAULT_API_URL = "http://localhost:3000";
+const TEST_DATA_DIR = `${import.meta.dir}/test-data`;
+
+type BenchmarkMode = "detector" | "api";
 
 // Parse command line arguments
 const { values: args } = parseArgs({
@@ -35,6 +39,9 @@ const { values: args } = parseArgs({
     threshold: { type: "string", short: "t" },
     languages: { type: "string", short: "l" },
     split: { type: "string", short: "s" },
+    mode: { type: "string", short: "m" },
+    "detector-url": { type: "string" },
+    "target-url": { type: "string" },
     verbose: { type: "boolean", short: "v", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -51,6 +58,9 @@ Options:
   -t, --threshold <value>    Score threshold (default: ${DEFAULT_THRESHOLD})
   -l, --languages <langs>    Comma-separated languages to test (e.g., de,en)
   -s, --split <dev|test>     Only run cases from this split (default: all)
+  -m, --mode <detector|api>  Run against the detector /analyze API or PasteGuard /api/mask
+      --detector-url <url>   Detector base URL (default: DETECTOR_URL or ${DEFAULT_DETECTOR_URL})
+      --target-url <url>     PasteGuard app URL for --mode api (default: PASTEGUARD_URL or ${DEFAULT_API_URL})
   -v, --verbose              Show detailed results for each test case
   -h, --help                 Show this help message
 
@@ -58,6 +68,7 @@ Examples:
   bun run benchmarks/pii-accuracy/run.ts
   bun run benchmarks/pii-accuracy/run.ts --threshold 0.5
   bun run benchmarks/pii-accuracy/run.ts --languages de,en
+  bun run benchmarks/pii-accuracy/run.ts --mode api --target-url https://pasteguard.eu --split test
   bun run benchmarks/pii-accuracy/run.ts --verbose
 `);
   process.exit(0);
@@ -67,6 +78,34 @@ const threshold = args.threshold ? Number.parseFloat(args.threshold) : DEFAULT_T
 const verbose = args.verbose ?? false;
 const languageFilter = args.languages?.split(",").map((l) => l.trim().toLowerCase());
 const splitFilter = args.split?.trim().toLowerCase();
+const mode = parseMode(args.mode);
+const detectorUrl = normalizeBaseUrl(
+  args["detector-url"] ?? process.env.DETECTOR_URL ?? DEFAULT_DETECTOR_URL,
+);
+const apiUrl = normalizeBaseUrl(
+  args["target-url"] ?? process.env.PASTEGUARD_URL ?? process.env.TARGET_URL ?? DEFAULT_API_URL,
+);
+
+if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+  console.error(`Invalid threshold: ${args.threshold}. Expected a number from 0 to 1.`);
+  process.exit(1);
+}
+
+if (splitFilter && !["dev", "test"].includes(splitFilter)) {
+  console.error(`Invalid split: ${splitFilter}. Expected "dev" or "test".`);
+  process.exit(1);
+}
+
+function parseMode(value: string | undefined): BenchmarkMode {
+  if (!value) return process.env.PASTEGUARD_URL || process.env.TARGET_URL ? "api" : "detector";
+  if (value === "detector" || value === "api") return value;
+  console.error(`Invalid mode: ${value}. Expected "detector" or "api".`);
+  process.exit(1);
+}
+
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
 
 // Entity types requested from the detector.
 const ENTITY_TYPES = [
@@ -122,12 +161,21 @@ async function loadTestCases(): Promise<TestCase[]> {
 }
 
 /**
- * Call the detector /analyze API
+ * Call the configured target.
  */
 async function detectPII(text: string, language: string): Promise<DetectedEntity[]> {
   if (!text) return [];
+  if (mode === "api") {
+    return detectViaMaskApi(text, language);
+  }
+  return detectViaDetector(text, language);
+}
 
-  const response = await fetch(`${DETECTOR_URL}/analyze`, {
+/**
+ * Call the detector /analyze API.
+ */
+async function detectViaDetector(text: string, language: string): Promise<DetectedEntity[]> {
+  const response = await fetch(`${detectorUrl}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -159,15 +207,66 @@ async function detectPII(text: string, language: string): Promise<DetectedEntity
 }
 
 /**
- * Check if the detector is available
+ * Call PasteGuard's public masking API. This exercises the same app endpoint
+ * users call in production, at the cost of losing detector scores and offsets.
  */
-async function checkDetector(): Promise<boolean> {
+async function detectViaMaskApi(text: string, language: string): Promise<DetectedEntity[]> {
+  const response = await fetch(`${apiUrl}/api/mask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, language, detect: ["pii"] }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`PasteGuard API error: ${response.status} ${await response.text()}`);
+  }
+
+  const data = (await response.json()) as {
+    context?: Record<string, string>;
+    entities?: Array<{ type: string; placeholder: string }>;
+  };
+
+  return (data.entities ?? [])
+    .map((entity) => {
+      const entityText = data.context?.[entity.placeholder] ?? "";
+      const start = entityText ? text.indexOf(entityText) : -1;
+      return {
+        type: entity.type,
+        text: entityText,
+        start: start >= 0 ? start : undefined,
+        end: start >= 0 ? start + entityText.length : undefined,
+        score: 1,
+      };
+    })
+    .filter((entity) => entity.text);
+}
+
+/**
+ * Check if the configured target is available.
+ */
+async function checkTarget(): Promise<boolean> {
   try {
-    const response = await fetch(`${DETECTOR_URL}/health`);
+    if (mode === "detector") {
+      const response = await fetch(`${detectorUrl}/health`);
+      return response.ok;
+    }
+
+    const response = await fetch(`${apiUrl}/api/mask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "benchmark smoke test", language: "en", detect: ["pii"] }),
+    });
     return response.ok;
   } catch {
     return false;
   }
+}
+
+function missingTargetHelp(): string {
+  if (mode === "detector") {
+    return "Start it with:\n  docker compose --profile dev up detector -d";
+  }
+  return `Check the app URL or run locally with:\n  bun run dev\nCurrent target: ${apiUrl}`;
 }
 
 /**
@@ -215,6 +314,24 @@ async function runTestCase(testCase: TestCase): Promise<TestResult> {
     falseNegatives,
     falsePositives,
     truePositives,
+  };
+}
+
+function errorResult(testCase: TestCase, error: unknown): TestResult {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    id: testCase.id,
+    text: testCase.text,
+    language: testCase.language,
+    category: testCase.category,
+    split: testCase.split,
+    passed: false,
+    expected: testCase.expected,
+    detected: [],
+    falseNegatives: testCase.expected,
+    falsePositives: [],
+    truePositives: [],
+    error: message,
   };
 }
 
@@ -288,19 +405,20 @@ async function main(): Promise<void> {
   console.log("║           PII Detection Accuracy Benchmark                 ║");
   console.log("╚════════════════════════════════════════════════════════════╝\n");
 
-  // Check detector availability
-  console.log(`Detector URL: ${DETECTOR_URL}`);
+  // Check target availability
+  console.log(`Mode: ${mode}`);
+  console.log(`Target URL: ${mode === "detector" ? detectorUrl : apiUrl}`);
   console.log(`Threshold: ${threshold}`);
   if (languageFilter) {
     console.log(`Languages: ${languageFilter.join(", ")}`);
   }
 
-  if (!(await checkDetector())) {
-    console.error("\n✗ Detector is not available. Start it with:");
-    console.error("  docker compose up detector -d\n");
+  if (!(await checkTarget())) {
+    console.error("\n✗ Benchmark target is not available.");
+    console.error(`${missingTargetHelp()}\n`);
     process.exit(1);
   }
-  console.log("Detector: ✓ Connected\n");
+  console.log("Target: ✓ Connected\n");
 
   // Load test cases from directory
   const testCases = await loadTestCases();
@@ -324,7 +442,9 @@ async function main(): Promise<void> {
         console.log(`${icon} ${result.id}`);
         if (!result.passed) {
           if (result.falseNegatives.length > 0) {
-            console.log(`    Missed: ${result.falseNegatives.map((e) => `${e.type}:"${e.text}"`).join(", ")}`);
+            console.log(
+              `    Missed: ${result.falseNegatives.map((e) => `${e.type}:"${e.text}"`).join(", ")}`,
+            );
           }
           if (result.falsePositives.length > 0) {
             console.log(
@@ -335,6 +455,7 @@ async function main(): Promise<void> {
       }
     } catch (error) {
       console.error(`Error in test ${testCase.id}:`, error);
+      results.push(errorResult(testCase, error));
     }
   }
 
@@ -372,14 +493,17 @@ async function main(): Promise<void> {
 
   const core = results.filter((r) => r.category === "core");
   const hard = results.filter((r) => r.category === "hard");
+  const evalResults = results.filter((r) => r.category === "eval");
   const corePassed = core.filter((r) => r.passed).length;
   const hardPassed = hard.filter((r) => r.passed).length;
+  const evalPassed = evalResults.filter((r) => r.passed).length;
   console.log(
     `Overall: ${overall.passed}/${overall.total} passed  ` +
-      `(core ${corePassed}/${core.length}, hard ${hardPassed}/${hard.length})\n`,
+      `(core ${corePassed}/${core.length}, hard ${hardPassed}/${hard.length}, ` +
+      `eval ${evalPassed}/${evalResults.length})\n`,
   );
 
-  console.log("Metrics (P=Precision, R=Recall, F1=F1-Score):\n");
+  console.log("Metrics (P=Precision, R=Recall, F1=F1-Score, F2=Recall-weighted):\n");
 
   console.log(
     `  ${"OVERALL".padEnd(20)} P=${formatPercent(overall.precision).padStart(6)}  ` +
@@ -438,7 +562,19 @@ async function main(): Promise<void> {
     console.log(`False Positives (Wrong Detections): ${allFalsePositives.length}`);
     console.log("────────────────────────────────────────────────────────────");
     for (const { testId, entity } of allFalsePositives) {
-      console.log(`  ✗ "${entity.text}" (${entity.type}, score=${entity.score.toFixed(2)}) in ${testId}`);
+      console.log(
+        `  ✗ "${entity.text}" (${entity.type}, score=${entity.score.toFixed(2)}) in ${testId}`,
+      );
+    }
+  }
+
+  const executionErrors = results.filter((r) => r.error);
+  if (executionErrors.length > 0) {
+    console.log("\n────────────────────────────────────────────────────────────");
+    console.log(`Execution Errors: ${executionErrors.length}`);
+    console.log("────────────────────────────────────────────────────────────");
+    for (const result of executionErrors) {
+      console.log(`  ✗ ${result.id}: ${result.error}`);
     }
   }
 
@@ -448,7 +584,7 @@ async function main(): Promise<void> {
   // honest measure of limits, not a pass/fail gate, so their misses don't fail
   // the run (they're already reflected in the metrics above).
   const coreFailed = results.filter((r) => r.category === "core" && !r.passed).length;
-  if (coreFailed > 0) {
+  if (coreFailed > 0 || executionErrors.length > 0) {
     process.exit(1);
   }
 }
