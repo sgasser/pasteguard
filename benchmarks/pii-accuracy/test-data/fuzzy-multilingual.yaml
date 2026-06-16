@@ -1,0 +1,150 @@
+# Fuzzy-label coverage (person/location/organization) across 7 languages.
+# Grows N where model decisions hinge. Synthetic names only.
+# split: dev = for threshold calibration; test = held-out evaluation.
+
+test_cases:
+  # --- PERSON + LOCATION, test split ---
+  - id: ml_de_person_loc
+    text: "Bitte einen Termin mit Klaus Weber in Hamburg vereinbaren."
+    language: de
+    split: test
+    expected:
+      - { type: PERSON, text: "Klaus Weber" }
+      - { type: LOCATION, text: "Hamburg" }
+
+  - id: ml_it_person_loc
+    text: "Chiama Lucia Conti a Napoli per la pratica."
+    language: it
+    split: test
+    expected:
+      - { type: PERSON, text: "Lucia Conti" }
+      - { type: LOCATION, text: "Napoli" }
+
+  - id: ml_fr_person_loc
+    text: "Rendez-vous avec Émile Dubois à Marseille jeudi."
+    language: fr
+    split: test
+    expected:
+      - { type: PERSON, text: "Émile Dubois" }
+      - { type: LOCATION, text: "Marseille" }
+
+  - id: ml_es_person_loc
+    text: "Reunión con Lucía Fernández en Sevilla el lunes."
+    language: es
+    split: test
+    expected:
+      - { type: PERSON, text: "Lucía Fernández" }
+      - { type: LOCATION, text: "Sevilla" }
+
+  - id: ml_en_person_loc
+    text: "Meeting with Karen Mills in Boston next week."
+    language: en
+    split: test
+    expected:
+      - { type: PERSON, text: "Karen Mills" }
+      - { type: LOCATION, text: "Boston" }
+
+  - id: ml_nl_person_loc
+    text: "Afspraak met Jan de Vries in Rotterdam morgen."
+    language: nl
+    split: test
+    expected:
+      - { type: PERSON, text: "Jan de Vries" }
+      - { type: LOCATION, text: "Rotterdam" }
+
+  - id: ml_pt_person_loc
+    text: "Reunião com João Silva em Lisboa na sexta."
+    language: pt
+    split: test
+    expected:
+      - { type: PERSON, text: "João Silva" }
+      - { type: LOCATION, text: "Lisboa" }
+
+  # --- PERSON + LOCATION, dev split (for calibration) ---
+  - id: ml_de_person_loc_dev
+    text: "Frau Petra Schulz aus München hat angerufen."
+    language: de
+    split: dev
+    expected:
+      - { type: PERSON, text: "Petra Schulz" }
+      - { type: LOCATION, text: "München" }
+
+  - id: ml_it_person_loc_dev
+    text: "Il signor Marco Greco di Torino ha scritto."
+    language: it
+    split: dev
+    expected:
+      - { type: PERSON, text: "Marco Greco" }
+      - { type: LOCATION, text: "Torino" }
+
+  - id: ml_fr_person_loc_dev
+    text: "Madame Claire Lefèvre de Toulouse a confirmé."
+    language: fr
+    split: dev
+    expected:
+      - { type: PERSON, text: "Claire Lefèvre" }
+      - { type: LOCATION, text: "Toulouse" }
+
+  - id: ml_es_person_loc_dev
+    text: "El señor Pablo Romero de Valencia llamó ayer."
+    language: es
+    split: dev
+    expected:
+      - { type: PERSON, text: "Pablo Romero" }
+      - { type: LOCATION, text: "Valencia" }
+
+  - id: ml_en_person_loc_dev
+    text: "Mr. David Park from Seattle joined the call."
+    language: en
+    split: dev
+    expected:
+      - { type: PERSON, text: "David Park" }
+      - { type: LOCATION, text: "Seattle" }
+
+  - id: ml_nl_person_loc_dev
+    text: "Mevrouw Anna Bakker uit Utrecht reageerde."
+    language: nl
+    split: dev
+    expected:
+      - { type: PERSON, text: "Anna Bakker" }
+      - { type: LOCATION, text: "Utrecht" }
+
+  # category: hard — the model reliably misses "Porto" as a PT location
+  # ("do Porto"); documented limit, not a guaranteed capability.
+  - id: ml_pt_person_loc_dev
+    text: "O senhor Tiago Costa do Porto respondeu."
+    language: pt
+    split: dev
+    category: hard
+    expected:
+      - { type: PERSON, text: "Tiago Costa" }
+      - { type: LOCATION, text: "Porto" }
+
+  # --- ORGANIZATION with gate-known legal forms ---
+  - id: ml_de_org_dev
+    text: "Die Rechnung kommt von der Weber Logistik GmbH."
+    language: de
+    split: dev
+    expected:
+      - { type: ORGANIZATION, text: "Weber Logistik GmbH" }
+
+  - id: ml_it_org
+    text: "Fattura emessa da Greco Costruzioni S.r.l."
+    language: it
+    split: test
+    expected:
+      - { type: ORGANIZATION, text: "Greco Costruzioni S.r.l." }
+
+  - id: ml_nl_org
+    text: "Factuur van Bakker Handel B.V. ontvangen."
+    language: nl
+    split: test
+    expected:
+      - { type: ORGANIZATION, text: "Bakker Handel B.V." }
+
+  - id: ml_es_org_dev
+    text: "Factura de Romero Consultoría S.L. recibida."
+    language: es
+    split: dev
+    expected:
+      - { type: ORGANIZATION, text: "Romero Consultoría S.L." }

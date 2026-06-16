@@ -24,11 +24,26 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Type check benchmarks
+        run: bun run typecheck:benchmarks
+
       - name: Lint & format check
         run: bun run check
 
       - name: Run tests
         run: bun test
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install benchmark generator dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r benchmarks/pii-accuracy/requirements.txt
+
+      - name: Check generated benchmark corpus
+        run: python benchmarks/pii-accuracy/generate.py --check
 
   docker-build:
     name: Docker Build Test

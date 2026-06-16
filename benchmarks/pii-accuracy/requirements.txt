@@ -1,0 +1,3 @@
+Faker==40.23.0
+PyYAML==6.0.3
+python-stdnum==2.2

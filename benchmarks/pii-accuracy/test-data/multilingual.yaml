@@ -1,0 +1,27 @@
+# Additional core cases for language breadth (FR/ES). Synthetic names only.
+
+test_cases:
+  - id: fr_person_location
+    text: "Merci de contacter Sophie Martin à Lyon avant vendredi."
+    language: fr
+    expected:
+      - type: PERSON
+        text: "Sophie Martin"
+      - type: LOCATION
+        text: "Lyon"
+
+  - id: fr_email
+    text: "Son adresse est sophie.martin@exemple.fr."
+    language: fr
+    expected:
+      - type: EMAIL_ADDRESS
+        text: "sophie.martin@exemple.fr"
+
+  - id: es_person_location
+    text: "Por favor, llame a Carlos García en Madrid mañana."
+    language: es
+    expected:
+      - type: PERSON
+        text: "Carlos García"
+      - type: LOCATION
+        text: "Madrid"
