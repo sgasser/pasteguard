@@ -93,16 +93,25 @@ cases:
     split: test
     language: de
     entities: [LOCATION]
-    text: "Die Lieferadresse lautet Bahnhofstraße 12, 10115 Berlin."
+    text: "Die Lieferadresse lautet Bahnhofstraße 12."
     expected:
       - entity: LOCATION
         text: Bahnhofstraße 12
         match: contains
+
+  - id: hard_address_full_de
+    suite: hard
+    category: hard
+    split: test
+    language: de
+    entities: [LOCATION]
+    text: "Die Lieferadresse lautet Bahnhofstraße 12, 10115 Berlin."
+    expected:
       - entity: LOCATION
-        text: Berlin
+        text: Bahnhofstraße 12, 10115 Berlin
         match: contains
 
-  - id: hard_address_street_en
+  - id: hard_address_full_en
     suite: hard
     category: hard
     split: test
@@ -111,13 +120,10 @@ cases:
     text: "Ship the order to 1600 Pennsylvania Avenue, Washington."
     expected:
       - entity: LOCATION
-        text: 1600 Pennsylvania Avenue
-        match: contains
-      - entity: LOCATION
-        text: Washington
+        text: 1600 Pennsylvania Avenue, Washington
         match: contains
 
-  - id: hard_address_street_fr
+  - id: hard_address_full_fr
     suite: hard
     category: hard
     split: test
@@ -126,8 +132,5 @@ cases:
     text: "L'adresse de livraison est 25 Rue du Faubourg Saint-Honoré, Paris."
     expected:
       - entity: LOCATION
-        text: 25 Rue du Faubourg Saint-Honoré
-        match: contains
-      - entity: LOCATION
-        text: Paris
+        text: 25 Rue du Faubourg Saint-Honoré, Paris
         match: contains
