@@ -285,6 +285,50 @@ cases:
         text: John Smith
         match: contains
 
+  - id: core_person_non_western_arabic
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "Please add Amina Al-Rashid to the project access list."
+    expected:
+      - entity: PERSON
+        text: Amina Al-Rashid
+        match: contains
+
+  - id: core_person_non_western_chinese
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "The reviewer Wei Zhang approved the vendor exception."
+    expected:
+      - entity: PERSON
+        text: Wei Zhang
+        match: contains
+
+  - id: core_person_non_western_indian
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "Escalate the open ticket to Priya Krishnan in support."
+    expected:
+      - entity: PERSON
+        text: Priya Krishnan
+        match: contains
+
+  - id: core_person_non_western_turkish_de
+    suite: core
+    category: core
+    split: test
+    language: de
+    text: "Bitte trage Mehmet Yıldız in die Zugriffsliste ein."
+    expected:
+      - entity: PERSON
+        text: Mehmet Yıldız
+        match: contains
+
   - id: core_location_en
     suite: core
     category: core
