@@ -33,15 +33,11 @@ COPY tsconfig.json ./
 # =============================================================================
 FROM python:3.11-slim AS detector
 
-# CPU-only torch so the GLiNER dependency does not pull the CUDA build. On
-# x86_64 the CUDA build lives on the default index, so pin the CPU index; the
-# aarch64 wheels on PyPI are already CPU-only, so install those directly.
-ARG TARGETARCH
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        pip install --no-cache-dir torch; \
-    else \
-        pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu; \
-    fi
+# CPU-only torch. The CPU index serves both x86_64 and aarch64 CPU wheels, so
+# pin it for every arch. (PyPI's DEFAULT index now ships CUDA builds for
+# linux/arm64 too — e.g. torch 2.x+cuXXX — which would drag ~6 GB of unused
+# CUDA libraries into the image; the explicit CPU index avoids that.)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
 # Install the detector package (pulls fastapi/uvicorn/gliner/stdnum/...).
 COPY detector/pyproject.toml /srv/detector/
