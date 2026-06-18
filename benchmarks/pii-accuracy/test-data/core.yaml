@@ -339,3 +339,36 @@ cases:
       - entity: LOCATION
         text: Berlin
         match: contains
+
+  - id: core_vat_de
+    suite: core
+    category: core
+    split: test
+    language: de
+    text: "Rechnung mit USt-IdNr DE136695976 anbei."
+    expected:
+      - entity: VAT_CODE
+        text: DE136695976
+        match: exact
+
+  - id: core_vat_it
+    suite: core
+    category: core
+    split: test
+    language: it
+    text: "Partita IVA IT00743110157 in fattura."
+    expected:
+      - entity: VAT_CODE
+        text: IT00743110157
+        match: exact
+
+  - id: core_vat_fr
+    suite: core
+    category: core
+    split: test
+    language: fr
+    text: "Numero de TVA FR40303265045 sur la facture."
+    expected:
+      - entity: VAT_CODE
+        text: FR40303265045
+        match: exact

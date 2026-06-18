@@ -14,6 +14,7 @@ import re
 import phonenumbers
 from stdnum import iban as _iban_lib
 from stdnum import luhn as _luhn
+from stdnum.eu import vat as _eu_vat
 
 from .entities import (
     CREDIT_CARD,
@@ -21,6 +22,7 @@ from .entities import (
     IBAN_CODE,
     IP_ADDRESS,
     PHONE_NUMBER,
+    VAT_CODE,
     Span,
     overlaps,
 )
@@ -72,6 +74,10 @@ _IBAN_RE = re.compile(
 _CC_RE = re.compile(r"(?<![\d])(?:\d[ \-]?){13,19}(?<![\s\-])(?!\d)")
 # IPv6: generous candidate (hex/colon/dot) gated by Python's ipaddress parser.
 _IPV6_RE = re.compile(r"(?<![\w:.])[0-9A-Fa-f.:]{2,45}(?![\w:.])")
+# EU VAT: 2-letter member-state prefix + country body, validated by stdnum's
+# per-country checksum (so the regex stays permissive; FP profile like IBAN). An
+# IBAN's longer alnum run can't satisfy the trailing boundary, so they don't collide.
+_VAT_RE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2}) ?([0-9A-Za-z]{8,12})(?![A-Za-z0-9])")
 
 
 def _email(text: str) -> list[Span]:
@@ -124,6 +130,14 @@ def _iban(text: str) -> list[Span]:
     return out
 
 
+def _vat(text: str) -> list[Span]:
+    out: list[Span] = []
+    for m in _VAT_RE.finditer(text):
+        if _eu_vat.is_valid(m.group(1) + m.group(2)):
+            out.append(Span(VAT_CODE, m.start(), m.end(), 1.0))
+    return out
+
+
 def _credit_card(text: str) -> list[Span]:
     out: list[Span] = []
     for m in _CC_RE.finditer(text):
@@ -164,6 +178,7 @@ def detect_deterministic(text: str, language: str = "") -> list[Span]:
     ordered += _ipv6(text)
     ordered += _ipv4(text)
     ordered += _iban(text)
+    ordered += _vat(text)
     ordered += _credit_card(text)
     ordered += _phone(text, language)
 

@@ -70,6 +70,7 @@ const PIIDetectionSchema = z.object({
       "CREDIT_CARD",
       "IBAN_CODE",
       "IP_ADDRESS",
+      "VAT_CODE",
     ]),
   scan_roles: z.array(z.string()).optional(),
 });

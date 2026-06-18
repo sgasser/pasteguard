@@ -9,6 +9,7 @@ from detector.entities import (
     IBAN_CODE,
     IP_ADDRESS,
     PHONE_NUMBER,
+    VAT_CODE,
 )
 
 
@@ -56,6 +57,36 @@ def test_iban_does_not_bleed_into_following_word():
     spans = detect_deterministic("IBAN IT60 X054 2811 1010 0000 0123 456 entro", "it")
     iban = next(s for s in spans if s.entity_type == IBAN_CODE)
     assert "entro" not in "IBAN IT60 X054 2811 1010 0000 0123 456 entro"[iban.start : iban.end]
+
+
+# --- VAT (EU, stdnum-validated) ---
+def test_vat_valid_multiple_countries():
+    for v, lang in [
+        ("DE136695976", "de"),
+        ("IT00743110157", "it"),
+        ("FR40303265045", "fr"),
+        ("ESA13585625", "es"),
+        ("ATU13585627", "de"),
+        ("BE0428759497", "nl"),
+        ("PL5260001246", "pl"),
+    ]:
+        assert (VAT_CODE, v) in types_texts(f"VAT {v} on the invoice", lang)
+
+
+def test_vat_spaced_after_prefix():
+    assert (VAT_CODE, "DE 136695976") in types_texts("USt-IdNr DE 136695976", "de")
+
+
+def test_vat_invalid_checksum_rejected():
+    assert all(t != VAT_CODE for t, _ in types_texts("VAT DE136695977 is wrong", "de"))
+
+
+def test_vat_does_not_claim_iban():
+    # An IBAN must stay IBAN_CODE and never be mistagged as VAT.
+    text = "auf IBAN DE89 3704 0044 0532 0130 00"
+    types = types_texts(text, "de")
+    assert (IBAN_CODE, "DE89 3704 0044 0532 0130 00") in types
+    assert all(t != VAT_CODE for t, _ in types)
 
 
 # --- Email / IP ---

@@ -20,6 +20,7 @@ pii_detection:
     - CREDIT_CARD
     - IBAN_CODE
     - IP_ADDRESS
+    - VAT_CODE
 ```
 
 ## Options
@@ -60,8 +61,9 @@ If only one language is configured, language detection is skipped for better per
 | `CREDIT_CARD` | 4111 1111 1111 1111 |
 | `IBAN_CODE` | DE89 3704 0044 0532 0130 00 |
 | `IP_ADDRESS` | 192.168.1.1 |
+| `VAT_CODE` | EU VAT number, e.g. `DE136695976`, `IT00743110157`, `FR40303265045` |
 
-Names and locations are multilingual. IBAN, credit card, phone, email, and IP are international. The structured identifiers (IBAN, credit card, IP) are checksum- or format-validated, so they are caught with high precision and without false positives on lookalike numbers.
+Names and locations are multilingual. IBAN, credit card, phone, email, and IP are international. `VAT_CODE` covers any EU member state — validated per-country via the VAT checksum (`python-stdnum`) and requiring the country prefix; a bare domestic number without it is not flagged. The structured identifiers (IBAN, credit card, IP, VAT) are checksum- or format-validated, so they are caught with high precision and without false positives on lookalike numbers.
 
 ## Score Threshold
 

@@ -117,7 +117,7 @@ Every request is logged with masking details. See what was detected, what was ma
 
 ## What it catches
 
-**Personal data** — Names, locations, emails, phone numbers, credit cards, IBANs, and IP addresses. Works in many languages.
+**Personal data** — Names, locations, emails, phone numbers, credit cards, IBANs, IP addresses, and EU VAT numbers. Works in many languages.
 
 **Secrets** — API keys (OpenAI, Anthropic, Stripe, AWS, GitHub), SSH and PEM private keys, JWT tokens, bearer tokens, passwords, connection strings.
 

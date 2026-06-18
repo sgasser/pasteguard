@@ -84,6 +84,7 @@ pii_detection:
     - CREDIT_CARD
     - IBAN_CODE
     - IP_ADDRESS
+    - VAT_CODE  # EU VAT number (any member state; requires country prefix)
 
   # Which message roles to scan for PII (optional)
   # By default, all roles are scanned. Set this to scan only user-controlled content:

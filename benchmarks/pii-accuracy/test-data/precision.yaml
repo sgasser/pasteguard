@@ -277,3 +277,12 @@ cases:
     note: "GLiNER tags the German term 'Mandant' (client) as PERSON (~0.9) even against suppressor labels; it is not suppressed. Report-only."
     text: "Der Mandant hat die Unterlagen eingereicht."
     expected: []
+
+  - id: precision_invalid_vat_checksum
+    suite: precision
+    category: precision
+    split: test
+    language: de
+    entities: [VAT_CODE]
+    text: "Die Referenz DE136695977 hat keine gueltige Pruefsumme."
+    expected: []
