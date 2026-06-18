@@ -141,7 +141,7 @@ cases:
     language: en
     entities: [LOCATION]
     gate: false
-    note: "GLiNER tags cloud-region codes (eu-west-1, us-east-1) as LOCATION (~0.94). The model reads them as places; no threshold or competing label separates them (tested), and a structural regex would just be a hardcoded carve-out. Known model limitation, tracked report-only. Harmless over-masking, never an under-mask."
+    note: "GLiNER tags cloud-region codes (eu-west-1, us-east-1) as LOCATION (~0.94); a known model limitation, tracked report-only (over-masking, not a leak)."
     text: "The workload moved from eu-west-1 to us-east-1 during the test."
     expected: []
 
@@ -199,7 +199,7 @@ cases:
     language: ro
     entities: [PERSON, LOCATION]
     gate: false
-    note: "GLiNER tags the Romanian role noun 'Clientul' (the client) as PERSON/LOCATION (~0.85), and unlike the other languages here (le client, il cliente, etc.) the suppressor labels do not demote it. Report-only."
+    note: "GLiNER tags the Romanian role noun 'Clientul' as PERSON (~0.85); the suppressor labels don't demote it here. Report-only."
     text: "Clientul cere factura până la sfârșitul săptămânii."
     expected: []
 
@@ -252,7 +252,7 @@ cases:
     language: de
     entities: [PERSON, LOCATION]
     gate: false
-    note: "GLiNER tags the German pronoun 'Ich' as PERSON (~0.97), above the person floor and not separable by a competing label. Report-only until a pronoun guard or per-deployment config handles it."
+    note: "GLiNER tags the German pronoun 'Ich' as PERSON (~0.97), above the floor and not separable by a competing label. Report-only."
     text: "Ich habe die Rechnung bereits bezahlt."
     expected: []
 

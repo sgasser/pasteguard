@@ -23,19 +23,13 @@ def _floor(label: str, default: float) -> float:
 
 
 # Per-label confidence floors (calibrated against the accuracy benchmark;
-# overridable via env, e.g. DETECTOR_FLOOR_LOCATION=0.6). The person floor at
-# 0.85 trims low-confidence name noise; generic role nouns are demoted by the
-# suppressor labels (below), not this floor. High-confidence common-word false
-# positives (pronouns like "Ich"/"He" at ~0.96) sit above this floor and are a
-# known, tracked limitation (see the benchmark negative controls).
+# overridable via env, e.g. DETECTOR_FLOOR_LOCATION=0.6). Role nouns are demoted
+# by the suppressor labels (below), not by this floor.
 PER_LABEL_FLOOR = {
     "person": _floor("person", 0.85),
     "location": _floor("location", 0.50),
-    # Street addresses: GLiNER scores real addresses very high (>= 0.95) but a
-    # bare city under the "location" label often falls below the location floor,
-    # so a dedicated "address" label recovers full street addresses. Reported as
-    # LOCATION (see _LABEL_TO_TYPE) to keep the entity set unchanged. High floor
-    # because the model is confident on true addresses.
+    # A dedicated "address" label recovers full street addresses that a bare
+    # "location" reading misses; emitted as LOCATION (see _LABEL_TO_TYPE).
     "address": _floor("address", 0.70),
 }
 # Labels the request `score_threshold` may raise (high-volume, deployment-tunable).
@@ -49,11 +43,9 @@ _LABEL_TO_TYPE = {
     # LOCATION so the response entity set stays the Presidio drop-in set.
     "address": LOCATION,
 }
-# Suppressor labels: predicted alongside the emit labels only to give GLiNER a
-# competing reading for generic role nouns (client/customer/principal and their
-# article/inflected forms in any language). GLiNER assigns such tokens to one of
-# these instead of "person", so they drop out without a per-language denylist,
-# while real names keep scoring as "person" (>= ~0.99). Never emitted.
+# Suppressor labels: predicted but never emitted. They give GLiNER a competing
+# reading for generic role nouns (client/customer/...) in any language, so it
+# tags those instead of "person" — no per-language denylist needed.
 _SUPPRESS_LABELS = ["customer", "role"]
 _PREDICT_LABELS = _LABELS + _SUPPRESS_LABELS
 # Capture candidates below every floor so per-label filtering has them.
