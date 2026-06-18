@@ -56,8 +56,9 @@ masking:
 
 # PII Detection settings (detector service, /analyze contract)
 pii_detection:
-  # URL of the detector service (see detector/). Defaults to localhost for local
-  # dev; docker-compose overrides it with the in-network hostname.
+  # URL of the detector service (see detector/). Defaults to localhost, which is
+  # correct both for the all-in-one image (detector in the same container) and
+  # for local dev (bun run dev against the docker-compose detector service).
   detector_url: ${DETECTOR_URL:-http://localhost:5002}
 
   # Detection is multilingual and language-agnostic — one model finds entities

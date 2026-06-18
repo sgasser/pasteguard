@@ -1,7 +1,7 @@
 """Unit tests for the GLiNER layer's precision calibration (no model load).
 
-The cloud-region gate, role-noun suppressor labels, and per-label floors are the
-precision layer; the full model integration is covered by benchmarks/pii-accuracy.
+The role-noun suppressor labels and per-label floors are the precision layer; the
+full model integration is covered by benchmarks/pii-accuracy.
 """
 
 import pytest
@@ -52,6 +52,6 @@ def test_windows_overlapping_and_cover_long_text():
 def test_per_label_floors_present_and_ordered():
     assert set(PER_LABEL_FLOOR) == {"person", "location", "address"}
     assert all(0.0 <= v <= 1.0 for v in PER_LABEL_FLOOR.values())
-    # Person carries a stricter floor than location (higher volume, no structural
-    # guard), while location leans on the cloud-region guard for precision.
+    # Person carries a stricter floor than location: higher volume and no
+    # structural validator, so a higher floor curbs false positives.
     assert PER_LABEL_FLOOR["location"] <= PER_LABEL_FLOOR["person"]
