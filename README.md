@@ -33,7 +33,7 @@
 </picture>
 
 <p align="center">
-  Detects 30+ types of sensitive data across 24 languages.<br>
+  Detects personal data and secrets in many languages.<br>
   Your data never leaves your machine.
 </p>
 
@@ -52,7 +52,7 @@
 Run PasteGuard as a local proxy:
 
 ```bash
-docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:en
+docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:latest
 ```
 
 Point your tools or app to PasteGuard instead of the provider:
@@ -68,18 +68,7 @@ Point your tools or app to PasteGuard instead of the provider:
 client = OpenAI(base_url="http://localhost:3000/openai/v1")
 ```
 
-<details>
-<summary><strong>European Languages</strong></summary>
-
-For German, Spanish, French, Italian, Dutch, Polish, Portuguese, and Romanian:
-
-```bash
-docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:eu
-```
-
-For custom config, persistent logs, or other languages: **[Read the docs →](https://pasteguard.com/docs/installation)**
-
-</details>
+Detection is multilingual out of the box — no per-language images or setup. For custom config or persistent logs: **[Read the docs →](https://pasteguard.com/docs/installation)**
 
 <details>
 <summary><strong>Route Mode</strong></summary>
@@ -128,15 +117,21 @@ Every request is logged with masking details. See what was detected, what was ma
 
 ## What it catches
 
-**Personal data** — Names, emails, phone numbers, credit cards, IBANs, IP addresses, locations. Powered by [Microsoft Presidio](https://microsoft.github.io/presidio/). 24 languages.
+**Personal data** — Names, locations, emails, phone numbers, credit cards, IBANs, and IP addresses. Works in many languages.
 
 **Secrets** — API keys (OpenAI, Anthropic, Stripe, AWS, GitHub), SSH and PEM private keys, JWT tokens, bearer tokens, passwords, connection strings.
 
 Both detected and masked in real time, including streaming responses.
 
+## How detection works
+
+Detection runs as a separate service that PasteGuard calls over HTTP, so you can run it wherever you like. It mixes two things: exact checks with checksums (IBANs, credit cards, emails, phones, IPs) and a small AI model ([GLiNER](https://github.com/urchade/GLiNER)) for names and places. It works the same in any language.
+
+Code, Docker image, and tests are in [`detector/`](detector/).
+
 ## Tech Stack
 
-[Bun](https://bun.sh) · [Hono](https://hono.dev) · [Microsoft Presidio](https://microsoft.github.io/presidio/) · SQLite
+[Bun](https://bun.sh) · [Hono](https://hono.dev) · [GLiNER](https://github.com/urchade/GLiNER) + [python-stdnum](https://arthurdejong.org/python-stdnum/) ([`detector/`](detector/)) · SQLite
 
 ## Contributing
 

@@ -19,7 +19,7 @@ Primary endpoints:
 - Validation: Zod
 - Styling: Tailwind CSS v4
 - Database: SQLite at `data/pasteguard.db`
-- PII detection: Microsoft Presidio
+- PII detection: GLiNER + regex/checksum detector service (`detector/`) exposing `/analyze`
 - Formatting/linting: Biome
 
 ## Commands

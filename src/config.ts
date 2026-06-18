@@ -43,8 +43,8 @@ const MaskingSchema = z.object({
 
 const LanguageEnum = z.enum(SUPPORTED_LANGUAGES);
 
-// Accept either array or comma-separated string for languages
-// This allows using env vars like PASTEGUARD_LANGUAGES=en,de,fr
+// Accept either an array or a comma-separated string for languages (the latter
+// supports ${ENV_VAR} substitution in the YAML config, e.g. languages: ${LANGS:-en}).
 const LanguagesSchema = z
   .union([z.array(LanguageEnum), z.string()])
   .transform((val) => {
@@ -56,7 +56,7 @@ const LanguagesSchema = z
 
 const PIIDetectionSchema = z.object({
   enabled: z.boolean().default(true),
-  presidio_url: z.string().url(),
+  detector_url: z.string().url(),
   languages: LanguagesSchema,
   fallback_language: LanguageEnum.default("en"),
   score_threshold: z.coerce.number().min(0).max(1).default(0.7),
@@ -64,12 +64,12 @@ const PIIDetectionSchema = z.object({
     .array(z.string())
     .default([
       "PERSON",
+      "LOCATION",
       "EMAIL_ADDRESS",
       "PHONE_NUMBER",
       "CREDIT_CARD",
       "IBAN_CODE",
       "IP_ADDRESS",
-      "LOCATION",
     ]),
   scan_roles: z.array(z.string()).optional(),
 });

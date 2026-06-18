@@ -22,7 +22,6 @@ mock.module("../pii/detect", () => ({
     analyzeRequest: mockAnalyzeRequest,
     detectPII: mock(() => Promise.resolve([])),
     healthCheck: mock(() => Promise.resolve(true)),
-    getLanguageValidation: mock(() => undefined),
   }),
 }));
 

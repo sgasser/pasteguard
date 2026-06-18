@@ -1,0 +1,14 @@
+.git
+node_modules
+dist
+data
+config.yaml
+.env
+.gstack
+.context
+.conductor
+**/__pycache__
+**/*.pyc
+detector/.venv
+detector/tests
+*.egg-info

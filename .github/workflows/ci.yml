@@ -33,6 +33,42 @@ jobs:
       - name: Run tests
         run: bun test
 
+  detector:
+    name: Detector Lint, Types & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install detector
+        working-directory: detector
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          # CPU-only torch so the gliner dependency does not pull the CUDA build.
+          .venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+          .venv/bin/pip install -e ".[dev]"
+
+      - name: Lint
+        working-directory: detector
+        run: .venv/bin/ruff check .
+
+      - name: Format check
+        working-directory: detector
+        run: .venv/bin/ruff format . --check
+
+      - name: Type check
+        working-directory: detector
+        run: .venv/bin/pyright
+
+      - name: Run tests
+        working-directory: detector
+        run: .venv/bin/python -m pytest -q
+
   docker-build:
     name: Docker Build Test
     runs-on: ubuntu-latest
@@ -40,5 +76,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Build the all-in-one image users actually run (proxy + detector).
       - name: Test Docker build
         run: docker build -f docker/Dockerfile -t pasteguard:test .

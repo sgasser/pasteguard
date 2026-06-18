@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import pkg from "../../package.json";
 import { getConfig } from "../config";
-import { getPIIDetector } from "../pii/detect";
 import { getAnthropicInfo } from "../providers/anthropic/client";
 import { getLocalInfo } from "../providers/local";
 import { getOpenAIInfo } from "../providers/openai/client";
@@ -10,8 +9,6 @@ export const infoRoutes = new Hono();
 
 infoRoutes.get("/info", (c) => {
   const config = getConfig();
-  const detector = getPIIDetector();
-  const languageValidation = detector.getLanguageValidation();
 
   const providers = {
     openai: {
@@ -32,13 +29,7 @@ infoRoutes.get("/info", (c) => {
     mode: config.mode,
     providers,
     pii_detection: {
-      languages: languageValidation
-        ? {
-            configured: config.pii_detection.languages,
-            available: languageValidation.available,
-            missing: languageValidation.missing,
-          }
-        : config.pii_detection.languages,
+      languages: config.pii_detection.languages,
       fallback_language: config.pii_detection.fallback_language,
       score_threshold: config.pii_detection.score_threshold,
       entities: config.pii_detection.entities,

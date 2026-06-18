@@ -5,69 +5,47 @@ description: Configure PII detection settings
 
 ```yaml
 pii_detection:
-  presidio_url: http://localhost:5002
-  languages: ${PASTEGUARD_LANGUAGES:-en}  # Auto-configured per Docker image
+  detector_url: http://localhost:5002
+  languages:
+    - en
+    - de
+    - it
   fallback_language: en
   score_threshold: 0.7
   entities:
     - PERSON
+    - LOCATION
     - EMAIL_ADDRESS
     - PHONE_NUMBER
     - CREDIT_CARD
     - IBAN_CODE
     - IP_ADDRESS
-    - LOCATION
 ```
 
 ## Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `presidio_url` | `http://localhost:5002` | Presidio analyzer URL |
-| `languages` | (per image) | Languages to detect. Auto-configured in Docker images |
-| `fallback_language` | `en` | Fallback if detected language not in list |
-| `score_threshold` | `0.7` | Minimum confidence (0.0-1.0) |
-| `entities` | See below | Entity types to detect |
+| `detector_url` | `http://localhost:5002` | Detector `/analyze` URL |
+| `languages` | `["en"]` | Languages the proxy auto-detects among (used as a hint, e.g. phone region) |
+| `fallback_language` | `en` | Language hint used when none is detected |
+| `score_threshold` | `0.7` | Minimum confidence floor for the neural labels PERSON and LOCATION (0.0-1.0). Checksum-validated identifiers always score `1.0` and are unaffected |
+| `entities` | See below | Entity types to return |
 
 ## Languages
 
-Languages are auto-configured per Docker image:
+Detection is **multilingual and language-agnostic** — the model finds names and places regardless of the language the text is written in (an Italian name and city in a German letter are caught), and structured identifiers are matched by checksum independent of language. There are no per-language images and no spaCy models to load.
 
-- **`:en` image** → English only
-- **`:eu` image** → English, German, Spanish, French, Italian, Dutch, Polish, Portuguese, Romanian
-
-Each language adds ~10s to startup time as spaCy models are loaded.
-
-For custom language builds:
-
-```bash
-LANGUAGES=en,de,ja docker compose up -d --build
-```
-
-Available languages (24):
-`ca`, `zh`, `hr`, `da`, `nl`, `en`, `fi`, `fr`, `de`, `el`, `it`, `ja`, `ko`, `lt`, `mk`, `nb`, `pl`, `pt`, `ro`, `ru`, `sl`, `es`, `sv`, `uk`
-
-### Override Languages
-
-For local development or custom setups, override via config:
+The `languages` list and `fallback_language` only control the language *hint* the proxy sends with each request (which the detector uses for things like phone-number region); they do not gate detection.
 
 ```yaml
 pii_detection:
   languages:
     - en
     - de
+    - it
+  fallback_language: de
 ```
-
-### Fallback Language
-
-If the detected language isn't in your configured list, the fallback is used:
-
-```yaml
-pii_detection:
-  fallback_language: en  # Used for unsupported languages
-```
-
-### Performance
 
 If only one language is configured, language detection is skipped for better performance.
 
@@ -76,27 +54,34 @@ If only one language is configured, language detection is skipped for better per
 | Entity | Examples |
 |--------|----------|
 | `PERSON` | Dr. Sarah Chen, John Smith |
+| `LOCATION` | New York, München |
 | `EMAIL_ADDRESS` | sarah.chen@hospital.org |
-| `PHONE_NUMBER` | +1-555-123-4567 |
-| `CREDIT_CARD` | 4111-1111-1111-1111 |
+| `PHONE_NUMBER` | +49 171 1234567 |
+| `CREDIT_CARD` | 4111 1111 1111 1111 |
 | `IBAN_CODE` | DE89 3704 0044 0532 0130 00 |
 | `IP_ADDRESS` | 192.168.1.1 |
-| `LOCATION` | New York, 123 Main St |
-| `US_SSN` | 123-45-6789 |
-| `US_PASSPORT` | 123456789 |
-| `CRYPTO` | Bitcoin addresses |
-| `URL` | https://example.com |
+
+Names and locations are multilingual. IBAN, credit card, phone, email, and IP are international. The structured identifiers (IBAN, credit card, IP) are checksum- or format-validated, so they are caught with high precision and without false positives on lookalike numbers.
 
 ## Score Threshold
 
-Higher = fewer false positives, might miss some PII. Lower = catches more PII, more false positives.
+`score_threshold` raises the confidence floor for the **tunable** neural labels
+**PERSON** and **LOCATION** only. Higher = fewer false positives, might miss
+some PII; lower = catches more, more false positives.
 
 ```yaml
 pii_detection:
   score_threshold: 0.7  # Default, good balance
   # score_threshold: 0.5  # More aggressive
-  # score_threshold: 0.9  # More conservative
+  # score_threshold: 0.9  # More conservative (PERSON/LOCATION)
 ```
+
+Checksum-validated identifiers are always reported (score `1.0`) and are never
+dropped by the threshold. Tune the neural labels per deployment via the
+`DETECTOR_FLOOR_PERSON`, `DETECTOR_FLOOR_LOCATION`, and `DETECTOR_FLOOR_ADDRESS`
+environment variables on the detector service — e.g. `DETECTOR_FLOOR_PERSON=0.9`
+(fewer person false positives) or `DETECTOR_FLOOR_LOCATION=0.4` (more location
+recall). Street addresses are detected by the model and reported as `LOCATION`.
 
 ## Whitelist
 
@@ -131,4 +116,4 @@ pii_detection:
 | `tool` | Tool/function call results |
 | `function` | Legacy function results (OpenAI) |
 
-This reduces Presidio API calls for large system prompts and avoids false positives on app-controlled content.
+This reduces detector calls for large system prompts and avoids false positives on app-controlled content.
