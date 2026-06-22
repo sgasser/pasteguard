@@ -19,6 +19,30 @@ mock.module("../services/logger", () => ({
   logRequest: mock(() => {}),
 }));
 
+// Enable every secret type so the ordering test doesn't depend on the ambient config.
+const realConfig = await import("../config");
+const baseConfig = realConfig.getConfig();
+const testConfig = {
+  ...baseConfig,
+  secrets_detection: {
+    ...baseConfig.secrets_detection,
+    enabled: true,
+    entities: [
+      "OPENSSH_PRIVATE_KEY",
+      "PEM_PRIVATE_KEY",
+      "API_KEY_SK",
+      "API_KEY_AWS",
+      "API_KEY_GITHUB",
+      "JWT_TOKEN",
+      "BEARER_TOKEN",
+      "ENV_PASSWORD",
+      "ENV_SECRET",
+      "CONNECTION_STRING",
+    ],
+  },
+};
+mock.module("../config", () => ({ ...realConfig, getConfig: () => testConfig }));
+
 // Import after mocks are set up
 const { apiRoutes } = await import("./api");
 
@@ -219,6 +243,43 @@ describe("POST /api/mask", () => {
     // Entities should include both types
     expect(body.entities.some((e) => e.type === "EMAIL_ADDRESS")).toBe(true);
     expect(body.entities.some((e) => e.type === "PEM_PRIVATE_KEY")).toBe(true);
+  });
+
+  test("masks a connection string as a secret even when a PII email span overlaps it", async () => {
+    // Mock mirrors the real email detector: matches only if the email survived (i.e. secrets ran first).
+    mockDetectPII.mockImplementationOnce((text: string) => {
+      const m = text.match(/[\w.+-]+@[\w.-]+\.\w+/);
+      return Promise.resolve(
+        m && m.index !== undefined
+          ? [
+              {
+                entity_type: "EMAIL_ADDRESS",
+                start: m.index,
+                end: m.index + m[0].length,
+                score: 0.9,
+              },
+            ]
+          : [],
+      );
+    });
+
+    const res = await app.request("/api/mask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: "Connection: postgres://admin:S3cretPass@db.example.com:5432/appdb",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      masked: string;
+      entities: { type: string }[];
+    };
+    expect(body.masked).toContain("[[CONNECTION_STRING_1]]");
+    expect(body.entities.some((e) => e.type === "CONNECTION_STRING")).toBe(true);
+    expect(body.masked).not.toContain("[[EMAIL_ADDRESS");
+    expect(body.entities.some((e) => e.type === "EMAIL_ADDRESS")).toBe(false);
   });
 
   test("returns 400 for malformed JSON", async () => {

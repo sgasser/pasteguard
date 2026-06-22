@@ -132,61 +132,7 @@ apiRoutes.post("/mask", async (c) => {
   const secretTypes: string[] = [];
   let scanTimeMs = 0;
 
-  // Detect and mask PII
-  if (detectPII) {
-    try {
-      const piiStartTime = Date.now();
-      const detector = getPIIDetector();
-      const piiEntities = await detector.detectPII(maskedText, language);
-      scanTimeMs = Date.now() - piiStartTime;
-
-      // Apply whitelist filtering
-      const filteredEntities = filterWhitelistedEntities(
-        maskedText,
-        piiEntities,
-        config.masking.whitelist,
-      );
-
-      // Capture counters before masking to track new entities
-      const countersBefore = { ...context.counters };
-      const piiResult = maskPII(maskedText, filteredEntities, context);
-      maskedText = piiResult.masked;
-      allEntities.push(...extractEntities(countersBefore, piiResult.context));
-
-      // Collect unique entity types for logging
-      for (const entity of filteredEntities) {
-        if (!piiEntityTypes.includes(entity.entity_type)) {
-          piiEntityTypes.push(entity.entity_type);
-        }
-      }
-    } catch (error) {
-      // Log the error
-      logRequest(
-        createLogData({
-          provider: "api",
-          model: "mask",
-          startTime,
-          pii: { hasPII: false, entityTypes: [], language, languageFallback, scanTimeMs: 0 },
-          statusCode: 503,
-          errorMessage: error instanceof Error ? error.message : "PII detection failed",
-        }),
-        userAgent,
-      );
-
-      return c.json(
-        {
-          error: {
-            message: "PII detection failed",
-            type: "detection_error",
-            details: [{ message: error instanceof Error ? error.message : "Unknown error" }],
-          },
-        },
-        503,
-      );
-    }
-  }
-
-  // Detect and mask secrets
+  // Secrets before PII (as in the provider routes): otherwise PII masks a connection string's "pass@host" as an email and the CONNECTION_STRING pattern can't match.
   if (detectSecretsFlag && config.secrets_detection.enabled) {
     try {
       // Create a config for detection (always use mask action for API)
@@ -238,6 +184,60 @@ apiRoutes.post("/mask", async (c) => {
         {
           error: {
             message: "Secrets detection failed",
+            type: "detection_error",
+            details: [{ message: error instanceof Error ? error.message : "Unknown error" }],
+          },
+        },
+        503,
+      );
+    }
+  }
+
+  // Detect and mask PII
+  if (detectPII) {
+    try {
+      const piiStartTime = Date.now();
+      const detector = getPIIDetector();
+      const piiEntities = await detector.detectPII(maskedText, language);
+      scanTimeMs = Date.now() - piiStartTime;
+
+      // Apply whitelist filtering
+      const filteredEntities = filterWhitelistedEntities(
+        maskedText,
+        piiEntities,
+        config.masking.whitelist,
+      );
+
+      // Capture counters before masking to track new entities
+      const countersBefore = { ...context.counters };
+      const piiResult = maskPII(maskedText, filteredEntities, context);
+      maskedText = piiResult.masked;
+      allEntities.push(...extractEntities(countersBefore, piiResult.context));
+
+      // Collect unique entity types for logging
+      for (const entity of filteredEntities) {
+        if (!piiEntityTypes.includes(entity.entity_type)) {
+          piiEntityTypes.push(entity.entity_type);
+        }
+      }
+    } catch (error) {
+      // Log the error
+      logRequest(
+        createLogData({
+          provider: "api",
+          model: "mask",
+          startTime,
+          pii: { hasPII: false, entityTypes: [], language, languageFallback, scanTimeMs: 0 },
+          statusCode: 503,
+          errorMessage: error instanceof Error ? error.message : "PII detection failed",
+        }),
+        userAgent,
+      );
+
+      return c.json(
+        {
+          error: {
+            message: "PII detection failed",
             type: "detection_error",
             details: [{ message: error instanceof Error ? error.message : "Unknown error" }],
           },
