@@ -18,6 +18,11 @@ export interface SecretsProcessResult<TRequest> {
   masked: boolean;
 }
 
+/** Placeholder strings already inserted by secrets masking (so later PII/denylist passes skip them). */
+export function secretPlaceholders<TRequest>(result: SecretsProcessResult<TRequest>): string[] {
+  return result.maskingContext ? Object.keys(result.maskingContext.mapping) : [];
+}
+
 /**
  * Process a request for secrets detection
  */

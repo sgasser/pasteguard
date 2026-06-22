@@ -185,7 +185,7 @@ describe("PIIDetector", () => {
 
         expect(result.hasPII).toBe(true);
         expect(result.spanEntities[0]).toEqual([
-          { entity_type: "PROJECT_NAME", start: 7, end: 15, score: 2 },
+          { entity_type: "PROJECT_NAME", start: 7, end: 15, score: 1 },
         ]);
       } finally {
         config.masking.denylist = previousDenylist;
@@ -232,7 +232,7 @@ describe("PIIDetector", () => {
         const result = await detector.analyzeRequest(request, openaiExtractor);
 
         expect(result.spanEntities[0]).toEqual([
-          { entity_type: "EMAIL_ADDRESS", start: 6, end: 23, score: 2 },
+          { entity_type: "EMAIL_ADDRESS", start: 6, end: 23, score: 1 },
         ]);
       } finally {
         config.masking.denylist = previousDenylist;
@@ -387,8 +387,8 @@ describe("PIIDetector", () => {
       ]);
 
       expect(result).toEqual([
-        { entity_type: "PROJECT_NAME", start: 0, end: 8, score: 2 },
-        { entity_type: "PROJECT_NAME", start: 14, end: 22, score: 2 },
+        { entity_type: "PROJECT_NAME", start: 0, end: 8, score: 1 },
+        { entity_type: "PROJECT_NAME", start: 14, end: 22, score: 1 },
       ]);
     });
 
@@ -398,8 +398,8 @@ describe("PIIDetector", () => {
       ]);
 
       expect(result).toEqual([
-        { entity_type: "CUSTOMER_ID", start: 10, end: 21, score: 2 },
-        { entity_type: "CUSTOMER_ID", start: 26, end: 37, score: 2 },
+        { entity_type: "CUSTOMER_ID", start: 10, end: 21, score: 1 },
+        { entity_type: "CUSTOMER_ID", start: 26, end: 37, score: 1 },
       ]);
     });
 
@@ -408,7 +408,7 @@ describe("PIIDetector", () => {
         { pattern: "[ProjectX", type: "PROJECT_NAME", regex: false },
       ]);
 
-      expect(result).toEqual([{ entity_type: "PROJECT_NAME", start: 9, end: 18, score: 2 }]);
+      expect(result).toEqual([{ entity_type: "PROJECT_NAME", start: 9, end: 18, score: 1 }]);
     });
 
     test("matches regex patterns containing escaped non-syntax characters", () => {
@@ -416,16 +416,20 @@ describe("PIIDetector", () => {
         { pattern: "CUST\\-\\d{6}", type: "CUSTOMER_ID", regex: true },
       ]);
 
-      expect(result).toEqual([{ entity_type: "CUSTOMER_ID", start: 9, end: 20, score: 2 }]);
+      expect(result).toEqual([{ entity_type: "CUSTOMER_ID", start: 9, end: 20, score: 1 }]);
     });
 
-    test("ignores matches that fall inside an existing placeholder", () => {
-      const result = findDenylistedEntities("conn [[CONNECTION_STRING_1]] ProjectX", [
-        { pattern: "\\d+", type: "NUM", regex: true },
-        { pattern: "ProjectX", type: "PROJECT_NAME", regex: false },
-      ]);
+    test("ignores matches that fall inside a known placeholder", () => {
+      const result = findDenylistedEntities(
+        "conn [[CONNECTION_STRING_1]] ProjectX",
+        [
+          { pattern: "\\d+", type: "NUM", regex: true },
+          { pattern: "ProjectX", type: "PROJECT_NAME", regex: false },
+        ],
+        ["[[CONNECTION_STRING_1]]"],
+      );
 
-      expect(result).toEqual([{ entity_type: "PROJECT_NAME", start: 29, end: 37, score: 2 }]);
+      expect(result).toEqual([{ entity_type: "PROJECT_NAME", start: 29, end: 37, score: 1 }]);
     });
   });
 
@@ -438,37 +442,37 @@ describe("PIIDetector", () => {
 
     test("adds non-overlapping denylist matches", () => {
       const detected = [{ entity_type: "EMAIL_ADDRESS", start: 0, end: 5, score: 0.9 }];
-      const denylisted = [{ entity_type: "PROJECT_NAME", start: 10, end: 18, score: 2 }];
+      const denylisted = [{ entity_type: "PROJECT_NAME", start: 10, end: 18, score: 1 }];
 
       expect(mergeDenylistEntities(detected, denylisted)).toEqual([
         { entity_type: "EMAIL_ADDRESS", start: 0, end: 5, score: 0.9 },
-        { entity_type: "PROJECT_NAME", start: 10, end: 18, score: 2 },
+        { entity_type: "PROJECT_NAME", start: 10, end: 18, score: 1 },
       ]);
     });
 
     test("keeps the full detector span when a denylist match is contained within it", () => {
       const detected = [{ entity_type: "EMAIL_ADDRESS", start: 0, end: 17, score: 0.95 }];
-      const denylisted = [{ entity_type: "PROJECT_NAME", start: 0, end: 8, score: 2 }];
+      const denylisted = [{ entity_type: "PROJECT_NAME", start: 0, end: 8, score: 1 }];
 
       expect(mergeDenylistEntities(detected, denylisted)).toEqual([
-        { entity_type: "EMAIL_ADDRESS", start: 0, end: 17, score: 2 },
+        { entity_type: "EMAIL_ADDRESS", start: 0, end: 17, score: 1 },
       ]);
     });
 
     test("unions a partial overlap so no covered region is left unmasked", () => {
       const detected = [{ entity_type: "PERSON", start: 0, end: 10, score: 0.9 }];
-      const denylisted = [{ entity_type: "PROJECT_NAME", start: 5, end: 15, score: 2 }];
+      const denylisted = [{ entity_type: "PROJECT_NAME", start: 5, end: 15, score: 1 }];
 
       expect(mergeDenylistEntities(detected, denylisted)).toEqual([
-        { entity_type: "PERSON", start: 0, end: 15, score: 2 },
+        { entity_type: "PERSON", start: 0, end: 15, score: 1 },
       ]);
     });
 
     test("returns denylist-only matches when the detector found nothing", () => {
-      const denylisted = [{ entity_type: "PROJECT_NAME", start: 0, end: 8, score: 2 }];
+      const denylisted = [{ entity_type: "PROJECT_NAME", start: 0, end: 8, score: 1 }];
 
       expect(mergeDenylistEntities([], denylisted)).toEqual([
-        { entity_type: "PROJECT_NAME", start: 0, end: 8, score: 2 },
+        { entity_type: "PROJECT_NAME", start: 0, end: 8, score: 1 },
       ]);
     });
   });

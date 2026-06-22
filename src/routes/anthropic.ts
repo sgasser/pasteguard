@@ -31,7 +31,11 @@ import { callLocalAnthropic } from "../providers/local";
 import { unmaskSecretsResponse } from "../secrets/mask";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
-import { processSecretsRequest, type SecretsProcessResult } from "../services/secrets";
+import {
+  processSecretsRequest,
+  type SecretsProcessResult,
+  secretPlaceholders,
+} from "../services/secrets";
 import {
   createLogData,
   errorFormats,
@@ -113,7 +117,7 @@ anthropicRoutes.post(
     // Step 2: Detect PII and configured denylist terms
     let piiResult: PIIDetectResult;
     try {
-      piiResult = await detectPII(request, anthropicExtractor);
+      piiResult = await detectPII(request, anthropicExtractor, secretPlaceholders(secretsResult));
     } catch (error) {
       console.error("PII detection error:", error);
       return respondDetectionError(c, request, secretsResult, startTime);

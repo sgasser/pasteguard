@@ -216,7 +216,7 @@ apiRoutes.post("/mask", async (c) => {
       );
       const entitiesToMask = mergeDenylistEntities(
         filteredEntities,
-        findDenylistedEntities(maskedText, config.masking.denylist),
+        findDenylistedEntities(maskedText, config.masking.denylist, Object.keys(context.mapping)),
       );
 
       // Capture counters before masking to track new entities

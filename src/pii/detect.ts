@@ -11,6 +11,9 @@ export interface PIIEntity {
   score: number;
 }
 
+// Denylist matches are exact (operator-configured), so they carry full confidence.
+const DENYLIST_MATCH_SCORE = 1;
+
 function findLiteralMatches(text: string, pattern: string, type: string): PIIEntity[] {
   const matches: PIIEntity[] = [];
   let index = text.indexOf(pattern);
@@ -20,7 +23,7 @@ function findLiteralMatches(text: string, pattern: string, type: string): PIIEnt
       entity_type: type,
       start: index,
       end: index + pattern.length,
-      score: 2,
+      score: DENYLIST_MATCH_SCORE,
     });
     index = text.indexOf(pattern, index + pattern.length);
   }
@@ -38,36 +41,42 @@ function findRegexMatches(text: string, pattern: string, type: string): PIIEntit
       entity_type: type,
       start: match.index,
       end: match.index + match[0].length,
-      score: 2,
+      score: DENYLIST_MATCH_SCORE,
     });
   }
 
   return matches;
 }
 
-// Matches already-masked placeholders such as [[PERSON_1]] or [[API_KEY_SK_2]] (uppercase type + counter).
-const PLACEHOLDER_PATTERN = /\[\[[A-Z][A-Z0-9_]*_\d+\]\]/g;
-
-function placeholderSpans(text: string): Array<{ start: number; end: number }> {
+function placeholderSpans(
+  text: string,
+  placeholders: readonly string[],
+): Array<{ start: number; end: number }> {
   const spans: Array<{ start: number; end: number }> = [];
-  for (const match of text.matchAll(PLACEHOLDER_PATTERN)) {
-    if (match.index !== undefined) {
-      spans.push({ start: match.index, end: match.index + match[0].length });
+  for (const placeholder of placeholders) {
+    let index = text.indexOf(placeholder);
+    while (index !== -1) {
+      spans.push({ start: index, end: index + placeholder.length });
+      index = text.indexOf(placeholder, index + placeholder.length);
     }
   }
   return spans;
 }
 
-export function findDenylistedEntities(text: string, denylist: DenylistPattern[]): PIIEntity[] {
+export function findDenylistedEntities(
+  text: string,
+  denylist: DenylistPattern[],
+  knownPlaceholders: readonly string[] = [],
+): PIIEntity[] {
   if (denylist.length === 0 || !text) return [];
 
   const matches = denylist.flatMap(({ pattern, type, regex }) =>
     regex ? findRegexMatches(text, pattern, type) : findLiteralMatches(text, pattern, type),
   );
-  if (matches.length === 0) return matches;
+  if (matches.length === 0 || knownPlaceholders.length === 0) return matches;
 
-  // Drop matches inside an existing placeholder; re-masking its internals would corrupt the earlier mask.
-  const masked = placeholderSpans(text);
+  // Drop matches inside an already-masked placeholder; re-masking its internals would corrupt the earlier mask.
+  const masked = placeholderSpans(text, knownPlaceholders);
   if (masked.length === 0) return matches;
   return matches.filter((m) => !masked.some((p) => overlaps(m, p)));
 }
@@ -196,6 +205,7 @@ export class PIIDetector {
   async analyzeRequest<TRequest, TResponse>(
     request: TRequest,
     extractor: RequestExtractor<TRequest, TResponse>,
+    knownPlaceholders: readonly string[] = [],
   ): Promise<PIIDetectionResult> {
     const startTime = Date.now();
     const config = getConfig();
@@ -232,7 +242,7 @@ export class PIIDetector {
     const spanEntities: PIIEntity[][] = await Promise.all(
       spans.map(async (span) => {
         if (!span.text) return [];
-        const denylistedEntities = findDenylistedEntities(span.text, denylist);
+        const denylistedEntities = findDenylistedEntities(span.text, denylist, knownPlaceholders);
 
         if (scanRoles && span.role && !scanRoles.has(span.role)) {
           return mergeDenylistEntities([], denylistedEntities);

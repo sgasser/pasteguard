@@ -23,7 +23,11 @@ import {
 } from "../secrets/mask";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
-import { processSecretsRequest, type SecretsProcessResult } from "../services/secrets";
+import {
+  processSecretsRequest,
+  type SecretsProcessResult,
+  secretPlaceholders,
+} from "../services/secrets";
 import {
   createLogData,
   errorFormats,
@@ -82,7 +86,7 @@ codexRoutes.post(
 
     let piiResult: PIIDetectResult;
     try {
-      piiResult = await detectPII(request, codexExtractor);
+      piiResult = await detectPII(request, codexExtractor, secretPlaceholders(secretsResult));
     } catch (error) {
       console.error("PII detection error:", error);
       return respondDetectionError(c, request, startTime);
