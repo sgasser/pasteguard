@@ -23,7 +23,8 @@ export interface PIIMaskResult<TRequest> {
 export async function detectPII<TRequest, TResponse>(
   request: TRequest,
   extractor: RequestExtractor<TRequest, TResponse>,
-  knownPlaceholders: readonly string[] = [],
+  // Required (no default) so a new route can't silently skip the secrets placeholders.
+  knownPlaceholders: readonly string[],
 ): Promise<PIIDetectResult> {
   const detector = getPIIDetector();
   const detection = await detector.analyzeRequest(request, extractor, knownPlaceholders);
