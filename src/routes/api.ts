@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getConfig, type SecretsDetectionConfig } from "../config";
 import { createPlaceholderContext, type PlaceholderContext } from "../masking/context";
-import { filterWhitelistedEntities, getPIIDetector } from "../pii/detect";
+import { filterWhitelistedEntities, findDenylistedEntities, getPIIDetector } from "../pii/detect";
 import { mask as maskPII } from "../pii/mask";
 import { detectSecrets } from "../secrets/detect";
 import { maskSecrets } from "../secrets/mask";
@@ -198,7 +198,9 @@ apiRoutes.post("/mask", async (c) => {
     try {
       const piiStartTime = Date.now();
       const detector = getPIIDetector();
-      const piiEntities = await detector.detectPII(maskedText, language);
+      const piiEntities = config.pii_detection.enabled
+        ? await detector.detectPII(maskedText, language)
+        : [];
       scanTimeMs = Date.now() - piiStartTime;
 
       // Apply whitelist filtering
@@ -207,15 +209,19 @@ apiRoutes.post("/mask", async (c) => {
         piiEntities,
         config.masking.whitelist,
       );
+      const entitiesToMask = [
+        ...filteredEntities,
+        ...findDenylistedEntities(maskedText, config.masking.denylist),
+      ];
 
       // Capture counters before masking to track new entities
       const countersBefore = { ...context.counters };
-      const piiResult = maskPII(maskedText, filteredEntities, context);
+      const piiResult = maskPII(maskedText, entitiesToMask, context);
       maskedText = piiResult.masked;
       allEntities.push(...extractEntities(countersBefore, piiResult.context));
 
       // Collect unique entity types for logging
-      for (const entity of filteredEntities) {
+      for (const entity of entitiesToMask) {
         if (!piiEntityTypes.includes(entity.entity_type)) {
           piiEntityTypes.push(entity.entity_type);
         }

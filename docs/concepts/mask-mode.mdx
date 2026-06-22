@@ -46,12 +46,20 @@ providers:
 masking:
   show_markers: false
   marker_text: "[protected]"
+  denylist:
+    - pattern: "ProjectX"
+      type: PROJECT_NAME
+    - pattern: 'CUST-\d{6}'
+      type: CUSTOMER_ID
+      regex: true
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `show_markers` | `false` | Add visual markers around unmasked values |
 | `marker_text` | `[protected]` | Marker text if enabled |
+| `whitelist` | built-in Claude Code prompt whitelist | Text patterns that are never masked |
+| `denylist` | `[]` | Text patterns that are always masked with the configured `type`; set `regex: true` for regex patterns |
 
 ## Response Headers
 

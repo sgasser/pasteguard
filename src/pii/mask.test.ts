@@ -18,12 +18,14 @@ const defaultConfig: MaskingConfig = {
   show_markers: false,
   marker_text: "[protected]",
   whitelist: [],
+  denylist: [],
 };
 
 const configWithMarkers: MaskingConfig = {
   show_markers: true,
   marker_text: "[protected]",
   whitelist: [],
+  denylist: [],
 };
 
 /** Helper to create a minimal request from messages */

@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
-import { filterWhitelistedEntities, type PIIEntity } from "../pii/detect";
+import { filterWhitelistedEntities, findDenylistedEntities, type PIIEntity } from "../pii/detect";
 
 // Mock the PII detector to avoid needing the detector running
 const mockDetectPII = mock<(text: string, language: string) => Promise<PIIEntity[]>>(() =>
@@ -12,6 +12,7 @@ mock.module("../pii/detect", () => ({
     healthCheck: mock(() => Promise.resolve(true)),
   }),
   filterWhitelistedEntities,
+  findDenylistedEntities,
 }));
 
 // Mock the logger to avoid database operations
@@ -131,6 +132,39 @@ describe("POST /api/mask", () => {
     expect(body.counters.EMAIL_ADDRESS).toBe(1);
     expect(body.entities).toHaveLength(1);
     expect(body.entities[0].type).toBe("EMAIL_ADDRESS");
+  });
+
+  test("masks configured denylist patterns", async () => {
+    const previousDenylist = testConfig.masking.denylist;
+    testConfig.masking.denylist = [
+      { pattern: "ProjectX", type: "PROJECT_NAME", regex: false },
+      { pattern: "CUST-\\d{6}", type: "CUSTOMER_ID", regex: true },
+    ];
+    mockDetectPII.mockResolvedValueOnce([]);
+
+    try {
+      const res = await app.request("/api/mask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "ProjectX customer CUST-123456" }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        masked: string;
+        context: Record<string, string>;
+        entities: { type: string; placeholder: string }[];
+      };
+      expect(body.masked).toBe("[[PROJECT_NAME_1]] customer [[CUSTOMER_ID_1]]");
+      expect(body.context["[[PROJECT_NAME_1]]"]).toBe("ProjectX");
+      expect(body.context["[[CUSTOMER_ID_1]]"]).toBe("CUST-123456");
+      expect(body.entities).toEqual([
+        { type: "PROJECT_NAME", placeholder: "[[PROJECT_NAME_1]]" },
+        { type: "CUSTOMER_ID", placeholder: "[[CUSTOMER_ID_1]]" },
+      ]);
+    } finally {
+      testConfig.masking.denylist = previousDenylist;
+    }
   });
 
   test("respects startFrom counters", async () => {

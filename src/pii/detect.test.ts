@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { getConfig } from "../config";
 import { openaiExtractor } from "../masking/extractors/openai";
 import type { OpenAIMessage, OpenAIRequest } from "../providers/openai/types";
-import { filterWhitelistedEntities, PIIDetector } from "./detect";
+import { filterWhitelistedEntities, findDenylistedEntities, PIIDetector } from "./detect";
 
 const originalFetch = globalThis.fetch;
 
@@ -164,6 +165,52 @@ describe("PIIDetector", () => {
       // First message (empty string) has no entities
       expect(result.spanEntities[0]).toHaveLength(0);
     });
+
+    test("adds denylist entities when detector returns none", async () => {
+      const config = getConfig();
+      const previousDenylist = config.masking.denylist;
+      config.masking.denylist = [{ pattern: "ProjectX", type: "PROJECT_NAME", regex: false }];
+      mockDetector({});
+
+      try {
+        const detector = new PIIDetector();
+        const request = createRequest([{ role: "user", content: "Launch ProjectX" }]);
+
+        const result = await detector.analyzeRequest(request, openaiExtractor);
+
+        expect(result.hasPII).toBe(true);
+        expect(result.spanEntities[0]).toEqual([
+          { entity_type: "PROJECT_NAME", start: 7, end: 15, score: 2 },
+        ]);
+      } finally {
+        config.masking.denylist = previousDenylist;
+      }
+    });
+
+    test("applies denylist when PII detection is disabled", async () => {
+      const config = getConfig();
+      const previousEnabled = config.pii_detection.enabled;
+      const previousDenylist = config.masking.denylist;
+      config.pii_detection.enabled = false;
+      config.masking.denylist = [{ pattern: "ProjectX", type: "PROJECT_NAME", regex: false }];
+      const fetchMock = mock(async () => {
+        throw new Error("Detector should not be called");
+      });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      try {
+        const detector = new PIIDetector();
+        const request = createRequest([{ role: "user", content: "Launch ProjectX" }]);
+
+        const result = await detector.analyzeRequest(request, openaiExtractor);
+
+        expect(result.hasPII).toBe(true);
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        config.pii_detection.enabled = previousEnabled;
+        config.masking.denylist = previousDenylist;
+      }
+    });
   });
 
   describe("detectPII", () => {
@@ -255,6 +302,46 @@ describe("PIIDetector", () => {
       const result = filterWhitelistedEntities(text, entities, []);
 
       expect(result).toHaveLength(2);
+    });
+  });
+
+  describe("findDenylistedEntities", () => {
+    test("finds literal denylist patterns", () => {
+      const result = findDenylistedEntities("ProjectX uses ProjectX-API", [
+        { pattern: "ProjectX", type: "PROJECT_NAME", regex: false },
+      ]);
+
+      expect(result).toEqual([
+        { entity_type: "PROJECT_NAME", start: 0, end: 8, score: 2 },
+        { entity_type: "PROJECT_NAME", start: 14, end: 22, score: 2 },
+      ]);
+    });
+
+    test("finds regex denylist patterns", () => {
+      const result = findDenylistedEntities("Customers CUST-123456 and CUST-654321", [
+        { pattern: "CUST-\\d{6}", type: "CUSTOMER_ID", regex: true },
+      ]);
+
+      expect(result).toEqual([
+        { entity_type: "CUSTOMER_ID", start: 10, end: 21, score: 2 },
+        { entity_type: "CUSTOMER_ID", start: 26, end: 37, score: 2 },
+      ]);
+    });
+
+    test("matches regex syntax literally unless regex is enabled", () => {
+      const result = findDenylistedEntities("Internal [ProjectX", [
+        { pattern: "[ProjectX", type: "PROJECT_NAME", regex: false },
+      ]);
+
+      expect(result).toEqual([{ entity_type: "PROJECT_NAME", start: 9, end: 18, score: 2 }]);
+    });
+
+    test("matches regex patterns containing escaped non-syntax characters", () => {
+      const result = findDenylistedEntities("Customer CUST-123456 onboarded", [
+        { pattern: "CUST\\-\\d{6}", type: "CUSTOMER_ID", regex: true },
+      ]);
+
+      expect(result).toEqual([{ entity_type: "CUSTOMER_ID", start: 9, end: 20, score: 2 }]);
     });
   });
 });

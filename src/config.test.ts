@@ -55,4 +55,55 @@ pii_detection:
       cleanupConfig(path);
     }
   });
+
+  test("accepts masking denylist patterns", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+masking:
+  denylist:
+    - pattern: "ProjectX"
+      type: PROJECT_NAME
+    - pattern: 'CUST-\\d{6}'
+      type: CUSTOMER_ID
+      regex: true
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.masking.denylist).toEqual([
+        { pattern: "ProjectX", type: "PROJECT_NAME", regex: false },
+        { pattern: "CUST-\\d{6}", type: "CUSTOMER_ID", regex: true },
+      ]);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("rejects invalid masking denylist regex patterns", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+masking:
+  denylist:
+    - pattern: "[ProjectX"
+      type: PROJECT_NAME
+      regex: true
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      expect(() => loadConfig(path)).toThrow("Invalid configuration");
+    } finally {
+      cleanupConfig(path);
+    }
+  });
 });

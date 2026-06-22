@@ -98,6 +98,22 @@ masking:
 
 Patterns match bidirectionally - detected text containing a whitelist entry (or vice versa) is excluded.
 
+## Denylist
+
+Force specific text or regex patterns to be masked, even when the detector does not report them or PII detection is disabled. Each entry needs a `type`, which is used for the placeholder name.
+
+```yaml
+masking:
+  denylist:
+    - pattern: "ProjectX"
+      type: PROJECT_NAME
+    - pattern: 'CUST-\d{6}'
+      type: CUSTOMER_ID
+      regex: true
+```
+
+Patterns are matched literally by default. Set `regex: true` to use JavaScript regular expression syntax, and use single quotes in YAML when the pattern contains backslashes.
+
 ## Scan Roles
 
 By default, all message roles are scanned. To scan only user-controlled content:

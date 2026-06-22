@@ -81,25 +81,11 @@ codexRoutes.post(
     }
 
     let piiResult: PIIDetectResult;
-    if (!config.pii_detection.enabled) {
-      piiResult = {
-        detection: {
-          hasPII: false,
-          spanEntities: [],
-          allEntities: [],
-          scanTimeMs: 0,
-          language: config.pii_detection.fallback_language,
-          languageFallback: false,
-        },
-        hasPII: false,
-      };
-    } else {
-      try {
-        piiResult = await detectPII(request, codexExtractor);
-      } catch (error) {
-        console.error("PII detection error:", error);
-        return respondDetectionError(c, request, startTime);
-      }
+    try {
+      piiResult = await detectPII(request, codexExtractor);
+    } catch (error) {
+      console.error("PII detection error:", error);
+      return respondDetectionError(c, request, startTime);
     }
 
     const shouldBlockRouteMode =

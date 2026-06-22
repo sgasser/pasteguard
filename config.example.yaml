@@ -54,6 +54,14 @@ masking:
   # whitelist:
   #   - "Company Name Inc."
 
+  # Text or regex patterns that are always masked, even if the detector misses them
+  # denylist:
+  #   - pattern: "ProjectX"
+  #     type: PROJECT_NAME
+  #   - pattern: 'CUST-\d{6}'
+  #     type: CUSTOMER_ID
+  #     regex: true
+
 # PII Detection settings (detector service, /analyze contract)
 pii_detection:
   # URL of the detector service (see detector/). Defaults to localhost, which is

@@ -32,6 +32,26 @@ const CodexProviderSchema = z.object({
 
 const DEFAULT_WHITELIST = ["You are Claude Code, Anthropic's official CLI for Claude."];
 
+const DenylistPatternSchema = z
+  .object({
+    pattern: z.string().min(1),
+    type: z.string().min(1),
+    regex: z.boolean().default(false),
+  })
+  .superRefine((entry, ctx) => {
+    if (!entry.regex) return;
+
+    try {
+      new RegExp(entry.pattern, "g");
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pattern"],
+        message: "Invalid denylist regex pattern",
+      });
+    }
+  });
+
 const MaskingSchema = z.object({
   show_markers: z.boolean().default(false),
   marker_text: z.string().default("[protected]"),
@@ -39,6 +59,7 @@ const MaskingSchema = z.object({
     .array(z.string())
     .default([])
     .transform((arr) => [...DEFAULT_WHITELIST, ...arr]),
+  denylist: z.array(DenylistPatternSchema).default([]),
 });
 
 const LanguageEnum = z.enum(SUPPORTED_LANGUAGES);
@@ -170,6 +191,7 @@ export type AnthropicProviderConfig = z.infer<typeof AnthropicProviderSchema>;
 export type CodexProviderConfig = z.infer<typeof CodexProviderSchema>;
 export type LocalProviderConfig = z.infer<typeof LocalProviderSchema>;
 export type MaskingConfig = z.infer<typeof MaskingSchema>;
+export type DenylistPattern = z.infer<typeof DenylistPatternSchema>;
 export type SecretsDetectionConfig = z.infer<typeof SecretsDetectionSchema>;
 export type ServerConfig = z.infer<typeof ServerSchema>;
 

@@ -1,4 +1,4 @@
-import { getConfig } from "../config";
+import { type DenylistPattern, getConfig } from "../config";
 import { HEALTH_CHECK_TIMEOUT_MS } from "../constants/timeouts";
 import type { RequestExtractor } from "../masking/types";
 import { getLanguageDetector, type SupportedLanguage } from "../services/language-detector";
@@ -8,6 +8,48 @@ export interface PIIEntity {
   start: number;
   end: number;
   score: number;
+}
+
+function findLiteralMatches(text: string, pattern: string, type: string): PIIEntity[] {
+  const matches: PIIEntity[] = [];
+  let index = text.indexOf(pattern);
+
+  while (index !== -1) {
+    matches.push({
+      entity_type: type,
+      start: index,
+      end: index + pattern.length,
+      score: 2,
+    });
+    index = text.indexOf(pattern, index + pattern.length);
+  }
+
+  return matches;
+}
+
+function findRegexMatches(text: string, pattern: string, type: string): PIIEntity[] {
+  const regex = new RegExp(pattern, "g");
+  const matches: PIIEntity[] = [];
+
+  for (const match of text.matchAll(regex)) {
+    if (match.index === undefined || match[0].length === 0) continue;
+    matches.push({
+      entity_type: type,
+      start: match.index,
+      end: match.index + match[0].length,
+      score: 2,
+    });
+  }
+
+  return matches;
+}
+
+export function findDenylistedEntities(text: string, denylist: DenylistPattern[]): PIIEntity[] {
+  if (denylist.length === 0 || !text) return [];
+
+  return denylist.flatMap(({ pattern, type, regex }) =>
+    regex ? findRegexMatches(text, pattern, type) : findLiteralMatches(text, pattern, type),
+  );
 }
 
 export function filterWhitelistedEntities(
@@ -120,15 +162,22 @@ export class PIIDetector {
       ? new Set(config.pii_detection.scan_roles)
       : null;
     const whitelist = config.masking.whitelist;
+    const denylist = config.masking.denylist;
 
     const spanEntities: PIIEntity[][] = await Promise.all(
       spans.map(async (span) => {
-        if (scanRoles && span.role && !scanRoles.has(span.role)) {
-          return [];
-        }
         if (!span.text) return [];
-        const entities = await this.detectPII(span.text, langResult.language);
-        return filterWhitelistedEntities(span.text, entities, whitelist);
+        const denylistedEntities = findDenylistedEntities(span.text, denylist);
+
+        if (scanRoles && span.role && !scanRoles.has(span.role)) {
+          return denylistedEntities;
+        }
+
+        const detectedEntities = config.pii_detection.enabled
+          ? await this.detectPII(span.text, langResult.language)
+          : [];
+        const filteredEntities = filterWhitelistedEntities(span.text, detectedEntities, whitelist);
+        return [...filteredEntities, ...denylistedEntities];
       }),
     );
 
