@@ -262,7 +262,9 @@ describe("PIIDetector", () => {
     test("filters entities matching whitelist pattern", () => {
       const text = "You are Claude Code, Anthropic's official CLI for Claude.";
       const entities = [{ entity_type: "PERSON", start: 8, end: 14, score: 0.9 }];
-      const whitelist = ["You are Claude Code, Anthropic's official CLI for Claude."];
+      const whitelist = [
+        { pattern: "You are Claude Code, Anthropic's official CLI for Claude.", regex: false },
+      ];
 
       const result = filterWhitelistedEntities(text, entities, whitelist);
 
@@ -275,7 +277,7 @@ describe("PIIDetector", () => {
         { entity_type: "PERSON", start: 8, end: 16, score: 0.9 },
         { entity_type: "EMAIL_ADDRESS", start: 20, end: 36, score: 0.95 },
       ];
-      const whitelist = ["Claude"];
+      const whitelist = [{ pattern: "Claude", regex: false }];
 
       const result = filterWhitelistedEntities(text, entities, whitelist);
 
@@ -285,7 +287,7 @@ describe("PIIDetector", () => {
     test("filters when entity text is contained in whitelist pattern", () => {
       const text = "Hello Claude, how are you?";
       const entities = [{ entity_type: "PERSON", start: 6, end: 12, score: 0.85 }];
-      const whitelist = ["You are Claude Code"];
+      const whitelist = [{ pattern: "You are Claude Code", regex: false }];
 
       const result = filterWhitelistedEntities(text, entities, whitelist);
 
@@ -302,6 +304,16 @@ describe("PIIDetector", () => {
       const result = filterWhitelistedEntities(text, entities, []);
 
       expect(result).toHaveLength(2);
+    });
+
+    test("filters entities matching regex whitelist pattern", () => {
+      const text = "Reference TEST-1234 is public";
+      const entities = [{ entity_type: "CUSTOMER_ID", start: 10, end: 19, score: 0.9 }];
+      const whitelist = [{ pattern: "TEST-\\d+", regex: true }];
+
+      const result = filterWhitelistedEntities(text, entities, whitelist);
+
+      expect(result).toHaveLength(0);
     });
   });
 

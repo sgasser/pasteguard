@@ -56,13 +56,17 @@ pii_detection:
     }
   });
 
-  test("accepts masking denylist patterns", () => {
+  test("accepts masking whitelist and denylist patterns", () => {
     const path = writeConfig(`
 mode: mask
 providers:
   openai: {}
   anthropic: {}
 masking:
+  whitelist:
+    - "Acme Corp"
+    - pattern: 'TEST-\\d+'
+      regex: true
   denylist:
     - pattern: "ProjectX"
       type: PROJECT_NAME
@@ -76,10 +80,36 @@ pii_detection:
     try {
       const config = loadConfig(path);
 
+      expect(config.masking.whitelist).toEqual([
+        { pattern: "You are Claude Code, Anthropic's official CLI for Claude.", regex: false },
+        { pattern: "Acme Corp", regex: false },
+        { pattern: "TEST-\\d+", regex: true },
+      ]);
       expect(config.masking.denylist).toEqual([
         { pattern: "ProjectX", type: "PROJECT_NAME", regex: false },
         { pattern: "CUST-\\d{6}", type: "CUSTOMER_ID", regex: true },
       ]);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("rejects invalid masking whitelist regex patterns", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+masking:
+  whitelist:
+    - pattern: "[Acme"
+      regex: true
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      expect(() => loadConfig(path)).toThrow("Invalid configuration");
     } finally {
       cleanupConfig(path);
     }

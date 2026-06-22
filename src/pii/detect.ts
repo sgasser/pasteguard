@@ -1,4 +1,4 @@
-import { type DenylistPattern, getConfig } from "../config";
+import { type DenylistPattern, getConfig, type WhitelistPattern } from "../config";
 import { HEALTH_CHECK_TIMEOUT_MS } from "../constants/timeouts";
 import type { RequestExtractor } from "../masking/types";
 import { getLanguageDetector, type SupportedLanguage } from "../services/language-detector";
@@ -55,15 +55,18 @@ export function findDenylistedEntities(text: string, denylist: DenylistPattern[]
 export function filterWhitelistedEntities(
   text: string,
   entities: PIIEntity[],
-  whitelist: string[],
+  whitelist: WhitelistPattern[],
 ): PIIEntity[] {
   if (whitelist.length === 0) return entities;
 
   return entities.filter((entity) => {
     const detectedText = text.slice(entity.start, entity.end);
-    return !whitelist.some(
-      (pattern) => pattern.includes(detectedText) || detectedText.includes(pattern),
-    );
+    return !whitelist.some(({ pattern, regex }) => {
+      if (regex) {
+        return new RegExp(pattern, "g").test(detectedText);
+      }
+      return pattern.includes(detectedText) || detectedText.includes(pattern);
+    });
   });
 }
 

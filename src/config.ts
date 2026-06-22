@@ -30,7 +30,43 @@ const CodexProviderSchema = z.object({
   base_url: z.string().url().default("https://chatgpt.com/backend-api/codex"),
 });
 
-const DEFAULT_WHITELIST = ["You are Claude Code, Anthropic's official CLI for Claude."];
+const DEFAULT_WHITELIST = [
+  { pattern: "You are Claude Code, Anthropic's official CLI for Claude.", regex: false },
+];
+
+function validateRegexPattern(
+  pattern: string,
+  regex: boolean,
+  ctx: z.RefinementCtx,
+  message: string,
+): void {
+  if (!regex) return;
+
+  try {
+    new RegExp(pattern, "g");
+  } catch {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["pattern"],
+      message,
+    });
+  }
+}
+
+const WhitelistPatternSchema = z.union([
+  z
+    .string()
+    .min(1)
+    .transform((pattern) => ({ pattern, regex: false })),
+  z
+    .object({
+      pattern: z.string().min(1),
+      regex: z.boolean().default(false),
+    })
+    .superRefine((entry, ctx) => {
+      validateRegexPattern(entry.pattern, entry.regex, ctx, "Invalid whitelist regex pattern");
+    }),
+]);
 
 const DenylistPatternSchema = z
   .object({
@@ -39,24 +75,14 @@ const DenylistPatternSchema = z
     regex: z.boolean().default(false),
   })
   .superRefine((entry, ctx) => {
-    if (!entry.regex) return;
-
-    try {
-      new RegExp(entry.pattern, "g");
-    } catch {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["pattern"],
-        message: "Invalid denylist regex pattern",
-      });
-    }
+    validateRegexPattern(entry.pattern, entry.regex, ctx, "Invalid denylist regex pattern");
   });
 
 const MaskingSchema = z.object({
   show_markers: z.boolean().default(false),
   marker_text: z.string().default("[protected]"),
   whitelist: z
-    .array(z.string())
+    .array(WhitelistPatternSchema)
     .default([])
     .transform((arr) => [...DEFAULT_WHITELIST, ...arr]),
   denylist: z.array(DenylistPatternSchema).default([]),
@@ -191,6 +217,7 @@ export type AnthropicProviderConfig = z.infer<typeof AnthropicProviderSchema>;
 export type CodexProviderConfig = z.infer<typeof CodexProviderSchema>;
 export type LocalProviderConfig = z.infer<typeof LocalProviderSchema>;
 export type MaskingConfig = z.infer<typeof MaskingSchema>;
+export type WhitelistPattern = z.infer<typeof WhitelistPatternSchema>;
 export type DenylistPattern = z.infer<typeof DenylistPatternSchema>;
 export type SecretsDetectionConfig = z.infer<typeof SecretsDetectionSchema>;
 export type ServerConfig = z.infer<typeof ServerSchema>;

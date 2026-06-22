@@ -52,7 +52,9 @@ masking:
 
   # Text patterns that are never masked (protects against false positives)
   # whitelist:
-  #   - "Company Name Inc."
+  #   - pattern: "Company Name Inc."
+  #   - pattern: 'TEST-\d+'
+  #     regex: true
 
   # Text or regex patterns that are always masked, even if the detector misses them
   # denylist:

@@ -92,11 +92,13 @@ Exclude specific text patterns from PII masking. Useful for preventing false pos
 ```yaml
 masking:
   whitelist:
-    - "Acme Corp"
-    - "Product XYZ"
+    - pattern: "Acme Corp"
+    - pattern: "Product XYZ"
+    - pattern: 'TEST-\d+'
+      regex: true
 ```
 
-Patterns match bidirectionally - detected text containing a whitelist entry (or vice versa) is excluded.
+Literal patterns match bidirectionally - detected text containing a whitelist entry (or vice versa) is excluded. Set `regex: true` to match detected text with JavaScript regular expression syntax.
 
 ## Denylist
 
