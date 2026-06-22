@@ -17,7 +17,7 @@ export interface EntityWithScore extends Span {
   entity_type: string;
 }
 
-function overlaps(a: Span, b: Span): boolean {
+export function overlaps(a: Span, b: Span): boolean {
   return a.start < b.end && b.start < a.end;
 }
 

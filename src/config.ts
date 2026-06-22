@@ -42,13 +42,24 @@ function validateRegexPattern(
 ): void {
   if (!regex) return;
 
+  let compiled: RegExp;
   try {
-    new RegExp(pattern, "g");
+    compiled = new RegExp(pattern, "g");
   } catch {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["pattern"],
       message,
+    });
+    return;
+  }
+
+  // Reject patterns that match the empty string: zero-length matches are skipped, so they mask nothing.
+  if (compiled.test("")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["pattern"],
+      message: `${message} (must not match the empty string)`,
     });
   }
 }

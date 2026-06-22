@@ -136,4 +136,26 @@ pii_detection:
       cleanupConfig(path);
     }
   });
+
+  test("rejects denylist regex patterns that match the empty string", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+masking:
+  denylist:
+    - pattern: 'x*'
+      type: NUM
+      regex: true
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      expect(() => loadConfig(path)).toThrow("Invalid configuration");
+    } finally {
+      cleanupConfig(path);
+    }
+  });
 });

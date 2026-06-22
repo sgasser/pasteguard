@@ -1,5 +1,6 @@
 import { type DenylistPattern, getConfig, type WhitelistPattern } from "../config";
 import { HEALTH_CHECK_TIMEOUT_MS } from "../constants/timeouts";
+import { overlaps, resolveConflicts } from "../masking/conflict-resolver";
 import type { RequestExtractor } from "../masking/types";
 import { getLanguageDetector, type SupportedLanguage } from "../services/language-detector";
 
@@ -44,12 +45,60 @@ function findRegexMatches(text: string, pattern: string, type: string): PIIEntit
   return matches;
 }
 
+// Matches already-masked placeholders such as [[PERSON_1]] or [[API_KEY_SK_2]] (uppercase type + counter).
+const PLACEHOLDER_PATTERN = /\[\[[A-Z][A-Z0-9_]*_\d+\]\]/g;
+
+function placeholderSpans(text: string): Array<{ start: number; end: number }> {
+  const spans: Array<{ start: number; end: number }> = [];
+  for (const match of text.matchAll(PLACEHOLDER_PATTERN)) {
+    if (match.index !== undefined) {
+      spans.push({ start: match.index, end: match.index + match[0].length });
+    }
+  }
+  return spans;
+}
+
 export function findDenylistedEntities(text: string, denylist: DenylistPattern[]): PIIEntity[] {
   if (denylist.length === 0 || !text) return [];
 
-  return denylist.flatMap(({ pattern, type, regex }) =>
+  const matches = denylist.flatMap(({ pattern, type, regex }) =>
     regex ? findRegexMatches(text, pattern, type) : findLiteralMatches(text, pattern, type),
   );
+  if (matches.length === 0) return matches;
+
+  // Drop matches inside an existing placeholder; re-masking its internals would corrupt the earlier mask.
+  const masked = placeholderSpans(text);
+  if (masked.length === 0) return matches;
+  return matches.filter((m) => !masked.some((p) => overlaps(m, p)));
+}
+
+// Additive merge: a denylist match extends coverage but never shrinks an overlapping detector span; overlaps become their union and the detector type wins.
+export function mergeDenylistEntities(detected: PIIEntity[], denylisted: PIIEntity[]): PIIEntity[] {
+  if (denylisted.length === 0) return detected;
+
+  const resolvedDetector = resolveConflicts(detected);
+  const tagged = [
+    ...resolvedDetector.map((e) => ({ e, forced: false })),
+    ...denylisted.map((e) => ({ e, forced: true })),
+  ].sort((a, b) => a.e.start - b.e.start);
+
+  const result: { e: PIIEntity; forced: boolean }[] = [];
+  for (const item of tagged) {
+    const last = result[result.length - 1];
+    if (last && overlaps(item.e, last.e)) {
+      last.e = {
+        entity_type: last.forced && !item.forced ? item.e.entity_type : last.e.entity_type,
+        start: last.e.start,
+        end: Math.max(last.e.end, item.e.end),
+        score: Math.max(last.e.score, item.e.score),
+      };
+      last.forced = last.forced && item.forced;
+    } else {
+      result.push({ e: { ...item.e }, forced: item.forced });
+    }
+  }
+
+  return result.map((r) => r.e);
 }
 
 export function filterWhitelistedEntities(
@@ -63,7 +112,8 @@ export function filterWhitelistedEntities(
     const detectedText = text.slice(entity.start, entity.end);
     return !whitelist.some(({ pattern, regex }) => {
       if (regex) {
-        return new RegExp(pattern, "g").test(detectedText);
+        // Anchor to the whole entity so a partial match can't un-mask a larger detected span.
+        return new RegExp(`^(?:${pattern})$`).test(detectedText);
       }
       return pattern.includes(detectedText) || detectedText.includes(pattern);
     });
@@ -150,6 +200,18 @@ export class PIIDetector {
     const startTime = Date.now();
     const config = getConfig();
 
+    // Pure pass-through: detection off and no denylist, so skip extraction and language detection.
+    if (!config.pii_detection.enabled && config.masking.denylist.length === 0) {
+      return {
+        hasPII: false,
+        spanEntities: [],
+        allEntities: [],
+        scanTimeMs: 0,
+        language: config.pii_detection.fallback_language,
+        languageFallback: true,
+      };
+    }
+
     // Extract all text spans from request
     const spans = extractor.extractTexts(request);
 
@@ -173,14 +235,14 @@ export class PIIDetector {
         const denylistedEntities = findDenylistedEntities(span.text, denylist);
 
         if (scanRoles && span.role && !scanRoles.has(span.role)) {
-          return denylistedEntities;
+          return mergeDenylistEntities([], denylistedEntities);
         }
 
         const detectedEntities = config.pii_detection.enabled
           ? await this.detectPII(span.text, langResult.language)
           : [];
         const filteredEntities = filterWhitelistedEntities(span.text, detectedEntities, whitelist);
-        return [...filteredEntities, ...denylistedEntities];
+        return mergeDenylistEntities(filteredEntities, denylistedEntities);
       }),
     );
 

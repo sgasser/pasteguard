@@ -9,7 +9,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getConfig, type SecretsDetectionConfig } from "../config";
 import { createPlaceholderContext, type PlaceholderContext } from "../masking/context";
-import { filterWhitelistedEntities, findDenylistedEntities, getPIIDetector } from "../pii/detect";
+import {
+  filterWhitelistedEntities,
+  findDenylistedEntities,
+  getPIIDetector,
+  mergeDenylistEntities,
+} from "../pii/detect";
 import { mask as maskPII } from "../pii/mask";
 import { detectSecrets } from "../secrets/detect";
 import { maskSecrets } from "../secrets/mask";
@@ -209,10 +214,10 @@ apiRoutes.post("/mask", async (c) => {
         piiEntities,
         config.masking.whitelist,
       );
-      const entitiesToMask = [
-        ...filteredEntities,
-        ...findDenylistedEntities(maskedText, config.masking.denylist),
-      ];
+      const entitiesToMask = mergeDenylistEntities(
+        filteredEntities,
+        findDenylistedEntities(maskedText, config.masking.denylist),
+      );
 
       // Capture counters before masking to track new entities
       const countersBefore = { ...context.counters };
