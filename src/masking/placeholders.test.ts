@@ -84,12 +84,14 @@ describe("findPartialPlaceholderStart", () => {
   });
 
   test("buffers a trailing single bracket (first half of a split [[)", () => {
-    // A chunk ending in "[" may be the first half of "[[" split across chunks,
-    // so it must be buffered, not emitted.
     expect(findPartialPlaceholderStart("Hello [")).toBe(6);
   });
 
   test("buffers a trailing single bracket after a complete placeholder", () => {
     expect(findPartialPlaceholderStart("[[PERSON_1]] [")).toBe(13);
+  });
+
+  test("buffers an incomplete placeholder whose closing ]] is split", () => {
+    expect(findPartialPlaceholderStart("Hi [[PERSON_1]")).toBe(3);
   });
 });

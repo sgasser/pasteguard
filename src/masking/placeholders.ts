@@ -43,12 +43,9 @@ export function findPartialPlaceholderStart(text: string): number {
     return placeholderStart;
   }
 
-  // The start delimiter itself can split across chunks (a chunk ending in "[" is
-  // half of "[["), so buffer a trailing partial of it too.
-  for (let n = start.length - 1; n > 0; n--) {
-    if (text.endsWith(start.slice(0, n))) {
-      return text.length - n;
-    }
+  // A trailing "[" may be the first half of a "[[" that completes in the next chunk.
+  if (text.endsWith(start.slice(0, 1))) {
+    return text.length - 1;
   }
 
   return -1; // Entire string is safe to emit
