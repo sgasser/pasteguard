@@ -116,8 +116,6 @@ masking:
 
 Patterns are matched literally by default. Set `regex: true` to use JavaScript regular expression syntax, and use single quotes in YAML when the pattern contains backslashes. A regex pattern must not match the empty string (e.g. use `\d+`, not `\d*`); such a pattern is rejected at startup because it would silently mask nothing. Matches that fall inside an already-masked placeholder are ignored.
 
-<Warning>Whitelist and denylist regexes run against request content on every request. PasteGuard checks that a pattern compiles but does not guard against catastrophic backtracking — use simple, non-backtracking expressions to avoid a denial-of-service from a pathological pattern.</Warning>
-
 ## Scan Roles
 
 By default, all message roles are scanned. To scan only user-controlled content:
