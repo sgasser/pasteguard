@@ -89,6 +89,23 @@ def test_vat_does_not_claim_iban():
     assert all(t != VAT_CODE for t, _ in types)
 
 
+def test_vat_label_prefix_not_absorbed():
+    # A 2-letter label before the VAT (e.g. "ID") must not be taken as the country prefix.
+    for text in ["Tax ID DE136695976 here", "Steuer-ID DE136695976 anbei"]:
+        assert (VAT_CODE, "DE136695976") in types_texts(text, "en")
+
+
+def test_vat_lowercase():
+    assert (VAT_CODE, "de136695976") in types_texts("the vat is de136695976.", "en")
+    assert (VAT_CODE, "it00743110157") in types_texts("partita iva it00743110157.", "it")
+
+
+def test_vat_word_prefix_does_not_swallow_following_vat():
+    # A lowercase word that is also a country code ("es", "it") must not hide the real VAT.
+    for text in ["es DE136695976", "it DE136695976"]:
+        assert (VAT_CODE, "DE136695976") in types_texts(text, "en")
+
+
 # --- Email / IP ---
 def test_email():
     assert (EMAIL_ADDRESS, "john.doe@company.com") in types_texts("at john.doe@company.com")

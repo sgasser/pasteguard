@@ -74,10 +74,13 @@ _IBAN_RE = re.compile(
 _CC_RE = re.compile(r"(?<![\d])(?:\d[ \-]?){13,19}(?<![\s\-])(?!\d)")
 # IPv6: generous candidate (hex/colon/dot) gated by Python's ipaddress parser.
 _IPV6_RE = re.compile(r"(?<![\w:.])[0-9A-Fa-f.:]{2,45}(?![\w:.])")
-# EU VAT: 2-letter member-state prefix + country body, validated by stdnum's
-# per-country checksum (so the regex stays permissive; FP profile like IBAN). An
-# IBAN's longer alnum run can't satisfy the trailing boundary, so they don't collide.
-_VAT_RE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2}) ?([0-9A-Za-z]{8,12})(?![A-Za-z0-9])")
+# EU VAT country prefixes; stdnum.eu.vat validates the per-country checksum.
+_VAT_CC = "AT|BE|BG|HR|CY|CZ|DK|EE|FI|FR|DE|EL|GR|HU|IE|IT|LV|LT|LU|MT|NL|PL|PT|RO|SK|SI|ES|SE|EU"
+# Overlapping (lookahead) candidates so a word prefix like "it" can't hide a real VAT.
+_VAT_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?=(?P<code>" + _VAT_CC + r")[ ]?(?P<body>[0-9A-Za-z]{8,12})(?![A-Za-z0-9]))",
+    re.IGNORECASE,
+)
 
 
 def _email(text: str) -> list[Span]:
@@ -133,8 +136,8 @@ def _iban(text: str) -> list[Span]:
 def _vat(text: str) -> list[Span]:
     out: list[Span] = []
     for m in _VAT_RE.finditer(text):
-        if _eu_vat.is_valid(m.group(1) + m.group(2)):
-            out.append(Span(VAT_CODE, m.start(), m.end(), 1.0))
+        if _eu_vat.is_valid(m.group("code") + m.group("body")):
+            out.append(Span(VAT_CODE, m.start("code"), m.end("body"), 1.0))
     return out
 
 
