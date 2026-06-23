@@ -17,7 +17,13 @@ In route mode, clean Codex Responses requests are forwarded to Codex. Requests c
 
 ## Codex CLI
 
-Add a custom Codex model provider to `~/.codex/config.toml`:
+First make sure Codex is authenticated:
+
+```bash
+codex login
+```
+
+Then add a custom Codex model provider to `~/.codex/config.toml`:
 
 ```toml
 model_provider = "pasteguard-codex"
@@ -29,6 +35,8 @@ wire_api = "responses"
 requires_openai_auth = true
 supports_websockets = false
 ```
+
+If PasteGuard runs on a different port, update the `base_url`.
 
 Then run Codex normally:
 
