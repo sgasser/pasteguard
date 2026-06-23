@@ -27,26 +27,6 @@ from .entities import (
     overlaps,
 )
 
-DEFAULT_PHONE_REGIONS = [
-    "US",
-    "GB",
-    "DE",
-    "AT",
-    "CH",
-    "IT",
-    "FR",
-    "BE",
-    "LU",
-    "ES",
-    "NL",
-    "PT",
-    "BR",
-    "PL",
-    "RO",
-    "MD",
-    "IN",
-]
-
 # `\w` is Unicode-aware so accented names (müller@, andré.) match in full;
 # structure rejects leading/trailing/consecutive dots.
 _EMAIL_RE = re.compile(
@@ -156,7 +136,7 @@ def _phone_regions(phone_regions: list[str] | None) -> list[str]:
             seen.add(region)
         return normalized
 
-    return DEFAULT_PHONE_REGIONS
+    return []
 
 
 def _phone(text: str, phone_regions: list[str] | None = None) -> list[Span]:

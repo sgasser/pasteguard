@@ -71,25 +71,9 @@ pii_detection:
   # for local dev (bun run dev against the docker-compose detector service).
   detector_url: ${DETECTOR_URL:-http://localhost:5002}
 
-  # Regions for national-format phone numbers; +international numbers work globally.
-  phone_regions:
-    - US
-    - GB
-    - DE
-    - AT
-    - CH
-    - IT
-    - FR
-    - BE
-    - LU
-    - ES
-    - NL
-    - PT
-    - BR
-    - PL
-    - RO
-    - MD
-    - IN
+  # Add regions only if you need national-format numbers; + numbers work globally.
+  phone_regions: []
+  # phone_regions: [US, GB, DE, IT, IN]
 
   score_threshold: 0.7  # Minimum confidence score (0.0 - 1.0)
 

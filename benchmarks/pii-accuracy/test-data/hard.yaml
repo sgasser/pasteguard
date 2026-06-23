@@ -65,15 +65,15 @@ cases:
         text: Anne-Marie Johnson
         match: contains
 
-  - id: hard_phone_national_uk
+  - id: hard_phone_international_uk
     suite: hard
     category: hard
     split: test
     language: en
-    text: "The London callback number is 020 7946 0958."
+    text: "The London callback number is +44 20 7946 0958."
     expected:
       - entity: PHONE_NUMBER
-        text: 020 7946 0958
+        text: +44 20 7946 0958
         match: contains
 
   - id: hard_location_ambiguous_city

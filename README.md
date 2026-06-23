@@ -127,7 +127,7 @@ Both detected and masked in real time, including streaming responses.
 
 ## How detection works
 
-Detection runs as a separate service that PasteGuard calls over HTTP, so you can run it wherever you like. It mixes two things: exact checks with checksums (IBANs, credit cards, emails, phones, IPs) and a small AI model ([GLiNER](https://github.com/urchade/GLiNER)) for names and places. It works the same in any language. National-format phone numbers are validated against configured phone regions; international `+` numbers work globally.
+Detection runs as a separate service that PasteGuard calls over HTTP, so you can run it wherever you like. It mixes exact checks with checksums (IBANs, credit cards, emails, phones, IPs) and a small AI model ([GLiNER](https://github.com/urchade/GLiNER)) for names and places. It works the same in any language. Phone numbers are international-only by default; add `phone_regions` if you need local formats.
 
 Code, Docker image, and tests are in [`detector/`](detector/).
 

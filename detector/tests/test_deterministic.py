@@ -205,14 +205,20 @@ def test_phone_regions_control_national_formats():
     )
 
 
-def test_phone_default_regions_keep_longest_overlap():
-    types = types_texts("Please call the customer on 98765 43210.")
+def test_phone_configured_regions_keep_longest_overlap():
+    types = types_texts("Please call the customer on 98765 43210.", ["IN"])
     assert (PHONE_NUMBER, "98765 43210") in types
     assert (PHONE_NUMBER, "43210") not in types
 
 
 def test_phone_no_false_positive_on_invoice_number():
     assert all(t != PHONE_NUMBER for t, _ in types_texts("Rechnung 2893081508152 vom"))
+
+
+def test_default_phone_detection_is_international_only():
+    assert (PHONE_NUMBER, "+49 171 1234567") in types_texts("Tel: +49 171 1234567")
+    assert all(t != PHONE_NUMBER for t, _ in types_texts("Telefon 0171-1234567"))
+    assert all(t != PHONE_NUMBER for t, _ in types_texts("Please call 98765 43210."))
 
 
 def test_phone_english_uk_national():

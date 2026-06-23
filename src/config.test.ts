@@ -144,6 +144,25 @@ pii_detection:
     }
   });
 
+  test("defaults to international-only phone detection", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.phone_regions).toEqual([]);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
   test("rejects invalid phone region codes", () => {
     const path = writeConfig(`
 mode: mask

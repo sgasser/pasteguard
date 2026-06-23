@@ -166,7 +166,7 @@ Mode:       ${config.mode.toUpperCase()}
 ${modeInfo}
 
 PII Detection:
-  Phone regions: ${config.pii_detection.phone_regions.join(", ")}
+  Phone regions: ${config.pii_detection.phone_regions.length > 0 ? config.pii_detection.phone_regions.join(", ") : "none (+ international only)"}
   Threshold: ${config.pii_detection.score_threshold}
   Entities:  ${config.pii_detection.entities.join(", ")}
 

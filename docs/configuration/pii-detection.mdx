@@ -6,12 +6,7 @@ description: Configure PII detection settings
 ```yaml
 pii_detection:
   detector_url: http://localhost:5002
-  phone_regions:
-    - US
-    - GB
-    - DE
-    - IT
-    - IN
+  phone_regions: []
   score_threshold: 0.7
   entities:
     - PERSON
@@ -29,15 +24,15 @@ pii_detection:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `detector_url` | `http://localhost:5002` | Detector `/analyze` URL |
-| `phone_regions` | US, GB, DE, AT, CH, IT, FR, BE, LU, ES, NL, PT, BR, PL, RO, MD, IN | Regions used to validate national-format phone numbers without a country prefix |
+| `phone_regions` | `[]` | Optional regions for national-format phone numbers |
 | `score_threshold` | `0.7` | Minimum confidence floor for the neural labels PERSON and LOCATION (0.0-1.0). Checksum-validated identifiers always score `1.0` and are unaffected |
 | `entities` | See below | Entity types to return |
 
 ## Phone Regions
 
-Detection is **multilingual and language-agnostic** — the model finds names and places regardless of the language the text is written in (an Italian name and city in a German letter are caught), and structured identifiers are matched by checksum independent of language. There are no per-language images and no spaCy models to load.
+Detection is **multilingual and language-agnostic**. Names and places use one model. Structured identifiers use format or checksum checks.
 
-Phone numbers are different: international numbers with a `+` country prefix are detected globally, but national-format numbers need one or more country numbering plans. Configure those plans with `phone_regions` instead of relying on text language.
+Phone numbers are `+` international-only by default. Add `phone_regions` only when you need local formats.
 
 ```yaml
 pii_detection:
@@ -49,7 +44,7 @@ pii_detection:
     - IN
 ```
 
-Use a focused list for the traffic you expect. Adding many regions improves recall for mixed-language and international text, but can increase false positives on IDs, ticket numbers, and other digit sequences.
+Keep the list focused. More regions can mean more false positives on IDs and ticket numbers.
 
 ## Entities
 
@@ -64,7 +59,7 @@ Use a focused list for the traffic you expect. Adding many regions improves reca
 | `IP_ADDRESS` | 192.168.1.1 |
 | `VAT_CODE` | EU VAT number, e.g. `DE136695976`, `IT00743110157`, `FR40303265045` |
 
-Names and locations are multilingual. IBAN, credit card, phone, email, and IP are international. `VAT_CODE` covers any EU member state — validated per-country via the VAT checksum (`python-stdnum`) and requiring the country prefix; a bare domestic number without it is not flagged. The structured identifiers (IBAN, credit card, IP, VAT) are checksum- or format-validated, so they are caught with high precision and without false positives on lookalike numbers.
+Names and locations are multilingual. IBAN, credit card, email, IP, and `+` phone numbers work internationally. `VAT_CODE` requires a country prefix and is validated with `python-stdnum`.
 
 ## Score Threshold
 

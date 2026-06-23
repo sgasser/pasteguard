@@ -25,13 +25,13 @@ The detector speaks the `/analyze` HTTP contract, is configured through the `det
 | `IP_ADDRESS` | 192.168.1.1 |
 | `VAT_CODE` | EU VAT number, e.g. `DE136695976`, `IT00743110157`, `FR40303265045` |
 
-Names and locations are detected by the multilingual model (verified across EN/DE/IT/FR/ES/NL/PT and more). IBAN, credit card, email, and IP work internationally. Phone numbers with a `+` country prefix are global; national-format phone numbers are validated against configured `phone_regions`. `VAT_CODE` covers any EU member state, validated per-country via the VAT checksum (`python-stdnum`) and requiring the country prefix. The structured identifiers (IBAN, credit card, IP, VAT) are checksum- or format-validated, so they are caught with high precision and without false positives on lookalike numbers.
+Names and locations use the multilingual model. IBAN, credit card, email, and IP work internationally. Phone numbers are `+` international-only by default; set `phone_regions` for local formats. `VAT_CODE` requires a country prefix and is validated with `python-stdnum`.
 
 ## Languages and phone regions
 
-Detection is multilingual and **language-agnostic** — one pass over the text finds entities regardless of the language it is written in, so mixed-language documents (for example an Italian name and city in a German letter) are handled correctly. PasteGuard does not auto-detect language.
+Detection is multilingual and **language-agnostic**. PasteGuard does not auto-detect language.
 
-National-format phone numbers are the exception because the same digits can be valid or invalid depending on the country numbering plan. Configure `phone_regions` for the regions your traffic commonly contains.
+National-format phone numbers need country rules. Configure `phone_regions` only for regions your traffic uses.
 
 ## Confidence Scoring
 

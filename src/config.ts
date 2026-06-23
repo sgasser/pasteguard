@@ -113,26 +113,8 @@ const PhoneRegionsSchema = z
       .map((s) => s.trim())
       .filter(Boolean);
   })
-  .pipe(z.array(PhoneRegionSchema).min(1))
-  .default([
-    "US",
-    "GB",
-    "DE",
-    "AT",
-    "CH",
-    "IT",
-    "FR",
-    "BE",
-    "LU",
-    "ES",
-    "NL",
-    "PT",
-    "BR",
-    "PL",
-    "RO",
-    "MD",
-    "IN",
-  ]);
+  .pipe(z.array(PhoneRegionSchema))
+  .default([]);
 
 const PIIDetectionSchema = z.object({
   enabled: z.boolean().default(true),
