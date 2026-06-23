@@ -1,7 +1,5 @@
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
-file_include_globs = ".env\n.env.local\n.env.*.local\nconfig.yaml\n"
-
 [scripts]
 setup = """
 set -e
