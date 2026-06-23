@@ -37,7 +37,8 @@ FROM python:3.11-slim AS detector
 # pin it for every arch. (PyPI's DEFAULT index now ships CUDA builds for
 # linux/arm64 too — e.g. torch 2.x+cuXXX — which would drag ~6 GB of unused
 # CUDA libraries into the image; the explicit CPU index avoids that.)
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir typing-extensions \
+    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
 # Install the detector package (pulls fastapi/uvicorn/gliner/stdnum/...).
 COPY detector/pyproject.toml /srv/detector/
