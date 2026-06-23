@@ -20,9 +20,6 @@ export interface RequestLog {
   prompt_tokens: number | null;
   completion_tokens: number | null;
   user_agent: string | null;
-  language: string;
-  language_fallback: boolean;
-  detected_language: string | null;
   masked_content: string | null;
   secrets_detected: number | null;
   secrets_types: string | null;
@@ -99,9 +96,6 @@ export class Logger {
         prompt_tokens INTEGER,
         completion_tokens INTEGER,
         user_agent TEXT,
-        language TEXT NOT NULL DEFAULT 'en',
-        language_fallback INTEGER NOT NULL DEFAULT 0,
-        detected_language TEXT,
         masked_content TEXT,
         secrets_detected INTEGER,
         secrets_types TEXT,
@@ -141,9 +135,9 @@ export class Logger {
   log(entry: Omit<RequestLog, "id">): void {
     const stmt = this.db.prepare(`
       INSERT INTO request_logs
-        (timestamp, mode, provider, source, model, pii_detected, entities, latency_ms, scan_time_ms, prompt_tokens, completion_tokens, user_agent, language, language_fallback, detected_language, masked_content, secrets_detected, secrets_types, status_code, error_message)
+        (timestamp, mode, provider, source, model, pii_detected, entities, latency_ms, scan_time_ms, prompt_tokens, completion_tokens, user_agent, masked_content, secrets_detected, secrets_types, status_code, error_message)
       VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -159,9 +153,6 @@ export class Logger {
       entry.prompt_tokens,
       entry.completion_tokens,
       entry.user_agent,
-      entry.language,
-      entry.language_fallback ? 1 : 0,
-      entry.detected_language,
       entry.masked_content,
       entry.secrets_detected ?? null,
       entry.secrets_types ?? null,
@@ -175,7 +166,26 @@ export class Logger {
    */
   getLogs(limit: number = 100, offset: number = 0): RequestLog[] {
     const stmt = this.db.prepare(`
-      SELECT * FROM request_logs
+      SELECT
+        id,
+        timestamp,
+        mode,
+        provider,
+        source,
+        model,
+        pii_detected,
+        entities,
+        latency_ms,
+        scan_time_ms,
+        prompt_tokens,
+        completion_tokens,
+        user_agent,
+        masked_content,
+        secrets_detected,
+        secrets_types,
+        status_code,
+        error_message
+      FROM request_logs
       ORDER BY timestamp DESC
       LIMIT ? OFFSET ?
     `);
@@ -334,9 +344,6 @@ export interface RequestLogData {
   scanTimeMs: number;
   promptTokens?: number;
   completionTokens?: number;
-  language: string;
-  languageFallback: boolean;
-  detectedLanguage?: string;
   maskedContent?: string;
   secretsDetected?: boolean;
   secretsMasked?: boolean;
@@ -374,9 +381,6 @@ export function logRequest(data: RequestLogData, userAgent: string | null): void
       prompt_tokens: data.promptTokens ?? null,
       completion_tokens: data.completionTokens ?? null,
       user_agent: userAgent,
-      language: data.language,
-      language_fallback: data.languageFallback,
-      detected_language: data.detectedLanguage ?? null,
       masked_content: shouldLogContent ? (data.maskedContent ?? null) : null,
       secrets_detected: data.secretsDetected !== undefined ? (data.secretsDetected ? 1 : 0) : null,
       secrets_types: shouldLogSecretTypes ? data.secretsTypes!.join(",") : null,

@@ -80,8 +80,6 @@ export const errorFormats = {
 
 export interface PIIHeaderData {
   hasPII: boolean;
-  language: string;
-  languageFallback: boolean;
 }
 
 export interface SecretsHeaderData {
@@ -103,11 +101,7 @@ export function setResponseHeaders(
   c.header("X-PasteGuard-Mode", mode);
   c.header("X-PasteGuard-Provider", provider);
   c.header("X-PasteGuard-PII-Detected", pii.hasPII.toString());
-  c.header("X-PasteGuard-Language", pii.language);
 
-  if (pii.languageFallback) {
-    c.header("X-PasteGuard-Language-Fallback", "true");
-  }
   if (mode === "mask" && pii.hasPII) {
     c.header("X-PasteGuard-PII-Masked", "true");
   }
@@ -138,9 +132,6 @@ export function setBlockedHeaders(c: Context, secretTypes: string[]): void {
 export interface PIILogData {
   hasPII: boolean;
   entityTypes: string[];
-  language: string;
-  languageFallback: boolean;
-  detectedLanguage?: string;
   scanTimeMs: number;
 }
 
@@ -160,9 +151,6 @@ export function toPIILogData(piiResult: PIIDetectResult): PIILogData {
   return {
     hasPII: piiResult.hasPII,
     entityTypes: [...new Set(piiResult.detection.allEntities.map((e) => e.entity_type))],
-    language: piiResult.detection.language,
-    languageFallback: piiResult.detection.languageFallback,
-    detectedLanguage: piiResult.detection.detectedLanguage,
     scanTimeMs: piiResult.detection.scanTimeMs,
   };
 }
@@ -173,8 +161,6 @@ export function toPIILogData(piiResult: PIIDetectResult): PIILogData {
 export function toPIIHeaderData(piiResult: PIIDetectResult): PIIHeaderData {
   return {
     hasPII: piiResult.hasPII,
-    language: piiResult.detection.language,
-    languageFallback: piiResult.detection.languageFallback,
   };
 }
 
@@ -236,9 +222,6 @@ export function createLogData(options: CreateLogDataOptions): RequestLogData {
     entities: pii?.entityTypes ?? [],
     latencyMs: Date.now() - startTime,
     scanTimeMs: pii?.scanTimeMs ?? 0,
-    language: pii?.language ?? config.pii_detection.fallback_language,
-    languageFallback: pii?.languageFallback ?? false,
-    detectedLanguage: pii?.detectedLanguage,
     maskedContent,
     secretsDetected: secrets?.detected,
     secretsMasked: secrets?.masked,

@@ -2,7 +2,6 @@
  * Test utilities for creating detection results
  */
 
-import type { SupportedLanguage } from "../constants/languages";
 import type { PIIDetectionResult, PIIEntity } from "../pii/detect";
 import type { MessageSecretsResult, SecretLocation } from "../secrets/detect";
 
@@ -12,9 +11,6 @@ import type { MessageSecretsResult, SecretLocation } from "../secrets/detect";
 export function createPIIResultFromSpans(
   spanEntities: PIIEntity[][],
   options: {
-    language?: SupportedLanguage;
-    languageFallback?: boolean;
-    detectedLanguage?: string;
     scanTimeMs?: number;
   } = {},
 ): PIIDetectionResult {
@@ -24,9 +20,6 @@ export function createPIIResultFromSpans(
     spanEntities,
     allEntities,
     scanTimeMs: options.scanTimeMs ?? 0,
-    language: options.language ?? "en",
-    languageFallback: options.languageFallback ?? false,
-    detectedLanguage: options.detectedLanguage,
   };
 }
 

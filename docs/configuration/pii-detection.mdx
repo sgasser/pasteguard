@@ -6,11 +6,12 @@ description: Configure PII detection settings
 ```yaml
 pii_detection:
   detector_url: http://localhost:5002
-  languages:
-    - en
-    - de
-    - it
-  fallback_language: en
+  phone_regions:
+    - US
+    - GB
+    - DE
+    - IT
+    - IN
   score_threshold: 0.7
   entities:
     - PERSON
@@ -28,27 +29,27 @@ pii_detection:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `detector_url` | `http://localhost:5002` | Detector `/analyze` URL |
-| `languages` | `["en"]` | Languages the proxy auto-detects among (used as a hint, e.g. phone region) |
-| `fallback_language` | `en` | Language hint used when none is detected |
+| `phone_regions` | US, GB, DE, AT, CH, IT, FR, BE, LU, ES, NL, PT, BR, PL, RO, MD, IN | Regions used to validate national-format phone numbers without a country prefix |
 | `score_threshold` | `0.7` | Minimum confidence floor for the neural labels PERSON and LOCATION (0.0-1.0). Checksum-validated identifiers always score `1.0` and are unaffected |
 | `entities` | See below | Entity types to return |
 
-## Languages
+## Phone Regions
 
 Detection is **multilingual and language-agnostic** — the model finds names and places regardless of the language the text is written in (an Italian name and city in a German letter are caught), and structured identifiers are matched by checksum independent of language. There are no per-language images and no spaCy models to load.
 
-The `languages` list and `fallback_language` only control the language *hint* the proxy sends with each request (which the detector uses for things like phone-number region); they do not gate detection.
+Phone numbers are different: international numbers with a `+` country prefix are detected globally, but national-format numbers need one or more country numbering plans. Configure those plans with `phone_regions` instead of relying on text language.
 
 ```yaml
 pii_detection:
-  languages:
-    - en
-    - de
-    - it
-  fallback_language: de
+  phone_regions:
+    - US
+    - GB
+    - DE
+    - IT
+    - IN
 ```
 
-If only one language is configured, language detection is skipped for better performance.
+Use a focused list for the traffic you expect. Adding many regions improves recall for mixed-language and international text, but can increase false positives on IDs, ticket numbers, and other digit sequences.
 
 ## Entities
 

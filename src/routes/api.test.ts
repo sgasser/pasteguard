@@ -8,9 +8,7 @@ import {
 } from "../pii/detect";
 
 // Mock the PII detector to avoid needing the detector running
-const mockDetectPII = mock<(text: string, language: string) => Promise<PIIEntity[]>>(() =>
-  Promise.resolve([]),
-);
+const mockDetectPII = mock<(text: string) => Promise<PIIEntity[]>>(() => Promise.resolve([]));
 mock.module("../pii/detect", () => ({
   getPIIDetector: () => ({
     detectPII: mockDetectPII,
@@ -112,12 +110,10 @@ describe("POST /api/mask", () => {
       masked: string;
       context: Record<string, string>;
       entities: unknown[];
-      language: string;
     };
     expect(body.masked).toBe("Hello world");
     expect(body.context).toEqual({});
     expect(body.entities).toEqual([]);
-    expect(body.language).toBeDefined();
   });
 
   test("masks PII entities", async () => {
@@ -415,22 +411,6 @@ describe("POST /api/mask", () => {
     expect(body.error.type).toBe("detection_error");
     expect(body.error.message).toBe("PII detection failed");
     expect(body.error.details[0].message).toBe("Detector connection failed");
-  });
-
-  test("includes languageFallback in response", async () => {
-    mockDetectPII.mockResolvedValueOnce([]);
-
-    const res = await app.request("/api/mask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: "Hello world" }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      languageFallback: boolean;
-    };
-    expect(typeof body.languageFallback).toBe("boolean");
   });
 
   test("respects multiple entity types in startFrom", async () => {

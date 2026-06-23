@@ -9,8 +9,6 @@ const mockAnalyzeRequest = mock<() => Promise<PIIDetectionResult>>(() =>
     spanEntities: [],
     allEntities: [],
     scanTimeMs: 0,
-    language: "en",
-    languageFallback: false,
   }),
 );
 const mockLogRequest = mock(() => {});
@@ -55,8 +53,6 @@ afterEach(() => {
     spanEntities: [],
     allEntities: [],
     scanTimeMs: 0,
-    language: "en",
-    languageFallback: false,
   });
   mockLogRequest.mockClear();
 });
@@ -105,8 +101,6 @@ describe("Codex proxy", () => {
       spanEntities: [[{ entity_type: "EMAIL_ADDRESS", start: 6, end: 22, score: 0.99 }]],
       allEntities: [{ entity_type: "EMAIL_ADDRESS", start: 6, end: 22, score: 0.99 }],
       scanTimeMs: 3,
-      language: "en",
-      languageFallback: false,
     });
 
     const calls: CapturedRequest[] = [];
@@ -159,8 +153,6 @@ describe("Codex proxy", () => {
       spanEntities: [[{ entity_type: "EMAIL_ADDRESS", start: 6, end: 22, score: 0.99 }]],
       allEntities: [{ entity_type: "EMAIL_ADDRESS", start: 6, end: 22, score: 0.99 }],
       scanTimeMs: 3,
-      language: "en",
-      languageFallback: false,
     });
 
     let fetchCalled = false;
@@ -194,8 +186,6 @@ describe("Codex proxy", () => {
       spanEntities: [[{ entity_type: "EMAIL_ADDRESS", start: 6, end: 22, score: 0.99 }]],
       allEntities: [{ entity_type: "EMAIL_ADDRESS", start: 6, end: 22, score: 0.99 }],
       scanTimeMs: 3,
-      language: "en",
-      languageFallback: false,
     });
 
     globalThis.fetch = (async (_input: string | URL | Request, _init?: RequestInit) =>

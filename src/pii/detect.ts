@@ -2,7 +2,6 @@ import { type AllowlistPattern, type DenylistPattern, getConfig } from "../confi
 import { HEALTH_CHECK_TIMEOUT_MS } from "../constants/timeouts";
 import { overlaps, resolveConflicts } from "../masking/conflict-resolver";
 import type { RequestExtractor } from "../masking/types";
-import { getLanguageDetector, type SupportedLanguage } from "../services/language-detector";
 
 export interface PIIEntity {
   entity_type: string;
@@ -131,7 +130,7 @@ export function filterAllowlistedEntities(
 
 interface AnalyzeRequest {
   text: string;
-  language: string;
+  phone_regions?: string[];
   entities?: string[];
   score_threshold?: number;
 }
@@ -141,29 +140,28 @@ export interface PIIDetectionResult {
   spanEntities: PIIEntity[][];
   allEntities: PIIEntity[];
   scanTimeMs: number;
-  language: SupportedLanguage;
-  languageFallback: boolean;
-  detectedLanguage?: string;
 }
 
 export class PIIDetector {
   private detectorUrl: string;
   private scoreThreshold: number;
   private entityTypes: string[];
+  private phoneRegions: string[];
 
   constructor() {
     const config = getConfig();
     this.detectorUrl = config.pii_detection.detector_url;
     this.scoreThreshold = config.pii_detection.score_threshold;
     this.entityTypes = config.pii_detection.entities;
+    this.phoneRegions = config.pii_detection.phone_regions;
   }
 
-  async detectPII(text: string, language: SupportedLanguage): Promise<PIIEntity[]> {
+  async detectPII(text: string): Promise<PIIEntity[]> {
     const analyzeEndpoint = `${this.detectorUrl}/analyze`;
 
     const request: AnalyzeRequest = {
       text,
-      language,
+      phone_regions: this.phoneRegions,
       entities: this.entityTypes,
       score_threshold: this.scoreThreshold,
     };
@@ -210,27 +208,17 @@ export class PIIDetector {
     const startTime = Date.now();
     const config = getConfig();
 
-    // Pure pass-through: detection off and no denylist, so skip extraction and language detection.
     if (!config.pii_detection.enabled && config.masking.denylist.length === 0) {
       return {
         hasPII: false,
         spanEntities: [],
         allEntities: [],
         scanTimeMs: 0,
-        language: config.pii_detection.fallback_language,
-        languageFallback: true,
       };
     }
 
     // Extract all text spans from request
     const spans = extractor.extractTexts(request);
-
-    // Detect language from message content (skip system spans with messageIndex -1)
-    const messageSpans = spans.filter((span) => span.messageIndex >= 0);
-    const langText = messageSpans.map((s) => s.text).join("\n");
-    const langResult = langText
-      ? getLanguageDetector().detect(langText)
-      : { language: config.pii_detection.fallback_language, usedFallback: true };
 
     // Detect PII for each span independently
     const scanRoles = config.pii_detection.scan_roles
@@ -249,7 +237,7 @@ export class PIIDetector {
         }
 
         const detectedEntities = config.pii_detection.enabled
-          ? await this.detectPII(span.text, langResult.language)
+          ? await this.detectPII(span.text)
           : [];
         const filteredEntities = filterAllowlistedEntities(span.text, detectedEntities, allowlist);
         return mergeDenylistEntities(filteredEntities, denylistedEntities);
@@ -263,9 +251,6 @@ export class PIIDetector {
       spanEntities,
       allEntities,
       scanTimeMs: Date.now() - startTime,
-      language: langResult.language,
-      languageFallback: langResult.usedFallback,
-      detectedLanguage: langResult.detectedLanguage,
     };
   }
 

@@ -388,9 +388,6 @@ const LogsSection: FC = () => (
 								Model
 							</th>
 							<th class="bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
-								Language
-							</th>
-							<th class="bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
 								PII Entities
 							</th>
 							<th class="bg-elevated font-mono text-[0.65rem] font-medium uppercase tracking-widest text-text-muted px-4 py-3.5 text-left border-b border-border sticky top-0">
@@ -403,7 +400,7 @@ const LogsSection: FC = () => (
 					</thead>
 					<tbody id="logs-body">
 						<tr>
-							<td colSpan={8}>
+							<td colSpan={7}>
 								<div class="flex flex-col justify-center items-center p-10 gap-3">
 									<div class="loader-bars">
 										<div class="loader-bar" />
@@ -577,7 +574,7 @@ async function fetchLogs() {
     const tbody = document.getElementById('logs-body');
 
     if (data.logs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8"><div class="text-center py-10 text-text-muted"><div class="text-2xl mb-3 opacity-40">📋</div><div class="text-sm">No requests yet</div></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7"><div class="text-center py-10 text-text-muted"><div class="text-2xl mb-3 opacity-40">📋</div><div class="text-sm">No requests yet</div></div></td></tr>';
       return;
     }
 
@@ -587,16 +584,7 @@ async function fetchLogs() {
       const secretsTypes = log.secrets_types ? log.secrets_types.split(',').filter(s => s.trim()) : [];
       const secretsDetected = log.secrets_detected === 1;
       const isError = log.status_code && log.status_code >= 400;
-      const lang = log.language || 'en';
-      const detectedLang = log.detected_language;
       const source = log.source;
-
-      const formatLang = (code) => code ? code.toUpperCase() : lang.toUpperCase();
-
-      // Show original→fallback when fallback was used (e.g. FR→EN)
-      const langDisplay = log.language_fallback && detectedLang
-        ? '<span class="text-accent" title="Language not supported, fallback used">' + formatLang(detectedLang) + '</span><span class="text-text-muted text-[0.5rem] mx-0.5">→</span><span>' + lang.toUpperCase() + '</span>'
-        : lang.toUpperCase();
       const logId = log.id || index;
       const isExpanded = expandedRowId === logId;
 
@@ -615,7 +603,6 @@ async function fetchLogs() {
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' + sourceBadge + '</td>' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' + statusBadge + '</td>' +
           '<td class="font-mono text-[0.7rem] text-text-secondary px-4 py-3 border-b border-border-subtle align-middle">' + log.model + '</td>' +
-          '<td class="font-mono text-[0.65rem] font-medium px-4 py-3 border-b border-border-subtle align-middle">' + langDisplay + '</td>' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
             (entities.length > 0
               ? '<div class="flex flex-wrap gap-1">' + entities.map(e => '<span class="font-mono text-[0.55rem] px-1.5 py-0.5 bg-elevated border border-border rounded-sm text-text-secondary">' + e.trim() + '</span>').join('') + '</div>'
@@ -635,7 +622,7 @@ async function fetchLogs() {
 
       const detailRow =
         '<tr id="detail-' + logId + '" class="' + (isExpanded ? 'detail-row-visible' : 'hidden') + '">' +
-          '<td colspan="8" class="p-0 bg-detail border-b border-border-subtle">' +
+          '<td colspan="7" class="p-0 bg-detail border-b border-border-subtle">' +
             '<div class="p-4 px-5 animate-slide-down">' + detailContent + '</div>' +
           '</td>' +
         '</tr>';

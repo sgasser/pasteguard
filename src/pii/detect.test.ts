@@ -17,6 +17,8 @@ function mockDetector(
     Array<{ entity_type: string; start: number; end: number; score: number }>
   >,
 ) {
+  const analyzeRequests: unknown[] = [];
+
   globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
     const urlStr = url.toString();
 
@@ -26,6 +28,7 @@ function mockDetector(
 
     if (urlStr.includes("/analyze") && init?.body) {
       const body = JSON.parse(init.body as string);
+      analyzeRequests.push(body);
       const text = body.text as string;
 
       for (const [key, entities] of Object.entries(responses)) {
@@ -45,6 +48,8 @@ function mockDetector(
 
     return originalFetch(url, init);
   }) as unknown as typeof fetch;
+
+  return analyzeRequests;
 }
 
 function createRequest(messages: OpenAIMessage[]): OpenAIRequest {
@@ -273,7 +278,7 @@ describe("PIIDetector", () => {
       });
 
       const detector = new PIIDetector();
-      const entities = await detector.detectPII("test@example.com", "en");
+      const entities = await detector.detectPII("test@example.com");
 
       expect(entities).toHaveLength(1);
       expect(entities[0].entity_type).toBe("EMAIL_ADDRESS");
@@ -283,9 +288,29 @@ describe("PIIDetector", () => {
       mockDetector({});
 
       const detector = new PIIDetector();
-      const entities = await detector.detectPII("Hello world", "en");
+      const entities = await detector.detectPII("Hello world");
 
       expect(entities).toHaveLength(0);
+    });
+
+    test("sends configured phone regions to the detector", async () => {
+      const config = getConfig();
+      const previousPhoneRegions = config.pii_detection.phone_regions;
+      config.pii_detection.phone_regions = ["US", "IN", "IT"];
+      const analyzeRequests = mockDetector({});
+
+      try {
+        const detector = new PIIDetector();
+        await detector.detectPII("Call 080 1234 5678");
+
+        expect(analyzeRequests).toHaveLength(1);
+        expect(analyzeRequests[0]).toMatchObject({
+          text: "Call 080 1234 5678",
+          phone_regions: ["US", "IN", "IT"],
+        });
+      } finally {
+        config.pii_detection.phone_regions = previousPhoneRegions;
+      }
     });
   });
 

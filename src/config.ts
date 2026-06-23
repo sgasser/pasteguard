@@ -1,7 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
-import { SUPPORTED_LANGUAGES } from "./constants/languages";
 
 // Schema definitions
 
@@ -99,24 +98,46 @@ const MaskingSchema = z.object({
   denylist: z.array(DenylistPatternSchema).default([]),
 });
 
-const LanguageEnum = z.enum(SUPPORTED_LANGUAGES);
+const PhoneRegionSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.toUpperCase())
+  .pipe(z.string().regex(/^[A-Z]{2}$/, "Expected ISO 3166-1 alpha-2 region code"));
 
-// Accept either an array or a comma-separated string for languages (the latter
-// supports ${ENV_VAR} substitution in the YAML config, e.g. languages: ${LANGS:-en}).
-const LanguagesSchema = z
-  .union([z.array(LanguageEnum), z.string()])
+const PhoneRegionsSchema = z
+  .union([z.array(PhoneRegionSchema), z.string()])
   .transform((val) => {
     if (Array.isArray(val)) return val;
-    return val.split(",").map((s) => s.trim()) as (typeof SUPPORTED_LANGUAGES)[number][];
+    return val
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   })
-  .pipe(z.array(LanguageEnum))
-  .default(["en"]);
+  .pipe(z.array(PhoneRegionSchema).min(1))
+  .default([
+    "US",
+    "GB",
+    "DE",
+    "AT",
+    "CH",
+    "IT",
+    "FR",
+    "BE",
+    "LU",
+    "ES",
+    "NL",
+    "PT",
+    "BR",
+    "PL",
+    "RO",
+    "MD",
+    "IN",
+  ]);
 
 const PIIDetectionSchema = z.object({
   enabled: z.boolean().default(true),
   detector_url: z.string().url(),
-  languages: LanguagesSchema,
-  fallback_language: LanguageEnum.default("en"),
+  phone_regions: PhoneRegionsSchema,
   score_threshold: z.coerce.number().min(0).max(1).default(0.7),
   entities: z
     .array(z.string())

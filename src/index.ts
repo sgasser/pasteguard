@@ -125,8 +125,6 @@ async function validateStartup() {
   }
 
   console.log("[STARTUP] ✓ Detector connected");
-  // Language config is validated at load time (config.ts LanguageEnum); the
-  // detector is language-agnostic, so there is no runtime language gate.
 }
 
 function printStartupBanner(config: ReturnType<typeof getConfig>, host: string, port: number) {
@@ -168,8 +166,7 @@ Mode:       ${config.mode.toUpperCase()}
 ${modeInfo}
 
 PII Detection:
-  Languages: ${config.pii_detection.languages.join(", ")}
-  Fallback:  ${config.pii_detection.fallback_language}
+  Phone regions: ${config.pii_detection.phone_regions.join(", ")}
   Threshold: ${config.pii_detection.score_threshold}
   Entities:  ${config.pii_detection.entities.join(", ")}
 

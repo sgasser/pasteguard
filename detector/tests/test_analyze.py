@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import detector.app as appmod
-from detector.entities import LOCATION, PERSON, Span
+from detector.entities import LOCATION, PERSON, PHONE_NUMBER, Span
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ def test_health(client):
 
 def test_response_shape_and_offsets(client):
     text = "IBAN IT60X0542811101000000123456"
-    r = client.post("/analyze", json={"text": text, "language": "it", "score_threshold": 0.7})
+    r = client.post("/analyze", json={"text": text, "score_threshold": 0.7})
     assert r.status_code == 200
     body = r.json()
     assert body and all({"entity_type", "start", "end", "score"} == set(e) for e in body)
@@ -49,10 +49,8 @@ def test_response_shape_and_offsets(client):
 
 
 def test_routing_iban_in_german_text(client):
-    # An Italian IBAN inside German text, language=de — the deterministic layer
-    # is language-agnostic, so it must still be found.
     text = "Der Mandant Mario Rossi (IT60X0542811101000000123456) zahlt."
-    r = client.post("/analyze", json={"text": text, "language": "de", "score_threshold": 0.7})
+    r = client.post("/analyze", json={"text": text, "score_threshold": 0.7})
     types = {e["entity_type"] for e in r.json()}
     assert "IBAN_CODE" in types
     assert "PERSON" in types  # from the (stubbed) multilingual NER
@@ -64,7 +62,6 @@ def test_entity_filter(client):
         "/analyze",
         json={
             "text": text,
-            "language": "it",
             "entities": ["IBAN_CODE"],
             "score_threshold": 0.7,
         },
@@ -73,24 +70,37 @@ def test_entity_filter(client):
     assert types == {"IBAN_CODE"}
 
 
+def test_phone_regions_control_national_formats(client):
+    text = "English ticket text with Indian callback 98765 43210."
+    r = client.post(
+        "/analyze",
+        json={
+            "text": text,
+            "phone_regions": ["IN"],
+            "entities": ["PHONE_NUMBER"],
+            "score_threshold": 0.7,
+        },
+    )
+    types = {e["entity_type"] for e in r.json()}
+    assert PHONE_NUMBER in types
+
+
 def test_score_threshold_drops_fuzzy_keeps_deterministic(client):
     text = "Mario Rossi, IBAN IT60X0542811101000000123456"
-    r = client.post("/analyze", json={"text": text, "language": "it", "score_threshold": 0.99})
+    r = client.post("/analyze", json={"text": text, "score_threshold": 0.99})
     types = {e["entity_type"] for e in r.json()}
     assert "IBAN_CODE" in types  # deterministic, score 1.0
     assert "PERSON" not in types  # fuzzy 0.95 < 0.99
 
 
-def test_language_probe_never_errors(client):
-    # The PasteGuard probe: any language must return 200 with an array, never
-    # an error, so every configured language is treated as supported.
-    r = client.post("/analyze", json={"text": "test", "language": "xx", "entities": ["PERSON"]})
+def test_minimal_request_never_errors(client):
+    r = client.post("/analyze", json={"text": "test", "entities": ["PERSON"]})
     assert r.status_code == 200
     assert isinstance(r.json(), list)
 
 
 def test_empty_text(client):
-    r = client.post("/analyze", json={"text": "", "language": "de"})
+    r = client.post("/analyze", json={"text": ""})
     assert r.status_code == 200
     assert r.json() == []
 
@@ -99,7 +109,7 @@ def test_utf16_offsets_with_astral_char(client):
     # An emoji (astral, 2 UTF-16 code units) before the email must shift the
     # returned offsets so PasteGuard's JS text.slice lands on the email.
     text = "Hi 😀 mail@x.com"
-    r = client.post("/analyze", json={"text": text, "language": "en", "score_threshold": 0.7})
+    r = client.post("/analyze", json={"text": text, "score_threshold": 0.7})
     email = next(e for e in r.json() if e["entity_type"] == "EMAIL_ADDRESS")
     # JS code units: "Hi " (3) + emoji (2) + " " (1) = 6
     assert email["start"] == 6

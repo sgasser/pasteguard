@@ -13,8 +13,11 @@ from detector.entities import (
 )
 
 
-def types_texts(text, language=""):
-    return [(s.entity_type, text[s.start : s.end]) for s in detect_deterministic(text, language)]
+def types_texts(text, phone_regions=None):
+    return [
+        (s.entity_type, text[s.start : s.end])
+        for s in detect_deterministic(text, phone_regions)
+    ]
 
 
 # --- IBAN ---
@@ -26,27 +29,27 @@ def test_iban_plain():
 
 def test_iban_spaced_keeps_spacing_in_span():
     text = "Bonifico IBAN IT60 X054 2811 1010 0000 0123 456 entro lunedì"
-    assert (IBAN_CODE, "IT60 X054 2811 1010 0000 0123 456") in types_texts(text, "it")
+    assert (IBAN_CODE, "IT60 X054 2811 1010 0000 0123 456") in types_texts(text)
 
 
 def test_iban_german():
     assert (IBAN_CODE, "DE89 3704 0044 0532 0130 00") in types_texts(
-        "auf IBAN DE89 3704 0044 0532 0130 00", "de"
+        "auf IBAN DE89 3704 0044 0532 0130 00"
     )
 
 
 def test_iban_invalid_checksum_rejected():
-    assert types_texts("IBAN errato: IT60X0542811101000000123457", "it") == []
+    assert types_texts("IBAN errato: IT60X0542811101000000123457") == []
 
 
 def test_iban_lowercase():
     assert (IBAN_CODE, "de89 3704 0044 0532 0130 00") in types_texts(
-        "bitte auf iban de89 3704 0044 0532 0130 00", "de"
+        "bitte auf iban de89 3704 0044 0532 0130 00"
     )
 
 
 def test_iban_lowercase_does_not_bleed_into_following_word():
-    spans = detect_deterministic("iban de89 3704 0044 0532 0130 00 grazie", "it")
+    spans = detect_deterministic("iban de89 3704 0044 0532 0130 00 grazie")
     iban = next(s for s in spans if s.entity_type == IBAN_CODE)
     text = "iban de89 3704 0044 0532 0130 00 grazie"
     assert "grazie" not in text[iban.start : iban.end]
@@ -54,37 +57,37 @@ def test_iban_lowercase_does_not_bleed_into_following_word():
 
 def test_iban_does_not_bleed_into_following_word():
     # The lowercase word after the IBAN must not be swallowed.
-    spans = detect_deterministic("IBAN IT60 X054 2811 1010 0000 0123 456 entro", "it")
+    spans = detect_deterministic("IBAN IT60 X054 2811 1010 0000 0123 456 entro")
     iban = next(s for s in spans if s.entity_type == IBAN_CODE)
     assert "entro" not in "IBAN IT60 X054 2811 1010 0000 0123 456 entro"[iban.start : iban.end]
 
 
 # --- VAT (EU, stdnum-validated) ---
 def test_vat_valid_multiple_countries():
-    for v, lang in [
-        ("DE136695976", "de"),
-        ("IT00743110157", "it"),
-        ("FR40303265045", "fr"),
-        ("ESA13585625", "es"),
-        ("ATU13585627", "de"),
-        ("BE0428759497", "nl"),
-        ("PL5260001246", "pl"),
+    for v in [
+        "DE136695976",
+        "IT00743110157",
+        "FR40303265045",
+        "ESA13585625",
+        "ATU13585627",
+        "BE0428759497",
+        "PL5260001246",
     ]:
-        assert (VAT_CODE, v) in types_texts(f"VAT {v} on the invoice", lang)
+        assert (VAT_CODE, v) in types_texts(f"VAT {v} on the invoice")
 
 
 def test_vat_spaced_after_prefix():
-    assert (VAT_CODE, "DE 136695976") in types_texts("USt-IdNr DE 136695976", "de")
+    assert (VAT_CODE, "DE 136695976") in types_texts("USt-IdNr DE 136695976")
 
 
 def test_vat_invalid_checksum_rejected():
-    assert all(t != VAT_CODE for t, _ in types_texts("VAT DE136695977 is wrong", "de"))
+    assert all(t != VAT_CODE for t, _ in types_texts("VAT DE136695977 is wrong"))
 
 
 def test_vat_does_not_claim_iban():
     # An IBAN must stay IBAN_CODE and never be mistagged as VAT.
     text = "auf IBAN DE89 3704 0044 0532 0130 00"
-    types = types_texts(text, "de")
+    types = types_texts(text)
     assert (IBAN_CODE, "DE89 3704 0044 0532 0130 00") in types
     assert all(t != VAT_CODE for t, _ in types)
 
@@ -92,18 +95,18 @@ def test_vat_does_not_claim_iban():
 def test_vat_label_prefix_not_absorbed():
     # A 2-letter label before the VAT (e.g. "ID") must not be taken as the country prefix.
     for text in ["Tax ID DE136695976 here", "Steuer-ID DE136695976 anbei"]:
-        assert (VAT_CODE, "DE136695976") in types_texts(text, "en")
+        assert (VAT_CODE, "DE136695976") in types_texts(text)
 
 
 def test_vat_lowercase():
-    assert (VAT_CODE, "de136695976") in types_texts("the vat is de136695976.", "en")
-    assert (VAT_CODE, "it00743110157") in types_texts("partita iva it00743110157.", "it")
+    assert (VAT_CODE, "de136695976") in types_texts("the vat is de136695976.")
+    assert (VAT_CODE, "it00743110157") in types_texts("partita iva it00743110157.")
 
 
 def test_vat_word_prefix_does_not_swallow_following_vat():
     # A lowercase word that is also a country code ("es", "it") must not hide the real VAT.
     for text in ["es DE136695976", "it DE136695976"]:
-        assert (VAT_CODE, "DE136695976") in types_texts(text, "en")
+        assert (VAT_CODE, "DE136695976") in types_texts(text)
 
 
 # --- Email / IP ---
@@ -187,79 +190,94 @@ def test_credit_card_invalid_luhn_rejected():
 
 # --- Phone (VALID leniency: no FP on long ID digit runs) ---
 def test_phone_german_national():
-    assert (PHONE_NUMBER, "0171-1234567") in types_texts("Telefon 0171-1234567", "de")
+    assert (PHONE_NUMBER, "0171-1234567") in types_texts("Telefon 0171-1234567", ["DE"])
 
 
 def test_phone_international():
-    assert (PHONE_NUMBER, "+49 171 1234567") in types_texts("Tel: +49 171 1234567", "de")
+    assert (PHONE_NUMBER, "+49 171 1234567") in types_texts("Tel: +49 171 1234567")
+
+
+def test_phone_regions_control_national_formats():
+    assert (PHONE_NUMBER, "98765 43210") in types_texts(
+        "Please call the customer on 98765 43210.", ["IN"]
+    )
+    assert (PHONE_NUMBER, "06 6982") in types_texts(
+        "El contacto italiano atiende en 06 6982.", ["IT"]
+    )
+
+
+def test_phone_default_regions_keep_longest_overlap():
+    types = types_texts("Please call the customer on 98765 43210.")
+    assert (PHONE_NUMBER, "98765 43210") in types
+    assert (PHONE_NUMBER, "43210") not in types
 
 
 def test_phone_no_false_positive_on_invoice_number():
-    assert all(t != PHONE_NUMBER for t, _ in types_texts("Rechnung 2893081508152 vom", "de"))
+    assert all(t != PHONE_NUMBER for t, _ in types_texts("Rechnung 2893081508152 vom"))
 
 
 def test_phone_english_uk_national():
     assert (PHONE_NUMBER, "0121 234 5678") in types_texts(
-        "The Birmingham callback number is 0121 234 5678.", "en"
+        "The Birmingham callback number is 0121 234 5678.", ["GB"]
     )
 
 
 def test_phone_german_extra_regions():
     assert (PHONE_NUMBER, "01 234567890") in types_texts(
-        "Die Wiener Kontaktnummer ist 01 234567890.", "de"
+        "Die Wiener Kontaktnummer ist 01 234567890.", ["AT"]
     )
     assert (PHONE_NUMBER, "0848 800 800") in types_texts(
-        "Die Schweizer Kontaktnummer ist 0848 800 800.", "de"
+        "Die Schweizer Kontaktnummer ist 0848 800 800.", ["CH"]
     )
 
 
 def test_phone_french_extra_regions():
     assert (PHONE_NUMBER, "012 34 56 78") in types_texts(
-        "Le numéro belge du contact est 012 34 56 78.", "fr"
+        "Le numéro belge du contact est 012 34 56 78.", ["BE"]
     )
     assert (PHONE_NUMBER, "0848 800 800") in types_texts(
-        "Le numéro suisse du contact est 0848 800 800.", "fr"
+        "Le numéro suisse du contact est 0848 800 800.", ["CH"]
     )
     assert (PHONE_NUMBER, "27 12 34 56") in types_texts(
-        "Le numéro luxembourgeois du contact est 27 12 34 56.", "fr"
+        "Le numéro luxembourgeois du contact est 27 12 34 56.", ["LU"]
     )
 
 
 def test_phone_dutch_belgium_region():
     assert (PHONE_NUMBER, "012 34 56 78") in types_texts(
-        "Het Belgische telefoonnummer is 012 34 56 78.", "nl"
+        "Het Belgische telefoonnummer is 012 34 56 78.", ["BE"]
     )
 
 
 def test_phone_portuguese_brazil_region():
     assert (PHONE_NUMBER, "(11) 2345-6789") in types_texts(
-        "O número brasileiro do contato é (11) 2345-6789.", "pt"
+        "O número brasileiro do contato é (11) 2345-6789.", ["BR"]
     )
 
 
 def test_phone_polish_and_romanian_primary_regions():
     assert (PHONE_NUMBER, "12 345 67 89") in types_texts(
-        "Numer krajowy kontaktu to 12 345 67 89.", "pl"
+        "Numer krajowy kontaktu to 12 345 67 89.", ["PL"]
     )
     assert (PHONE_NUMBER, "021 123 4567") in types_texts(
-        "Numărul național al contactului este 021 123 4567.", "ro"
+        "Numărul național al contactului este 021 123 4567.", ["RO"]
     )
 
 
 def test_phone_romanian_moldova_region():
     assert (PHONE_NUMBER, "022 212 345") in types_texts(
-        "Numărul de contact din Moldova este 022 212 345.", "ro"
+        "Numărul de contact din Moldova este 022 212 345.", ["MD"]
     )
 
 
 # --- overlap / priority ---
 def test_no_overlapping_spans():
     text = "IBAN IT60 X054 2811 1010 0000 0123 456, mail luca@example.it"
-    spans = detect_deterministic(text, "it")
+    spans = detect_deterministic(text)
     spans.sort(key=lambda s: s.start)
     for a, b in pairwise(spans):
         assert a.end <= b.start
 
 
 def test_empty_text():
-    assert detect_deterministic("", "de") == []
+    assert detect_deterministic("") == []

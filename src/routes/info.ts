@@ -29,8 +29,7 @@ infoRoutes.get("/info", (c) => {
     mode: config.mode,
     providers,
     pii_detection: {
-      languages: config.pii_detection.languages,
-      fallback_language: config.pii_detection.fallback_language,
+      phone_regions: config.pii_detection.phone_regions,
       score_threshold: config.pii_detection.score_threshold,
       entities: config.pii_detection.entities,
     },

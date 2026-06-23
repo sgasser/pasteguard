@@ -67,11 +67,11 @@ curl -O https://raw.githubusercontent.com/sgasser/pasteguard/main/docker-compose
 docker compose up -d
 ```
 
-## Languages
+## Languages and phone numbers
 
-Detection is multilingual and needs no per-language configuration. The `languages`
-and `fallback_language` settings only set a hint sent with each request (e.g. for
-phone-number region) — see [PII Detection Config](/configuration/pii-detection).
+Detection is multilingual and needs no per-language configuration. Configure
+`phone_regions` only if you need national-format phone numbers without a `+`
+country prefix — see [PII Detection Config](/configuration/pii-detection).
 
 ## Environment Variables
 

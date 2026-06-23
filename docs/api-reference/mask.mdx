@@ -37,7 +37,6 @@ X-PasteGuard-Source: browser-extension
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `text` | string | Yes | Text to scan and mask |
-| `language` | string | No | Language code for PII detection (auto-detected if not provided) |
 | `startFrom` | object | No | Counter values to continue numbering from previous calls |
 | `detect` | array | No | What to detect: `["pii"]`, `["secrets"]`, or `["pii", "secrets"]` (default: both) |
 
@@ -57,9 +56,7 @@ X-PasteGuard-Source: browser-extension
   "entities": [
     { "type": "EMAIL_ADDRESS", "placeholder": "[[EMAIL_ADDRESS_1]]" },
     { "type": "PHONE_NUMBER", "placeholder": "[[PHONE_NUMBER_1]]" }
-  ],
-  "language": "en",
-  "languageFallback": false
+  ]
 }
 ```
 
@@ -69,8 +66,6 @@ X-PasteGuard-Source: browser-extension
 | `context` | Mapping of placeholder to original value (for client-side unmasking) |
 | `counters` | Final counter values per entity type |
 | `entities` | List of detected entities with their placeholders |
-| `language` | Language used for PII detection |
-| `languageFallback` | Whether the configured fallback language was used (auto-detection failed) |
 
 ## Detection Options
 

@@ -1,13 +1,3 @@
-"""The /analyze service PasteGuard speaks (src/pii/detect.ts):
-  POST /analyze  {text, language, entities?, score_threshold?}
-                 -> [{entity_type, start, end, score}]  (offsets into text)
-  GET  /health   -> 200
-
-The service is language-agnostic: every language returns 200 with a (possibly
-empty) array, so the PasteGuard language probe always treats configured
-languages as supported.
-"""
-
 from __future__ import annotations
 
 from bisect import bisect_left
@@ -35,7 +25,7 @@ def _utf16_mapper(text: str):
 
 class AnalyzeRequest(BaseModel):
     text: str
-    language: str = ""
+    phone_regions: list[str] | None = None
     entities: list[str] | None = None
     score_threshold: float = 0.0
 
@@ -64,9 +54,7 @@ def health() -> dict[str, str]:
 
 @app.post("/analyze", response_model=list[Entity])
 def analyze(req: AnalyzeRequest) -> list[Entity]:
-    deterministic = detect_deterministic(req.text, req.language)
-    # NER already applied per-label floors, so merge must not re-drop by the
-    # global threshold; deterministic spans are 1.0, so a 0.0 floor is safe.
+    deterministic = detect_deterministic(req.text, req.phone_regions)
     fuzzy = detect_gliner(req.text, req.score_threshold)
     spans = merge(deterministic, fuzzy, req.entities, 0.0)
     to_u16 = _utf16_mapper(req.text)

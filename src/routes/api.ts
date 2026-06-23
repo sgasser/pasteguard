@@ -18,7 +18,6 @@ import {
 import { mask as maskPII } from "../pii/mask";
 import { detectSecrets } from "../secrets/detect";
 import { maskSecrets } from "../secrets/mask";
-import { getLanguageDetector, type SupportedLanguage } from "../services/language-detector";
 import { logRequest, normalizeRequestSource } from "../services/logger";
 import { createLogData } from "./utils";
 
@@ -27,7 +26,6 @@ export const apiRoutes = new Hono();
 // Request schema
 const MaskRequestSchema = z.object({
   text: z.string().trim().min(1, "text is required"),
-  language: z.string().optional(),
   startFrom: z.record(z.string(), z.number()).optional(),
   detect: z.array(z.enum(["pii", "secrets"])).optional(),
 });
@@ -45,8 +43,6 @@ interface MaskResponse {
   context: Record<string, string>;
   counters: Record<string, number>;
   entities: MaskEntity[];
-  language: string;
-  languageFallback: boolean;
 }
 
 /**
@@ -118,20 +114,6 @@ apiRoutes.post("/mask", async (c) => {
     }
   }
 
-  // Detect language (use provided or auto-detect)
-  let language: SupportedLanguage;
-  let languageFallback = false;
-  if (
-    request.language &&
-    config.pii_detection.languages.includes(request.language as SupportedLanguage)
-  ) {
-    language = request.language as SupportedLanguage;
-  } else {
-    const langResult = getLanguageDetector().detect(request.text);
-    language = langResult.language;
-    languageFallback = langResult.usedFallback;
-  }
-
   let maskedText = request.text;
   const allEntities: MaskEntity[] = [];
   const piiEntityTypes: string[] = [];
@@ -177,8 +159,6 @@ apiRoutes.post("/mask", async (c) => {
           pii: {
             hasPII: piiEntityTypes.length > 0,
             entityTypes: piiEntityTypes,
-            language,
-            languageFallback,
             scanTimeMs,
           },
           statusCode: 503,
@@ -205,9 +185,7 @@ apiRoutes.post("/mask", async (c) => {
     try {
       const piiStartTime = Date.now();
       const detector = getPIIDetector();
-      const piiEntities = config.pii_detection.enabled
-        ? await detector.detectPII(maskedText, language)
-        : [];
+      const piiEntities = config.pii_detection.enabled ? await detector.detectPII(maskedText) : [];
       scanTimeMs = Date.now() - piiStartTime;
 
       const filteredEntities = filterAllowlistedEntities(
@@ -240,7 +218,7 @@ apiRoutes.post("/mask", async (c) => {
           source,
           model: "mask",
           startTime,
-          pii: { hasPII: false, entityTypes: [], language, languageFallback, scanTimeMs: 0 },
+          pii: { hasPII: false, entityTypes: [], scanTimeMs: 0 },
           statusCode: 503,
           errorMessage: error instanceof Error ? error.message : "PII detection failed",
         }),
@@ -270,8 +248,6 @@ apiRoutes.post("/mask", async (c) => {
       pii: {
         hasPII: piiEntityTypes.length > 0,
         entityTypes: piiEntityTypes,
-        language,
-        languageFallback,
         scanTimeMs,
       },
       secrets:
@@ -288,8 +264,6 @@ apiRoutes.post("/mask", async (c) => {
     context: context.mapping,
     counters: { ...context.counters },
     entities: allEntities,
-    language,
-    languageFallback,
   };
 
   return c.json(response);

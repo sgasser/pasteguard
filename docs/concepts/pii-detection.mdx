@@ -3,7 +3,7 @@ title: PII Detection
 description: Personal data detection via a deterministic checksum layer plus multilingual GLiNER NER
 ---
 
-PasteGuard detects PII with a small open-source service that pairs a deterministic regex/checksum layer with a multilingual neural model. Detection is **language-agnostic**: the neural model finds names and places whatever the request language — an Italian name and city in a German letter are caught even with a `de` hint — and structured identifiers (IBAN, credit card, email, IP) are matched by checksum, not by language.
+PasteGuard detects PII with a small open-source service that pairs a deterministic regex/checksum layer with a multilingual neural model. Detection is **language-agnostic**: the neural model finds names and places in mixed-language text — for example, an Italian name and city in a German letter — and structured identifiers (IBAN, credit card, email, IP) are matched by checksum, not by language.
 
 ## How it works
 
@@ -25,11 +25,13 @@ The detector speaks the `/analyze` HTTP contract, is configured through the `det
 | `IP_ADDRESS` | 192.168.1.1 |
 | `VAT_CODE` | EU VAT number, e.g. `DE136695976`, `IT00743110157`, `FR40303265045` |
 
-Names and locations are detected by the multilingual model (verified across EN/DE/IT/FR/ES/NL/PT and more). IBAN, credit card, phone, email, and IP work internationally. `VAT_CODE` covers any EU member state, validated per-country via the VAT checksum (`python-stdnum`) and requiring the country prefix. The structured identifiers (IBAN, credit card, IP, VAT) are checksum- or format-validated, so they are caught with high precision and without false positives on lookalike numbers.
+Names and locations are detected by the multilingual model (verified across EN/DE/IT/FR/ES/NL/PT and more). IBAN, credit card, email, and IP work internationally. Phone numbers with a `+` country prefix are global; national-format phone numbers are validated against configured `phone_regions`. `VAT_CODE` covers any EU member state, validated per-country via the VAT checksum (`python-stdnum`) and requiring the country prefix. The structured identifiers (IBAN, credit card, IP, VAT) are checksum- or format-validated, so they are caught with high precision and without false positives on lookalike numbers.
 
-## Languages
+## Languages and phone regions
 
-Detection is multilingual and **language-agnostic** — one pass over the text finds entities regardless of the language it is written in, so mixed-language documents (for example an Italian name and city in a German letter) are handled correctly. The `language` field in a request is used only as a hint, e.g. to pick a phone-number region; it does not gate detection.
+Detection is multilingual and **language-agnostic** — one pass over the text finds entities regardless of the language it is written in, so mixed-language documents (for example an Italian name and city in a German letter) are handled correctly. PasteGuard does not auto-detect language.
+
+National-format phone numbers are the exception because the same digits can be valid or invalid depending on the country numbering plan. Configure `phone_regions` for the regions your traffic commonly contains.
 
 ## Confidence Scoring
 
@@ -49,11 +51,4 @@ When PII is detected:
 ```
 X-PasteGuard-PII-Detected: true
 X-PasteGuard-PII-Masked: true   # mask mode only
-X-PasteGuard-Language: en
-```
-
-If the fallback language was used:
-
-```
-X-PasteGuard-Language-Fallback: true
 ```

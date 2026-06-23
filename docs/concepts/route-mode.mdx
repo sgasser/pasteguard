@@ -98,7 +98,6 @@ When a request is routed to local:
 X-PasteGuard-Mode: route
 X-PasteGuard-Provider: local
 X-PasteGuard-PII-Detected: true
-X-PasteGuard-Language: en
 ```
 
 When routed to OpenAI or Anthropic:
@@ -107,11 +106,4 @@ When routed to OpenAI or Anthropic:
 X-PasteGuard-Mode: route
 X-PasteGuard-Provider: openai
 X-PasteGuard-PII-Detected: false
-X-PasteGuard-Language: en
-```
-
-If the detected language wasn't configured and fell back to `fallback_language`:
-
-```
-X-PasteGuard-Language-Fallback: true
 ```

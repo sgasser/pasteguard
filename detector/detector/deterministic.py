@@ -27,31 +27,25 @@ from .entities import (
     overlaps,
 )
 
-# Default phonenumbers region per request language, so national-format numbers
-# (not only +international) are matched.
-LANG_TO_REGION = {
-    "de": "DE",
-    "it": "IT",
-    "fr": "FR",
-    "es": "ES",
-    "en": "US",
-    "nl": "NL",
-    "pt": "PT",
-    "pl": "PL",
-    "ro": "RO",
-}
-EXTRA_LANGUAGE_REGIONS = {
-    # English benchmark and real traffic may contain either US or UK national
-    # formats. The primary region stays US; GB is an additional pass.
-    "en": ["GB"],
-    # Conservative CLDR-backed language regions where national phone formats
-    # are common in same-language text.
-    "de": ["AT", "CH"],
-    "fr": ["BE", "CH", "LU"],
-    "nl": ["BE"],
-    "pt": ["BR"],
-    "ro": ["MD"],
-}
+DEFAULT_PHONE_REGIONS = [
+    "US",
+    "GB",
+    "DE",
+    "AT",
+    "CH",
+    "IT",
+    "FR",
+    "BE",
+    "LU",
+    "ES",
+    "NL",
+    "PT",
+    "BR",
+    "PL",
+    "RO",
+    "MD",
+    "IN",
+]
 
 # `\w` is Unicode-aware so accented names (müller@, andré.) match in full;
 # structure rejects leading/trailing/consecutive dots.
@@ -150,40 +144,47 @@ def _credit_card(text: str) -> list[Span]:
     return out
 
 
-def _phone(text: str, language: str) -> list[Span]:
-    language_key = (language or "").lower()
-    region = LANG_TO_REGION.get(language_key)
-    regions = [region] if region else []
-    regions.extend(EXTRA_LANGUAGE_REGIONS.get(language_key, []))
+def _phone_regions(phone_regions: list[str] | None) -> list[str | None]:
+    if phone_regions:
+        normalized = []
+        seen = set()
+        for region in phone_regions:
+            region = (region or "").upper()
+            if not re.fullmatch(r"[A-Z]{2}", region) or region in seen:
+                continue
+            normalized.append(region)
+            seen.add(region)
+        return normalized or [None]
+
+    return DEFAULT_PHONE_REGIONS
+
+
+def _phone(text: str, phone_regions: list[str] | None = None) -> list[Span]:
+    regions = _phone_regions(phone_regions)
     out: list[Span] = []
-    # VALID leniency: only well-formed, assignable numbers. POSSIBLE would flag
-    # long invoice/ID digit runs as phones.
-    for candidate_region in regions or [None]:
+    for candidate_region in regions:
         for match in phonenumbers.PhoneNumberMatcher(
             text, candidate_region, leniency=phonenumbers.Leniency.VALID
         ):
             span = Span(PHONE_NUMBER, match.start, match.end, 1.0)
             if not any(s.start == span.start and s.end == span.end for s in out):
                 out.append(span)
-    return out
+    out.sort(key=lambda s: (s.start, -(s.end - s.start)))
+    return [s for i, s in enumerate(out) if not any(overlaps(s, prev) for prev in out[:i])]
 
 
-# Priority order: most specific first. A later detector's span is dropped if it
-# overlaps an already-accepted one.
-def detect_deterministic(text: str, language: str = "") -> list[Span]:
+def detect_deterministic(text: str, phone_regions: list[str] | None = None) -> list[Span]:
     if not text:
         return []
 
     ordered: list[Span] = []
     ordered += _email(text)
-    # IPv6 before IPv4 so an IPv4-mapped/embedded IPv6 (e.g. ::ffff:192.168.0.1)
-    # is claimed in full, not truncated to its IPv4 tail by overlap resolution.
     ordered += _ipv6(text)
     ordered += _ipv4(text)
     ordered += _iban(text)
     ordered += _vat(text)
     ordered += _credit_card(text)
-    ordered += _phone(text, language)
+    ordered += _phone(text, phone_regions)
 
     accepted: list[Span] = []
     for span in ordered:

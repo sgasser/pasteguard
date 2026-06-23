@@ -71,18 +71,25 @@ pii_detection:
   # for local dev (bun run dev against the docker-compose detector service).
   detector_url: ${DETECTOR_URL:-http://localhost:5002}
 
-  # Detection is multilingual and language-agnostic — one model finds entities
-  # regardless of the language. This list is only a hint (e.g. phone-number
-  # region) and the language reported in headers; it does not gate detection.
-  languages:
-    - en
-    # - de
-    # - fr
-    # - es
-    # - it
-
-  # Fallback language if detected language is not in the list above
-  fallback_language: en
+  # Regions for national-format phone numbers; +international numbers work globally.
+  phone_regions:
+    - US
+    - GB
+    - DE
+    - AT
+    - CH
+    - IT
+    - FR
+    - BE
+    - LU
+    - ES
+    - NL
+    - PT
+    - BR
+    - PL
+    - RO
+    - MD
+    - IN
 
   score_threshold: 0.7  # Minimum confidence score (0.0 - 1.0)
 
