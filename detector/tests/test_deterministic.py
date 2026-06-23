@@ -15,8 +15,7 @@ from detector.entities import (
 
 def types_texts(text, phone_regions=None):
     return [
-        (s.entity_type, text[s.start : s.end])
-        for s in detect_deterministic(text, phone_regions)
+        (s.entity_type, text[s.start : s.end]) for s in detect_deterministic(text, phone_regions)
     ]
 
 
