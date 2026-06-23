@@ -23,12 +23,7 @@ export function formatMaskedSpansForLog(
 ): string | undefined {
   const allowedRoles = new Set(scanRoles);
   const lines = spans
-    .filter(
-      (span) =>
-        span.text &&
-        (scope === "full" ||
-          (span.role && allowedRoles.has(span.role) && !isAgentContext(span.text))),
-    )
+    .filter((span) => span.text && (scope === "full" || (span.role && allowedRoles.has(span.role))))
     .map((span) => `[${labelSpan(span)}] ${span.text}`);
 
   return lines.length > 0 ? lines.join("\n").slice(0, 20000) : undefined;
@@ -47,13 +42,4 @@ function labelSpan(span: TextSpan): string {
   if (span.role === "mcp") return "mcp result";
   if (span.role === "user") return "user prompt";
   return span.role ?? "unknown";
-}
-
-function isAgentContext(text: string): boolean {
-  const trimmed = text.trimStart();
-  return (
-    trimmed.startsWith("<system-reminder>") ||
-    trimmed.startsWith("# AGENTS.md instructions for ") ||
-    trimmed.startsWith("<environment_context>")
-  );
 }

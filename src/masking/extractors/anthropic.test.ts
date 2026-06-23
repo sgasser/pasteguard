@@ -128,15 +128,11 @@ describe("Anthropic Text Extractor", () => {
       });
     });
 
-    test("classifies injected user content as system", () => {
+    test("classifies Claude injected user content as system", () => {
       const request = createRequest([
         {
           role: "user",
           content: [
-            {
-              type: "text",
-              text: "# AGENTS.md instructions for /repo\n\n<INSTRUCTIONS>internal</INSTRUCTIONS>",
-            },
             {
               type: "text",
               text: "<environment_context>\n<cwd>/repo</cwd>\n</environment_context>",
@@ -149,7 +145,21 @@ describe("Anthropic Text Extractor", () => {
 
       const spans = anthropicExtractor.extractTexts(request);
 
-      expect(spans.map((span) => span.role)).toEqual(["system", "system", "system", "user"]);
+      expect(spans.map((span) => span.role)).toEqual(["system", "system", "user"]);
+    });
+
+    test("keeps AGENTS.md text as user content for Anthropic", () => {
+      const request = createRequest([
+        {
+          role: "user",
+          content: "# AGENTS.md instructions for /repo\n\n<INSTRUCTIONS>user pasted text</INSTRUCTIONS>",
+        },
+      ]);
+
+      const spans = anthropicExtractor.extractTexts(request);
+
+      expect(spans).toHaveLength(1);
+      expect(spans[0].role).toBe("user");
     });
 
     test("extracts text from thinking blocks", () => {

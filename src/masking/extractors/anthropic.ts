@@ -26,11 +26,7 @@ const SYSTEM_MESSAGE_INDEX = -1;
 
 function isInjectedContext(text: string): boolean {
   const trimmed = text.trimStart();
-  return (
-    trimmed.startsWith("# AGENTS.md instructions for ") ||
-    trimmed.startsWith("<environment_context>") ||
-    trimmed.startsWith("<system-reminder>")
-  );
+  return trimmed.startsWith("<environment_context>") || trimmed.startsWith("<system-reminder>");
 }
 
 function roleForContent(role: string, text: string): string {

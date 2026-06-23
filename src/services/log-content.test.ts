@@ -142,9 +142,9 @@ describe("formatMaskedSpansForLog", () => {
     expect(result).not.toContain("messages[2].content[0].content");
     expect(result).not.toContain("jane.system@example.com");
     expect(result).not.toContain("alice.assistant@example.com");
-    expect(result).not.toContain("Private project memory");
-    expect(result).not.toContain("jane.agent@example.com");
-    expect(result).not.toContain("environment_context");
+    expect(result).toContain("Private project memory");
+    expect(result).toContain("jane.agent@example.com");
+    expect(result).toContain("environment_context");
   });
 
   test("can include all masked spans for debugging", () => {
