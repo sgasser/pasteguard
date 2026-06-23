@@ -98,7 +98,7 @@ masking:
       regex: true
 ```
 
-Literal patterns match bidirectionally - detected text containing a whitelist entry (or vice versa) is excluded. Set `regex: true` to match with JavaScript regular expression syntax; a regex whitelist entry must match the **entire** detected value (so `\d{4}` will not un-mask a longer number that merely contains four digits).
+A literal entry is matched as a substring: a detected value is left unmasked if it contains the entry, or the entry contains it. Set `regex: true` for JavaScript regex syntax — a regex entry must match the **entire** detected value, so `\d{4}` won't unmask a longer number that merely contains four digits.
 
 ## Denylist
 
@@ -114,7 +114,7 @@ masking:
       regex: true
 ```
 
-Patterns are matched literally by default. Set `regex: true` to use JavaScript regular expression syntax, and use single quotes in YAML when the pattern contains backslashes. A regex pattern must not match the empty string (e.g. use `\d+`, not `\d*`); such a pattern is rejected at startup because it would silently mask nothing. Matches that fall inside an already-masked placeholder are ignored.
+Patterns are matched literally by default. Set `regex: true` for JavaScript regex syntax — use single quotes in YAML when the pattern contains backslashes. A regex pattern must not match the empty string (use `\d+`, not `\d*`); empty-matching patterns are rejected at startup because they would mask nothing.
 
 ## Scan Roles
 
