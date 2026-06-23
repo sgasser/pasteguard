@@ -55,6 +55,8 @@ Run PasteGuard as a local proxy:
 docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:latest
 ```
 
+Open [localhost:3000](http://localhost:3000) for the dashboard.
+
 Point your tools or app to PasteGuard instead of the provider:
 
 | Target | PasteGuard URL | Original URL |
@@ -113,7 +115,7 @@ Every request is logged with masking details. See what was detected, what was ma
 
 <img src="assets/dashboard.png" width="100%" alt="PasteGuard Dashboard">
 
-[localhost:3000/dashboard](http://localhost:3000/dashboard)
+[localhost:3000](http://localhost:3000)
 
 ## What it catches
 

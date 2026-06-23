@@ -5,6 +5,11 @@ import { healthCheck as checkDetector } from "../services/pii";
 
 export const healthRoutes = new Hono();
 
+healthRoutes.get("/", (c) => {
+  const config = getConfig();
+  return c.redirect(config.dashboard.enabled ? "/dashboard" : "/health");
+});
+
 healthRoutes.get("/health", async (c) => {
   const config = getConfig();
   const piiEnabled = config.pii_detection.enabled;
