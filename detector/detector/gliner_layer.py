@@ -26,11 +26,11 @@ def _floor(label: str, default: float) -> float:
 # overridable via env, e.g. DETECTOR_FLOOR_LOCATION=0.6). Role nouns are demoted
 # by the suppressor labels (below), not by this floor.
 PER_LABEL_FLOOR = {
-    "person": _floor("person", 0.85),
-    "location": _floor("location", 0.50),
+    "person": _floor("person", 0.95),
+    "location": _floor("location", 0.80),
     # A dedicated "address" label recovers full street addresses that a bare
     # "location" reading misses; emitted as LOCATION (see _LABEL_TO_TYPE).
-    "address": _floor("address", 0.70),
+    "address": _floor("address", 0.80),
 }
 # Labels the request `score_threshold` may raise (high-volume, deployment-tunable).
 _TUNABLE = {"person", "location", "address"}
