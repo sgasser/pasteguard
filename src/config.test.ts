@@ -56,6 +56,36 @@ pii_detection:
     }
   });
 
+  test("enables all supported secret entity types by default", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.secrets_detection.entities).toEqual([
+        "OPENSSH_PRIVATE_KEY",
+        "PEM_PRIVATE_KEY",
+        "API_KEY_SK",
+        "API_KEY_AWS",
+        "API_KEY_GITHUB",
+        "JWT_TOKEN",
+        "BEARER_TOKEN",
+        "ENV_PASSWORD",
+        "ENV_SECRET",
+        "CONNECTION_STRING",
+      ]);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
   test("accepts masking allowlist and denylist patterns", () => {
     const path = writeConfig(`
 mode: mask

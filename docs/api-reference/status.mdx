@@ -89,7 +89,18 @@ curl http://localhost:3000/info
   "secrets_detection": {
     "enabled": true,
     "action": "mask",
-    "entities": ["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY"],
+    "entities": [
+      "OPENSSH_PRIVATE_KEY",
+      "PEM_PRIVATE_KEY",
+      "API_KEY_SK",
+      "API_KEY_AWS",
+      "API_KEY_GITHUB",
+      "JWT_TOKEN",
+      "BEARER_TOKEN",
+      "ENV_PASSWORD",
+      "ENV_SECRET",
+      "CONNECTION_STRING"
+    ],
     "max_scan_chars": 200000,
     "log_detected_types": true
   },

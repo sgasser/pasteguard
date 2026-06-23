@@ -172,7 +172,7 @@ const SecretEntityTypes = [
 const SecretsDetectionSchema = z.object({
   enabled: z.boolean().default(true),
   action: z.enum(["block", "mask", "route_local"]).default("mask"),
-  entities: z.array(z.enum(SecretEntityTypes)).default(["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY"]),
+  entities: z.array(z.enum(SecretEntityTypes)).default([...SecretEntityTypes]),
   max_scan_chars: z.coerce.number().int().min(0).default(200000),
   log_detected_types: z.boolean().default(true),
   scan_roles: z.array(z.string()).optional(),
