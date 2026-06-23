@@ -10,9 +10,6 @@ const defaultConfig: MaskingConfig = {
   denylist: [],
 };
 
-/**
- * Helper to create a ReadableStream from SSE data
- */
 function createSSEStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   let index = 0;
@@ -29,9 +26,6 @@ function createSSEStream(chunks: string[]): ReadableStream<Uint8Array> {
   });
 }
 
-/**
- * Helper to consume a stream and return all chunks as string
- */
 async function consumeStream(stream: ReadableStream<Uint8Array>): Promise<string> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -58,6 +52,21 @@ describe("createUnmaskingStream", () => {
     const result = await consumeStream(unmaskedStream);
 
     expect(result).toContain("Hello test@test.com!");
+  });
+
+  test("buffers a data line split mid-json across chunks", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "a@b.com";
+
+    const event = `data: {"choices":[{"delta":{"content":"Hello [[EMAIL_ADDRESS_1]]"}}]}\n\n`;
+    const splitAt = event.indexOf("ADDRESS_1");
+    const source = createSSEStream([event.slice(0, splitAt), event.slice(splitAt)]);
+
+    const unmaskedStream = createUnmaskingStream(source, context, defaultConfig);
+    const result = await consumeStream(unmaskedStream);
+
+    expect(result).toContain("Hello a@b.com");
+    expect(result).not.toContain("[[EMAIL_ADDRESS_1]]");
   });
 
   test("handles [DONE] message", async () => {

@@ -40,14 +40,6 @@ function unmaskTextContent(
   return { text: processedText, piiBuffer: nextPiiBuffer, secretsBuffer: nextSecretsBuffer };
 }
 
-/**
- * Creates a transform stream that unmasks SSE content
- *
- * Processes Server-Sent Events (SSE) chunks, buffering partial placeholders
- * and unmasking complete ones before forwarding to the client.
- *
- * Supports both PII unmasking and secrets unmasking, or either alone.
- */
 export function createUnmaskingStream(
   source: ReadableStream<Uint8Array>,
   piiContext: PlaceholderContext | undefined,
@@ -58,27 +50,100 @@ export function createUnmaskingStream(
   const encoder = new TextEncoder();
   let piiBuffer = "";
   let secretsBuffer = "";
+  let lineBuffer = "";
 
   return new ReadableStream({
     async start(controller) {
       const reader = source.getReader();
+
+      function processLine(line: string) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+
+          if (data === "[DONE]") {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+
+            if (typeof content === "string" && content !== "") {
+              const unmasked = unmaskTextContent(
+                content,
+                piiBuffer,
+                piiContext,
+                config,
+                secretsBuffer,
+                secretsContext,
+              );
+              piiBuffer = unmasked.piiBuffer;
+              secretsBuffer = unmasked.secretsBuffer;
+
+              if (unmasked.text) {
+                parsed.choices[0].delta.content = unmasked.text;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
+              }
+            } else if (Array.isArray(content)) {
+              const processedContent = content.flatMap((part: OpenAIContentPart) => {
+                if (part.type !== "text" || typeof part.text !== "string") {
+                  return [part];
+                }
+
+                const unmasked = unmaskTextContent(
+                  part.text,
+                  piiBuffer,
+                  piiContext,
+                  config,
+                  secretsBuffer,
+                  secretsContext,
+                );
+                piiBuffer = unmasked.piiBuffer;
+                secretsBuffer = unmasked.secretsBuffer;
+
+                if (!unmasked.text) {
+                  return [];
+                }
+
+                return [{ ...part, text: unmasked.text }];
+              });
+
+              if (processedContent.length > 0) {
+                parsed.choices[0].delta.content = processedContent;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
+              }
+            } else {
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            }
+          } catch {
+            controller.enqueue(encoder.encode(`${line}\n`));
+          }
+        } else if (line.trim()) {
+          controller.enqueue(encoder.encode(`${line}\n`));
+        }
+      }
 
       try {
         while (true) {
           const { done, value } = await reader.read();
 
           if (done) {
-            // Flush remaining buffer content before closing
+            lineBuffer += decoder.decode();
+
+            if (lineBuffer) {
+              processLine(lineBuffer);
+              lineBuffer = "";
+            }
+
             let flushed = "";
 
-            // Flush PII buffer first
             if (piiBuffer && piiContext) {
               flushed = flushMaskingBuffer(piiBuffer, piiContext, config);
             } else if (piiBuffer) {
               flushed = piiBuffer;
             }
 
-            // Then flush secrets buffer
             if (secretsBuffer && secretsContext) {
               flushed += flushSecretsMaskingBuffer(secretsBuffer, secretsContext);
             } else if (secretsBuffer) {
@@ -104,77 +169,12 @@ export function createUnmaskingStream(
             break;
           }
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          lineBuffer += decoder.decode(value, { stream: true });
+          const lines = lineBuffer.split("\n");
+          lineBuffer = lines.pop() || "";
 
           for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-
-              if (data === "[DONE]") {
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                continue;
-              }
-
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content;
-
-                if (typeof content === "string" && content !== "") {
-                  const unmasked = unmaskTextContent(
-                    content,
-                    piiBuffer,
-                    piiContext,
-                    config,
-                    secretsBuffer,
-                    secretsContext,
-                  );
-                  piiBuffer = unmasked.piiBuffer;
-                  secretsBuffer = unmasked.secretsBuffer;
-
-                  if (unmasked.text) {
-                    parsed.choices[0].delta.content = unmasked.text;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
-                  }
-                } else if (Array.isArray(content)) {
-                  const processedContent = content.flatMap((part: OpenAIContentPart) => {
-                    if (part.type !== "text" || typeof part.text !== "string") {
-                      return [part];
-                    }
-
-                    const unmasked = unmaskTextContent(
-                      part.text,
-                      piiBuffer,
-                      piiContext,
-                      config,
-                      secretsBuffer,
-                      secretsContext,
-                    );
-                    piiBuffer = unmasked.piiBuffer;
-                    secretsBuffer = unmasked.secretsBuffer;
-
-                    if (!unmasked.text) {
-                      return [];
-                    }
-
-                    return [{ ...part, text: unmasked.text }];
-                  });
-
-                  if (processedContent.length > 0) {
-                    parsed.choices[0].delta.content = processedContent;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
-                  }
-                } else {
-                  // Pass through non-content events
-                  controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-                }
-              } catch {
-                // Pass through unparseable data
-                controller.enqueue(encoder.encode(`${line}\n`));
-              }
-            } else if (line.trim()) {
-              controller.enqueue(encoder.encode(`${line}\n`));
-            }
+            processLine(line);
           }
         }
       } catch (error) {
