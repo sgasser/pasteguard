@@ -30,14 +30,6 @@ export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
 
 Codex users signed in with ChatGPT should use PasteGuard's Codex endpoint, not the OpenAI API endpoint:
 
-First make sure Codex is authenticated:
-
-```bash
-codex login
-```
-
-Then add a custom provider to `~/.codex/config.toml`:
-
 ```toml
 model_provider = "pasteguard-codex"
 
@@ -48,8 +40,6 @@ wire_api = "responses"
 requires_openai_auth = true
 supports_websockets = false
 ```
-
-If PasteGuard runs on a different port, update the `base_url`.
 
 Run a smoke test:
 
