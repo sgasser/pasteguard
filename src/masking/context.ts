@@ -19,17 +19,6 @@ export interface PlaceholderContext {
 }
 
 /**
- * Result of masking text with placeholders
- * Used by both PII masking and secrets masking
- */
-export interface MaskResult {
-  /** Text with sensitive data replaced by placeholders */
-  masked: string;
-  /** Context for unmasking (maps placeholders to original values) */
-  context: PlaceholderContext;
-}
-
-/**
  * Creates a new placeholder context
  */
 export function createPlaceholderContext(): PlaceholderContext {

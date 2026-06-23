@@ -10,10 +10,7 @@ import type {
 
 export type {
   MessageSecretsResult,
-  SecretEntityType,
   SecretLocation,
-  SecretsDetectionResult,
-  SecretsMatch,
 } from "./patterns/types";
 
 /**
@@ -82,7 +79,7 @@ export function detectSecretsInRequest<TRequest, TResponse>(
 /**
  * Detects secrets in text spans (low-level)
  */
-export function detectSecretsInSpans(
+function detectSecretsInSpans(
   spans: TextSpan[],
   config: SecretsDetectionConfig,
 ): MessageSecretsResult {
