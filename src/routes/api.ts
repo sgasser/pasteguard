@@ -130,6 +130,7 @@ apiRoutes.post("/mask", async (c) => {
         entities: config.secrets_detection.entities,
         max_scan_chars: config.secrets_detection.max_scan_chars,
         log_detected_types: false,
+        scan_roles: config.secrets_detection.scan_roles,
       };
 
       const secretsResult = detectSecrets(maskedText, secretsConfig);

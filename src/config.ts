@@ -133,7 +133,7 @@ const PIIDetectionSchema = z.object({
       "IP_ADDRESS",
       "VAT_CODE",
     ]),
-  scan_roles: z.array(z.string()).optional(),
+  scan_roles: z.array(z.string()).default(["user", "tool", "function", "mcp"]),
 });
 
 const ServerSchema = z.object({
@@ -146,6 +146,7 @@ const LoggingSchema = z.object({
   database: z.string().default("./data/pasteguard.db"),
   retention_days: z.coerce.number().int().min(0).default(30),
   log_masked_content: z.boolean().default(true),
+  masked_content_scope: z.enum(["scanned", "full"]).default("scanned"),
 });
 
 const DashboardAuthSchema = z.object({
@@ -178,7 +179,7 @@ const SecretsDetectionSchema = z.object({
   entities: z.array(z.enum(SecretEntityTypes)).default([...SecretEntityTypes]),
   max_scan_chars: z.coerce.number().int().min(0).default(200000),
   log_detected_types: z.boolean().default(true),
-  scan_roles: z.array(z.string()).optional(),
+  scan_roles: z.array(z.string()).default(["user", "tool", "function", "mcp"]),
 });
 
 const ConfigSchema = z

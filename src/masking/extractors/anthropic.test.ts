@@ -128,6 +128,30 @@ describe("Anthropic Text Extractor", () => {
       });
     });
 
+    test("classifies injected user content as system", () => {
+      const request = createRequest([
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "# AGENTS.md instructions for /repo\n\n<INSTRUCTIONS>internal</INSTRUCTIONS>",
+            },
+            {
+              type: "text",
+              text: "<environment_context>\n<cwd>/repo</cwd>\n</environment_context>",
+            },
+            { type: "text", text: "<system-reminder>internal reminder</system-reminder>" },
+            { type: "text", text: "Real user prompt jane@example.com" },
+          ],
+        },
+      ]);
+
+      const spans = anthropicExtractor.extractTexts(request);
+
+      expect(spans.map((span) => span.role)).toEqual(["system", "system", "system", "user"]);
+    });
+
     test("extracts text from thinking blocks", () => {
       const request = createRequest([
         {

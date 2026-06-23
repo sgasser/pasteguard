@@ -24,6 +24,19 @@ import type { MaskedSpan, RequestExtractor, TextSpan } from "../types";
 /** System content uses messageIndex -1 */
 const SYSTEM_MESSAGE_INDEX = -1;
 
+function isInjectedContext(text: string): boolean {
+  const trimmed = text.trimStart();
+  return (
+    trimmed.startsWith("# AGENTS.md instructions for ") ||
+    trimmed.startsWith("<environment_context>") ||
+    trimmed.startsWith("<system-reminder>")
+  );
+}
+
+function roleForContent(role: string, text: string): string {
+  return isInjectedContext(text) ? "system" : role;
+}
+
 /**
  * Extract text from a single content block
  */
@@ -123,7 +136,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
             path: `messages[${msgIdx}].content`,
             messageIndex: msgIdx,
             partIndex: 0,
-            role: msg.role,
+            role: roleForContent(msg.role, msg.content),
           });
         }
       } else if (Array.isArray(msg.content)) {
@@ -138,7 +151,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
                 path: `messages[${msgIdx}].content[${partIdx}].text`,
                 messageIndex: msgIdx,
                 partIndex: partIdx,
-                role: msg.role,
+                role: roleForContent(msg.role, text),
               });
             }
           } else if (block.type === "thinking") {
@@ -149,7 +162,7 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
                 path: `messages[${msgIdx}].content[${partIdx}].thinking`,
                 messageIndex: msgIdx,
                 partIndex: partIdx,
-                role: msg.role,
+                role: roleForContent(msg.role, text),
               });
             }
           } else if (block.type === "tool_result") {

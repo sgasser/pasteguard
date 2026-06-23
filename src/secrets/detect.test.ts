@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { SecretsDetectionConfig } from "../config";
-import { detectSecrets } from "./detect";
+import type { TextSpan } from "../masking/types";
+import { detectSecrets, detectSecretsInSpans } from "./detect";
 
 const defaultConfig: SecretsDetectionConfig = {
   enabled: true,
@@ -8,6 +9,7 @@ const defaultConfig: SecretsDetectionConfig = {
   entities: ["OPENSSH_PRIVATE_KEY", "PEM_PRIVATE_KEY"],
   max_scan_chars: 200000,
   log_detected_types: true,
+  scan_roles: ["user", "tool", "function", "mcp"],
 };
 
 const opensshKey = `-----BEGIN OPENSSH PRIVATE KEY-----
@@ -177,6 +179,112 @@ describe("detectSecrets", () => {
         expect(result.locations[i].start).toBeGreaterThan(result.locations[i + 1].start);
       }
     }
+  });
+});
+
+describe("detectSecretsInSpans", () => {
+  const apiKeyConfig: SecretsDetectionConfig = {
+    ...defaultConfig,
+    entities: ["API_KEY_SK"],
+  };
+
+  test("scans input roles by default and skips system/developer/assistant", () => {
+    const spans: TextSpan[] = [
+      {
+        text: `system ${openaiApiKey}`,
+        path: "messages[0].content",
+        messageIndex: 0,
+        partIndex: 0,
+        role: "system",
+      },
+      {
+        text: `developer ${openaiApiKey}`,
+        path: "messages[1].content",
+        messageIndex: 1,
+        partIndex: 0,
+        role: "developer",
+      },
+      {
+        text: `user ${openaiApiKey}`,
+        path: "messages[2].content",
+        messageIndex: 2,
+        partIndex: 0,
+        role: "user",
+      },
+      {
+        text: `assistant ${openaiApiKey}`,
+        path: "messages[3].content",
+        messageIndex: 3,
+        partIndex: 0,
+        role: "assistant",
+      },
+      {
+        text: `tool ${openaiApiKey}`,
+        path: "messages[4].content",
+        messageIndex: 4,
+        partIndex: 0,
+        role: "tool",
+      },
+      {
+        text: `function ${openaiApiKey}`,
+        path: "messages[5].content",
+        messageIndex: 5,
+        partIndex: 0,
+        role: "function",
+      },
+      {
+        text: `mcp ${openaiApiKey}`,
+        path: "input[6].output_text",
+        messageIndex: 6,
+        partIndex: 0,
+        role: "mcp",
+      },
+    ];
+
+    const result = detectSecretsInSpans(spans, apiKeyConfig);
+
+    expect(result.detected).toBe(true);
+    expect(result.spanLocations).toBeDefined();
+    expect(result.spanLocations?.map((locations) => locations.length)).toEqual([
+      0, 0, 1, 0, 1, 1, 1,
+    ]);
+    expect(result.matches).toEqual([{ type: "API_KEY_SK", count: 4 }]);
+  });
+
+  test("honors explicit scan_roles override", () => {
+    const config: SecretsDetectionConfig = {
+      ...apiKeyConfig,
+      scan_roles: ["system", "assistant"],
+    };
+    const spans: TextSpan[] = [
+      {
+        text: `system ${openaiApiKey}`,
+        path: "messages[0].content",
+        messageIndex: 0,
+        partIndex: 0,
+        role: "system",
+      },
+      {
+        text: `user ${openaiApiKey}`,
+        path: "messages[1].content",
+        messageIndex: 1,
+        partIndex: 0,
+        role: "user",
+      },
+      {
+        text: `assistant ${openaiApiKey}`,
+        path: "messages[2].content",
+        messageIndex: 2,
+        partIndex: 0,
+        role: "assistant",
+      },
+    ];
+
+    const result = detectSecretsInSpans(spans, config);
+
+    expect(result.detected).toBe(true);
+    expect(result.spanLocations?.map((locations) => locations.length)).toEqual([1, 0, 1]);
+    expect(result.matches).toEqual([{ type: "API_KEY_SK", count: 2 }]);
   });
 });
 

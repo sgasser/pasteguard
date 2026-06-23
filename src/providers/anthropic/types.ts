@@ -77,7 +77,7 @@ export const ContentBlockSchema = z.discriminatedUnion("type", [
 // Message and request types
 export const AnthropicMessageSchema = z
   .object({
-    role: z.enum(["user", "assistant"]),
+    role: z.enum(["system", "developer", "user", "assistant"]),
     content: z.union([z.string(), z.array(ContentBlockSchema)]),
   })
   .passthrough();

@@ -3,11 +3,7 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { getConfig } from "../config";
 import type { PlaceholderContext } from "../masking/context";
-import {
-  anthropicExtractor,
-  extractAnthropicTextContent,
-  extractSystemText,
-} from "../masking/extractors/anthropic";
+import { anthropicExtractor } from "../masking/extractors/anthropic";
 import { unmaskResponse as unmaskPIIResponse } from "../pii/mask";
 import { callAnthropic } from "../providers/anthropic/client";
 import { createAnthropicUnmaskingStream } from "../providers/anthropic/stream-transformer";
@@ -18,6 +14,7 @@ import {
 } from "../providers/anthropic/types";
 import { callLocalAnthropic } from "../providers/local";
 import { unmaskSecretsResponse } from "../secrets/mask";
+import { formatMaskedSpansForLog, mergeScanRoles } from "../services/log-content";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
 import {
@@ -194,21 +191,13 @@ interface LocalOptions {
 
 // --- Helpers ---
 
-function formatRequestForLog(request: AnthropicRequest): string {
-  const parts: string[] = [];
-
-  if (request.system) {
-    const systemText = extractSystemText(request.system);
-    if (systemText) parts.push(`[system] ${systemText}`);
-  }
-
-  for (const msg of request.messages) {
-    const text = extractAnthropicTextContent(msg.content);
-    const isMultimodal = Array.isArray(msg.content);
-    parts.push(`[${msg.role}${isMultimodal ? " multimodal" : ""}] ${text}`);
-  }
-
-  return parts.join("\n");
+function formatRequestForLog(request: AnthropicRequest): string | undefined {
+  const config = getConfig();
+  return formatMaskedSpansForLog(
+    anthropicExtractor.extractTexts(request),
+    mergeScanRoles(config.pii_detection.scan_roles, config.secrets_detection.scan_roles),
+    config.logging.masked_content_scope,
+  );
 }
 
 // --- Response handlers ---
@@ -304,6 +293,7 @@ async function sendToLocal(c: Context, originalRequest: AnthropicRequest, opts: 
         pii: toPIILogData(piiResult),
         secrets: toSecretsLogData(secretsResult),
         maskedContent,
+        statusCode: 200,
       }),
       c.req.header("User-Agent") || null,
     );
@@ -361,6 +351,7 @@ async function sendToAnthropic(c: Context, request: AnthropicRequest, opts: Send
         pii: toPIILogData(piiResult),
         secrets: toSecretsLogData(secretsResult),
         maskedContent,
+        statusCode: 200,
       }),
       c.req.header("User-Agent") || null,
     );

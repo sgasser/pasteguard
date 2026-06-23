@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { getConfig } from "../config";
 import { openaiExtractor } from "../masking/extractors/openai";
+import type { RequestExtractor, TextSpan } from "../masking/types";
 import type { OpenAIMessage, OpenAIRequest } from "../providers/openai/types";
 import {
   filterAllowlistedEntities,
@@ -56,37 +57,56 @@ function createRequest(messages: OpenAIMessage[]): OpenAIRequest {
   return { model: "gpt-4", messages };
 }
 
+const spanExtractor: RequestExtractor<TextSpan[], unknown> = {
+  extractTexts: (request) => request,
+  applyMasked: (request) => request,
+  unmaskResponse: (response) => response,
+};
+
 describe("PIIDetector", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
   });
 
   describe("analyzeRequest", () => {
-    test("scans all message roles", async () => {
-      mockDetector({
+    test("scans input roles by default and skips system/developer/assistant", async () => {
+      const analyzeRequests = mockDetector({
         "system-pii": [{ entity_type: "PERSON", start: 0, end: 10, score: 0.9 }],
         "user-pii": [{ entity_type: "EMAIL_ADDRESS", start: 0, end: 8, score: 0.9 }],
+        "tool-pii": [{ entity_type: "IP_ADDRESS", start: 0, end: 8, score: 0.9 }],
+        "function-pii": [{ entity_type: "VAT_CODE", start: 0, end: 12, score: 0.9 }],
         "assistant-pii": [{ entity_type: "PHONE_NUMBER", start: 0, end: 13, score: 0.9 }],
       });
 
       const detector = new PIIDetector();
       const request = createRequest([
         { role: "system", content: "system-pii here" },
+        { role: "developer", content: "developer-pii here" },
         { role: "user", content: "user-pii here" },
         { role: "assistant", content: "assistant-pii here" },
+        { role: "tool", content: "tool-pii here" },
+        { role: "function", content: "function-pii here" },
       ]);
 
       const result = await detector.analyzeRequest(request, openaiExtractor);
 
       expect(result.hasPII).toBe(true);
-      expect(result.spanEntities).toHaveLength(3);
-      expect(result.spanEntities[0]).toHaveLength(1);
-      expect(result.spanEntities[1]).toHaveLength(1);
+      expect(result.spanEntities).toHaveLength(6);
+      expect(result.spanEntities[0]).toHaveLength(0);
+      expect(result.spanEntities[1]).toHaveLength(0);
       expect(result.spanEntities[2]).toHaveLength(1);
+      expect(result.spanEntities[3]).toHaveLength(0);
+      expect(result.spanEntities[4]).toHaveLength(1);
+      expect(result.spanEntities[5]).toHaveLength(1);
+      expect(analyzeRequests).toEqual([
+        expect.objectContaining({ text: "user-pii here" }),
+        expect.objectContaining({ text: "tool-pii here" }),
+        expect.objectContaining({ text: "function-pii here" }),
+      ]);
     });
 
-    test("detects PII in system message when user message has none", async () => {
-      mockDetector({
+    test("ignores PII in system message when user message has none", async () => {
+      const analyzeRequests = mockDetector({
         "John Doe": [{ entity_type: "PERSON", start: 18, end: 26, score: 0.95 }],
       });
 
@@ -98,9 +118,86 @@ describe("PIIDetector", () => {
 
       const result = await detector.analyzeRequest(request, openaiExtractor);
 
+      expect(result.hasPII).toBe(false);
+      expect(result.spanEntities[0]).toHaveLength(0);
+      expect(result.spanEntities[1]).toHaveLength(0);
+      expect(analyzeRequests).toEqual([
+        expect.objectContaining({ text: "Extract the data into JSON" }),
+      ]);
+    });
+
+    test("scans mcp spans by default", async () => {
+      const analyzeRequests = mockDetector({
+        "mcp-pii": [{ entity_type: "EMAIL_ADDRESS", start: 0, end: 7, score: 0.9 }],
+      });
+
+      const detector = new PIIDetector();
+      const spans: TextSpan[] = [
+        {
+          text: "mcp-pii here",
+          path: "input[0].output_text",
+          messageIndex: 0,
+          partIndex: 0,
+          role: "mcp",
+        },
+      ];
+
+      const result = await detector.analyzeRequest(spans, spanExtractor);
+
       expect(result.hasPII).toBe(true);
       expect(result.spanEntities[0]).toHaveLength(1);
-      expect(result.spanEntities[0][0].entity_type).toBe("PERSON");
+      expect(analyzeRequests).toEqual([expect.objectContaining({ text: "mcp-pii here" })]);
+    });
+
+    test("honors explicit scan_roles override", async () => {
+      const config = getConfig();
+      const previousScanRoles = config.pii_detection.scan_roles;
+      config.pii_detection.scan_roles = ["system", "assistant"];
+      mockDetector({
+        "system-pii": [{ entity_type: "PERSON", start: 0, end: 10, score: 0.9 }],
+        "assistant-pii": [{ entity_type: "PHONE_NUMBER", start: 0, end: 13, score: 0.9 }],
+        "user-pii": [{ entity_type: "EMAIL_ADDRESS", start: 0, end: 8, score: 0.9 }],
+      });
+
+      try {
+        const detector = new PIIDetector();
+        const request = createRequest([
+          { role: "system", content: "system-pii here" },
+          { role: "user", content: "user-pii here" },
+          { role: "assistant", content: "assistant-pii here" },
+        ]);
+
+        const result = await detector.analyzeRequest(request, openaiExtractor);
+
+        expect(result.hasPII).toBe(true);
+        expect(result.spanEntities[0]).toHaveLength(1);
+        expect(result.spanEntities[1]).toHaveLength(0);
+        expect(result.spanEntities[2]).toHaveLength(1);
+      } finally {
+        config.pii_detection.scan_roles = previousScanRoles;
+      }
+    });
+
+    test("does not apply denylist to roles outside scan_roles", async () => {
+      const config = getConfig();
+      const previousDenylist = config.masking.denylist;
+      config.masking.denylist = [{ pattern: "ProjectX", type: "PROJECT_NAME", regex: false }];
+      mockDetector({});
+
+      try {
+        const detector = new PIIDetector();
+        const request = createRequest([
+          { role: "system", content: "Launch ProjectX" },
+          { role: "user", content: "No sensitive data" },
+        ]);
+
+        const result = await detector.analyzeRequest(request, openaiExtractor);
+
+        expect(result.hasPII).toBe(false);
+        expect(result.spanEntities[0]).toHaveLength(0);
+      } finally {
+        config.masking.denylist = previousDenylist;
+      }
     });
 
     test("detects PII in earlier user message", async () => {

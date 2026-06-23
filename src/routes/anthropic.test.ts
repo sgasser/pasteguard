@@ -29,6 +29,19 @@ describe("POST /anthropic/v1/messages", () => {
     expect(res.status).toBe(400);
   });
 
+  test("accepts Claude Code system messages", () => {
+    const result = AnthropicRequestSchema.parse({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 100,
+      messages: [
+        { role: "user", content: "Hello" },
+        { role: "system", content: "Claude Code context" },
+      ],
+    });
+
+    expect(result.messages[1].role).toBe("system");
+  });
+
   test("returns 400 for invalid role", async () => {
     const res = await app.request("/anthropic/v1/messages", {
       method: "POST",

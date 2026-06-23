@@ -86,6 +86,48 @@ pii_detection:
     }
   });
 
+  test("defaults PII and secrets scan roles to input-controlled content", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.scan_roles).toEqual(["user", "tool", "function", "mcp"]);
+      expect(config.secrets_detection.scan_roles).toEqual(["user", "tool", "function", "mcp"]);
+      expect(config.logging.masked_content_scope).toBe("scanned");
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("accepts full masked content scope for dashboard debugging", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+logging:
+  masked_content_scope: full
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.logging.masked_content_scope).toBe("full");
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
   test("accepts masking allowlist and denylist patterns", () => {
     const path = writeConfig(`
 mode: mask
