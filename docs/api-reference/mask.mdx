@@ -22,7 +22,7 @@ POST /api/mask
 curl -X POST http://localhost:3000/api/mask \
   -H "Content-Type: application/json" \
   -d '{
-    "text": "Contact john@example.com or call 555-1234"
+    "text": "Contact john@example.com or call +1 415-555-1234"
   }'
 ```
 
@@ -47,7 +47,7 @@ X-PasteGuard-Source: browser-extension
   "masked": "Contact [[EMAIL_ADDRESS_1]] or call [[PHONE_NUMBER_1]]",
   "context": {
     "[[EMAIL_ADDRESS_1]]": "john@example.com",
-    "[[PHONE_NUMBER_1]]": "555-1234"
+    "[[PHONE_NUMBER_1]]": "+1 415-555-1234"
   },
   "counters": {
     "EMAIL_ADDRESS": 1,
