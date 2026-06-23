@@ -19,7 +19,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     ports:
-      - "3000:3000"
+      - "${PASTEGUARD_PORT:-3000}:3000"
     env_file:
       - path: .env
         required: false
@@ -38,5 +38,5 @@ services:
       dockerfile: docker/Dockerfile
       target: detector
     ports:
-      - "5002:5002"
+      - "${PASTEGUARD_DETECTOR_PORT:-5002}:5002"
     restart: unless-stopped

@@ -1,16 +1,39 @@
-#:schema https://conductor.build/schemas/settings.repo.schema.json
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+file_include_globs = ".env\n.env.local\n.env.*.local\nconfig.yaml\n"
 
 [scripts]
 setup = """
+set -e
+
 bun install
+
 if [ ! -f config.yaml ]; then
-  sed 's/port: 3000/port: ${CONDUCTOR_PORT:-3000}/' config.example.yaml > config.yaml
+  cp config.example.yaml config.yaml
 fi
+
+tmp="$(mktemp)"
+sed \
+  -e 's/^  port: 3000$/  port: ${PASTEGUARD_PORT:-3000}/' \
+  -e 's/^  port: ${CONDUCTOR_PORT:-3000}$/  port: ${PASTEGUARD_PORT:-3000}/' \
+  config.yaml > "$tmp"
+mv "$tmp" config.yaml
+
 mkdir -p data
 """
 run = """
-docker compose -p pasteguard-dev --profile dev up detector -d
-CONDUCTOR_PORT=${CONDUCTOR_PORT:-3000} bun run dev
+set -e
+
+PORT="${CONDUCTOR_PORT:-3000}"
+export PASTEGUARD_PORT="$PORT"
+export PASTEGUARD_DETECTOR_PORT="$((PORT + 1))"
+export DETECTOR_URL="http://localhost:${PASTEGUARD_DETECTOR_PORT}"
+
+docker compose -p "pasteguard-${PORT}" --profile dev up detector -d
+bun run dev
 """
-archive = "true"
+archive = """
+PORT="${CONDUCTOR_PORT:-3000}"
+docker compose -p "pasteguard-${PORT}" --profile dev down --remove-orphans || true
+"""
 run_mode = "concurrent"
