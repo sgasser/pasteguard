@@ -1,4 +1,4 @@
-import { type DenylistPattern, getConfig, type WhitelistPattern } from "../config";
+import { type AllowlistPattern, type DenylistPattern, getConfig } from "../config";
 import { HEALTH_CHECK_TIMEOUT_MS } from "../constants/timeouts";
 import { overlaps, resolveConflicts } from "../masking/conflict-resolver";
 import type { RequestExtractor } from "../masking/types";
@@ -110,16 +110,16 @@ export function mergeDenylistEntities(detected: PIIEntity[], denylisted: PIIEnti
   return result.map((r) => r.e);
 }
 
-export function filterWhitelistedEntities(
+export function filterAllowlistedEntities(
   text: string,
   entities: PIIEntity[],
-  whitelist: WhitelistPattern[],
+  allowlist: AllowlistPattern[],
 ): PIIEntity[] {
-  if (whitelist.length === 0) return entities;
+  if (allowlist.length === 0) return entities;
 
   return entities.filter((entity) => {
     const detectedText = text.slice(entity.start, entity.end);
-    return !whitelist.some(({ pattern, regex }) => {
+    return !allowlist.some(({ pattern, regex }) => {
       if (regex) {
         // Anchor to the whole entity so a partial match can't un-mask a larger detected span.
         return new RegExp(`^(?:${pattern})$`).test(detectedText);
@@ -236,7 +236,7 @@ export class PIIDetector {
     const scanRoles = config.pii_detection.scan_roles
       ? new Set(config.pii_detection.scan_roles)
       : null;
-    const whitelist = config.masking.whitelist;
+    const allowlist = config.masking.allowlist;
     const denylist = config.masking.denylist;
 
     const spanEntities: PIIEntity[][] = await Promise.all(
@@ -251,7 +251,7 @@ export class PIIDetector {
         const detectedEntities = config.pii_detection.enabled
           ? await this.detectPII(span.text, langResult.language)
           : [];
-        const filteredEntities = filterWhitelistedEntities(span.text, detectedEntities, whitelist);
+        const filteredEntities = filterAllowlistedEntities(span.text, detectedEntities, allowlist);
         return mergeDenylistEntities(filteredEntities, denylistedEntities);
       }),
     );

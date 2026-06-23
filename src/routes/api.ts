@@ -10,7 +10,7 @@ import { z } from "zod";
 import { getConfig, type SecretsDetectionConfig } from "../config";
 import { createPlaceholderContext, type PlaceholderContext } from "../masking/context";
 import {
-  filterWhitelistedEntities,
+  filterAllowlistedEntities,
   findDenylistedEntities,
   getPIIDetector,
   mergeDenylistEntities,
@@ -208,11 +208,10 @@ apiRoutes.post("/mask", async (c) => {
         : [];
       scanTimeMs = Date.now() - piiStartTime;
 
-      // Apply whitelist filtering
-      const filteredEntities = filterWhitelistedEntities(
+      const filteredEntities = filterAllowlistedEntities(
         maskedText,
         piiEntities,
-        config.masking.whitelist,
+        config.masking.allowlist,
       );
       const entitiesToMask = mergeDenylistEntities(
         filteredEntities,

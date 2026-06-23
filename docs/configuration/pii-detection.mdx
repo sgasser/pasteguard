@@ -85,13 +85,13 @@ environment variables on the detector service — e.g. `DETECTOR_FLOOR_PERSON=0.
 (fewer person false positives) or `DETECTOR_FLOOR_LOCATION=0.4` (more location
 recall). Street addresses are detected by the model and reported as `LOCATION`.
 
-## Whitelist
+## Allowlist
 
 Exclude specific text patterns from PII masking. Useful for preventing false positives on company names or product identifiers.
 
 ```yaml
 masking:
-  whitelist:
+  allowlist:
     - pattern: "Acme Corp"
     - pattern: "Product XYZ"
     - pattern: 'TEST-\d+'

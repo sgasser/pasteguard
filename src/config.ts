@@ -30,7 +30,7 @@ const CodexProviderSchema = z.object({
   base_url: z.string().url().default("https://chatgpt.com/backend-api/codex"),
 });
 
-const DEFAULT_WHITELIST = [
+const DEFAULT_ALLOWLIST = [
   { pattern: "You are Claude Code, Anthropic's official CLI for Claude.", regex: false },
 ];
 
@@ -64,7 +64,7 @@ function validateRegexPattern(
   }
 }
 
-const WhitelistPatternSchema = z.union([
+const AllowlistPatternSchema = z.union([
   z
     .string()
     .min(1)
@@ -75,7 +75,7 @@ const WhitelistPatternSchema = z.union([
       regex: z.boolean().default(false),
     })
     .superRefine((entry, ctx) => {
-      validateRegexPattern(entry.pattern, entry.regex, ctx, "Invalid whitelist regex pattern");
+      validateRegexPattern(entry.pattern, entry.regex, ctx, "Invalid allowlist regex pattern");
     }),
 ]);
 
@@ -92,10 +92,10 @@ const DenylistPatternSchema = z
 const MaskingSchema = z.object({
   show_markers: z.boolean().default(false),
   marker_text: z.string().default("[protected]"),
-  whitelist: z
-    .array(WhitelistPatternSchema)
+  allowlist: z
+    .array(AllowlistPatternSchema)
     .default([])
-    .transform((arr) => [...DEFAULT_WHITELIST, ...arr]),
+    .transform((arr) => [...DEFAULT_ALLOWLIST, ...arr]),
   denylist: z.array(DenylistPatternSchema).default([]),
 });
 
@@ -228,7 +228,7 @@ export type AnthropicProviderConfig = z.infer<typeof AnthropicProviderSchema>;
 export type CodexProviderConfig = z.infer<typeof CodexProviderSchema>;
 export type LocalProviderConfig = z.infer<typeof LocalProviderSchema>;
 export type MaskingConfig = z.infer<typeof MaskingSchema>;
-export type WhitelistPattern = z.infer<typeof WhitelistPatternSchema>;
+export type AllowlistPattern = z.infer<typeof AllowlistPatternSchema>;
 export type DenylistPattern = z.infer<typeof DenylistPatternSchema>;
 export type SecretsDetectionConfig = z.infer<typeof SecretsDetectionSchema>;
 export type ServerConfig = z.infer<typeof ServerSchema>;

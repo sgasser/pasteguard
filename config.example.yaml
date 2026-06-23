@@ -51,7 +51,7 @@ masking:
   marker_text: "[protected]"
 
   # Text patterns that are never masked (protects against false positives)
-  # whitelist:
+  # allowlist:
   #   - pattern: "Company Name Inc."
   #   - pattern: 'TEST-\d+'
   #     regex: true

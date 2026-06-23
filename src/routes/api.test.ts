@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
 import {
-  filterWhitelistedEntities,
+  filterAllowlistedEntities,
   findDenylistedEntities,
   mergeDenylistEntities,
   type PIIEntity,
@@ -16,7 +16,7 @@ mock.module("../pii/detect", () => ({
     detectPII: mockDetectPII,
     healthCheck: mock(() => Promise.resolve(true)),
   }),
-  filterWhitelistedEntities,
+  filterAllowlistedEntities,
   findDenylistedEntities,
   mergeDenylistEntities,
 }));

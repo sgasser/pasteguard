@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
 import { getConfig } from "../config";
-import { filterWhitelistedEntities, type PIIDetectionResult, PIIDetector } from "../pii/detect";
+import { filterAllowlistedEntities, type PIIDetectionResult, PIIDetector } from "../pii/detect";
 
 const mockAnalyzeRequest = mock<() => Promise<PIIDetectionResult>>(() =>
   Promise.resolve({
@@ -17,7 +17,7 @@ const mockLogRequest = mock(() => {});
 
 mock.module("../pii/detect", () => ({
   PIIDetector,
-  filterWhitelistedEntities,
+  filterAllowlistedEntities,
   getPIIDetector: () => ({
     analyzeRequest: mockAnalyzeRequest,
     detectPII: mock(() => Promise.resolve([])),

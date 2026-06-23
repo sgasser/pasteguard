@@ -3,7 +3,7 @@ import { getConfig } from "../config";
 import { openaiExtractor } from "../masking/extractors/openai";
 import type { OpenAIMessage, OpenAIRequest } from "../providers/openai/types";
 import {
-  filterWhitelistedEntities,
+  filterAllowlistedEntities,
   findDenylistedEntities,
   mergeDenylistEntities,
   PIIDetector,
@@ -311,70 +311,70 @@ describe("PIIDetector", () => {
     });
   });
 
-  describe("filterWhitelistedEntities", () => {
-    test("filters entities matching whitelist pattern", () => {
+  describe("filterAllowlistedEntities", () => {
+    test("filters entities matching allowlist pattern", () => {
       const text = "You are Claude Code, Anthropic's official CLI for Claude.";
       const entities = [{ entity_type: "PERSON", start: 8, end: 14, score: 0.9 }];
-      const whitelist = [
+      const allowlist = [
         { pattern: "You are Claude Code, Anthropic's official CLI for Claude.", regex: false },
       ];
 
-      const result = filterWhitelistedEntities(text, entities, whitelist);
+      const result = filterAllowlistedEntities(text, entities, allowlist);
 
       expect(result).toHaveLength(0);
     });
 
-    test("keeps entities not in whitelist", () => {
+    test("keeps entities not in allowlist", () => {
       const text = "Contact John Doe at john@example.com";
       const entities = [
         { entity_type: "PERSON", start: 8, end: 16, score: 0.9 },
         { entity_type: "EMAIL_ADDRESS", start: 20, end: 36, score: 0.95 },
       ];
-      const whitelist = [{ pattern: "Claude", regex: false }];
+      const allowlist = [{ pattern: "Claude", regex: false }];
 
-      const result = filterWhitelistedEntities(text, entities, whitelist);
+      const result = filterAllowlistedEntities(text, entities, allowlist);
 
       expect(result).toHaveLength(2);
     });
 
-    test("filters when entity text is contained in whitelist pattern", () => {
+    test("filters when entity text is contained in allowlist pattern", () => {
       const text = "Hello Claude, how are you?";
       const entities = [{ entity_type: "PERSON", start: 6, end: 12, score: 0.85 }];
-      const whitelist = [{ pattern: "You are Claude Code", regex: false }];
+      const allowlist = [{ pattern: "You are Claude Code", regex: false }];
 
-      const result = filterWhitelistedEntities(text, entities, whitelist);
+      const result = filterAllowlistedEntities(text, entities, allowlist);
 
       expect(result).toHaveLength(0);
     });
 
-    test("returns all entities when whitelist is empty", () => {
+    test("returns all entities when allowlist is empty", () => {
       const text = "Contact Claude at claude@example.com";
       const entities = [
         { entity_type: "PERSON", start: 8, end: 14, score: 0.9 },
         { entity_type: "EMAIL_ADDRESS", start: 18, end: 36, score: 0.95 },
       ];
 
-      const result = filterWhitelistedEntities(text, entities, []);
+      const result = filterAllowlistedEntities(text, entities, []);
 
       expect(result).toHaveLength(2);
     });
 
-    test("filters entities matching regex whitelist pattern", () => {
+    test("filters entities matching regex allowlist pattern", () => {
       const text = "Reference TEST-1234 is public";
       const entities = [{ entity_type: "CUSTOMER_ID", start: 10, end: 19, score: 0.9 }];
-      const whitelist = [{ pattern: "TEST-\\d+", regex: true }];
+      const allowlist = [{ pattern: "TEST-\\d+", regex: true }];
 
-      const result = filterWhitelistedEntities(text, entities, whitelist);
+      const result = filterAllowlistedEntities(text, entities, allowlist);
 
       expect(result).toHaveLength(0);
     });
 
-    test("does not filter when a regex whitelist only partially matches the entity", () => {
+    test("does not filter when a regex allowlist only partially matches the entity", () => {
       const text = "card 1234567890123456 end";
       const entities = [{ entity_type: "CREDIT_CARD", start: 5, end: 21, score: 0.99 }];
-      const whitelist = [{ pattern: "\\d{4}", regex: true }];
+      const allowlist = [{ pattern: "\\d{4}", regex: true }];
 
-      const result = filterWhitelistedEntities(text, entities, whitelist);
+      const result = filterAllowlistedEntities(text, entities, allowlist);
 
       expect(result).toHaveLength(1);
     });

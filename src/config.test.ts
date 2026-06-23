@@ -56,14 +56,14 @@ pii_detection:
     }
   });
 
-  test("accepts masking whitelist and denylist patterns", () => {
+  test("accepts masking allowlist and denylist patterns", () => {
     const path = writeConfig(`
 mode: mask
 providers:
   openai: {}
   anthropic: {}
 masking:
-  whitelist:
+  allowlist:
     - "Acme Corp"
     - pattern: 'TEST-\\d+'
       regex: true
@@ -80,7 +80,7 @@ pii_detection:
     try {
       const config = loadConfig(path);
 
-      expect(config.masking.whitelist).toEqual([
+      expect(config.masking.allowlist).toEqual([
         { pattern: "You are Claude Code, Anthropic's official CLI for Claude.", regex: false },
         { pattern: "Acme Corp", regex: false },
         { pattern: "TEST-\\d+", regex: true },
@@ -94,14 +94,14 @@ pii_detection:
     }
   });
 
-  test("rejects invalid masking whitelist regex patterns", () => {
+  test("rejects invalid masking allowlist regex patterns", () => {
     const path = writeConfig(`
 mode: mask
 providers:
   openai: {}
   anthropic: {}
 masking:
-  whitelist:
+  allowlist:
     - pattern: "[Acme"
       regex: true
 pii_detection:
