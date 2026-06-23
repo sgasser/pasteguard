@@ -26,6 +26,12 @@ curl -X POST http://localhost:3000/api/mask \
   }'
 ```
 
+Browser extensions can identify themselves in dashboard logs by sending:
+
+```http
+X-PasteGuard-Source: browser-extension
+```
+
 ## Parameters
 
 | Parameter | Type | Required | Description |

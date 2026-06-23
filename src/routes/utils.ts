@@ -8,7 +8,7 @@
 import type { Context } from "hono";
 import { getConfig } from "../config";
 import { ProviderError } from "../providers/errors";
-import type { RequestLogData } from "../services/logger";
+import type { RequestLogData, RequestSource } from "../services/logger";
 import { logRequest } from "../services/logger";
 import type { PIIDetectResult } from "../services/pii";
 import type { SecretsProcessResult } from "../services/secrets";
@@ -208,6 +208,7 @@ export function toSecretsHeaderData<T>(
 
 export interface CreateLogDataOptions {
   provider: "openai" | "anthropic" | "codex" | "local" | "api";
+  source?: RequestSource;
   model: string;
   startTime: number;
   pii?: PIILogData;
@@ -229,6 +230,7 @@ export function createLogData(options: CreateLogDataOptions): RequestLogData {
     timestamp: new Date().toISOString(),
     mode: config.mode,
     provider,
+    source: options.source,
     model: model || "unknown",
     piiDetected: pii?.hasPII ?? false,
     entities: pii?.entityTypes ?? [],

@@ -3,11 +3,15 @@ import { mkdirSync } from "node:fs";
 import { getConfig } from "../config";
 import { shouldLogMaskedContent } from "./log-content";
 
+export type RequestProvider = "openai" | "anthropic" | "codex" | "local" | "api";
+export type RequestSource = RequestProvider | "browser_extension";
+
 export interface RequestLog {
   id?: number;
   timestamp: string;
   mode: "route" | "mask";
-  provider: "openai" | "anthropic" | "codex" | "local" | "api";
+  provider: RequestProvider;
+  source: RequestSource;
   model: string;
   pii_detected: boolean;
   entities: string;
@@ -36,9 +40,25 @@ export interface Stats {
   proxy_requests: number;
   local_requests: number;
   api_requests: number;
+  browser_extension_requests: number;
   avg_scan_time_ms: number;
   total_tokens: number;
   requests_last_hour: number;
+}
+
+export function normalizeRequestSource(
+  provider: RequestProvider,
+  sourceHeader?: string | null,
+): RequestSource {
+  if (provider !== "api") {
+    return provider;
+  }
+
+  if (sourceHeader?.trim().toLowerCase() === "browser-extension") {
+    return "browser_extension";
+  }
+
+  return "api";
 }
 
 /**
@@ -70,6 +90,7 @@ export class Logger {
         timestamp TEXT NOT NULL,
         mode TEXT NOT NULL DEFAULT 'route',
         provider TEXT NOT NULL,
+        source TEXT,
         model TEXT NOT NULL,
         pii_detected INTEGER NOT NULL DEFAULT 0,
         entities TEXT,
@@ -100,6 +121,10 @@ export class Logger {
       this.db.run("ALTER TABLE request_logs ADD COLUMN status_code INTEGER");
       this.db.run("ALTER TABLE request_logs ADD COLUMN error_message TEXT");
     }
+    if (!columns.find((c) => c.name === "source")) {
+      this.db.run("ALTER TABLE request_logs ADD COLUMN source TEXT");
+      this.db.run("UPDATE request_logs SET source = provider WHERE source IS NULL");
+    }
 
     // Create indexes for performance
     this.db.run(`
@@ -116,15 +141,16 @@ export class Logger {
   log(entry: Omit<RequestLog, "id">): void {
     const stmt = this.db.prepare(`
       INSERT INTO request_logs
-        (timestamp, mode, provider, model, pii_detected, entities, latency_ms, scan_time_ms, prompt_tokens, completion_tokens, user_agent, language, language_fallback, detected_language, masked_content, secrets_detected, secrets_types, status_code, error_message)
+        (timestamp, mode, provider, source, model, pii_detected, entities, latency_ms, scan_time_ms, prompt_tokens, completion_tokens, user_agent, language, language_fallback, detected_language, masked_content, secrets_detected, secrets_types, status_code, error_message)
       VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       entry.timestamp,
       entry.mode,
       entry.provider,
+      entry.source,
       entry.model,
       entry.pii_detected ? 1 : 0,
       entry.entities,
@@ -154,7 +180,10 @@ export class Logger {
       LIMIT ? OFFSET ?
     `);
 
-    return stmt.all(limit, offset) as RequestLog[];
+    return (stmt.all(limit, offset) as RequestLog[]).map((log) => ({
+      ...log,
+      source: log.source || normalizeRequestSource(log.provider),
+    }));
   }
 
   /**
@@ -181,7 +210,12 @@ export class Logger {
       .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE provider = 'local'`)
       .get() as { count: number };
     const apiResult = this.db
-      .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE provider = 'api'`)
+      .prepare(
+        `SELECT COUNT(*) as count FROM request_logs WHERE provider = 'api' AND source != 'browser_extension'`,
+      )
+      .get() as { count: number };
+    const browserExtensionResult = this.db
+      .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE source = 'browser_extension'`)
       .get() as { count: number };
 
     // Average scan time
@@ -216,6 +250,7 @@ export class Logger {
       proxy_requests: proxyResult.count,
       local_requests: localResult.count,
       api_requests: apiResult.count,
+      browser_extension_requests: browserExtensionResult.count,
       avg_scan_time_ms: Math.round(scanTimeResult.avg || 0),
       total_tokens: tokensResult.total,
       requests_last_hour: hourResult.count,
@@ -290,7 +325,8 @@ export function getLogger(): Logger {
 export interface RequestLogData {
   timestamp: string;
   mode: "route" | "mask";
-  provider: "openai" | "anthropic" | "codex" | "local" | "api";
+  provider: RequestProvider;
+  source?: RequestSource;
   model: string;
   piiDetected: boolean;
   entities: string[];
@@ -329,6 +365,7 @@ export function logRequest(data: RequestLogData, userAgent: string | null): void
       timestamp: data.timestamp,
       mode: data.mode,
       provider: data.provider,
+      source: data.source ?? normalizeRequestSource(data.provider),
       model: data.model,
       pii_detected: data.piiDetected,
       entities: data.entities.join(","),

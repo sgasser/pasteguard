@@ -19,7 +19,7 @@ import { mask as maskPII } from "../pii/mask";
 import { detectSecrets } from "../secrets/detect";
 import { maskSecrets } from "../secrets/mask";
 import { getLanguageDetector, type SupportedLanguage } from "../services/language-detector";
-import { logRequest } from "../services/logger";
+import { logRequest, normalizeRequestSource } from "../services/logger";
 import { createLogData } from "./utils";
 
 export const apiRoutes = new Hono();
@@ -83,6 +83,7 @@ apiRoutes.post("/mask", async (c) => {
   const startTime = Date.now();
   const config = getConfig();
   const userAgent = c.req.header("user-agent") || null;
+  const source = normalizeRequestSource("api", c.req.header("x-pasteguard-source"));
 
   // Parse and validate request
   const body = await c.req.json().catch(() => null);
@@ -170,6 +171,7 @@ apiRoutes.post("/mask", async (c) => {
       logRequest(
         createLogData({
           provider: "api",
+          source,
           model: "mask",
           startTime,
           pii: {
@@ -235,6 +237,7 @@ apiRoutes.post("/mask", async (c) => {
       logRequest(
         createLogData({
           provider: "api",
+          source,
           model: "mask",
           startTime,
           pii: { hasPII: false, entityTypes: [], language, languageFallback, scanTimeMs: 0 },
@@ -261,6 +264,7 @@ apiRoutes.post("/mask", async (c) => {
   logRequest(
     createLogData({
       provider: "api",
+      source,
       model: "mask",
       startTime,
       pii: {
