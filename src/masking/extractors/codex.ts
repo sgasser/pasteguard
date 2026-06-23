@@ -18,34 +18,56 @@ const TEXT_KEYS = new Set([
   "input",
   "input_text",
   "instructions",
+  "output",
   "output_text",
+  "stderr",
+  "stdout",
   "text",
 ]);
 
 interface LocatedString {
   path: Array<string | number>;
   value: string;
+  role: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function collectText(value: unknown, path: Array<string | number> = []): LocatedString[] {
+function roleForText(path: Array<string | number>, inheritedRole?: string): string {
+  if (path.includes("instructions")) return "system";
+  return inheritedRole ?? "user";
+}
+
+function inferRole(value: Record<string, unknown>, inheritedRole?: string): string | undefined {
+  if (typeof value.role === "string") return value.role;
+  if (value.type === "function_call_output" || value.type === "local_shell_call_output")
+    return "tool";
+  if (typeof value.type === "string" && value.type.startsWith("mcp_")) return "mcp";
+  return inheritedRole;
+}
+
+function collectText(
+  value: unknown,
+  path: Array<string | number> = [],
+  inheritedRole?: string,
+): LocatedString[] {
   if (typeof value === "string") {
     const key = path[path.length - 1];
     if (typeof key === "string" && TEXT_KEYS.has(key)) {
-      return [{ path, value }];
+      return [{ path, value, role: roleForText(path, inheritedRole) }];
     }
     return [];
   }
 
   if (Array.isArray(value)) {
-    return value.flatMap((item, index) => collectText(item, [...path, index]));
+    return value.flatMap((item, index) => collectText(item, [...path, index], inheritedRole));
   }
 
   if (isRecord(value)) {
-    return Object.entries(value).flatMap(([key, item]) => collectText(item, [...path, key]));
+    const role = inferRole(value, inheritedRole);
+    return Object.entries(value).flatMap(([key, item]) => collectText(item, [...path, key], role));
   }
 
   return [];
@@ -95,7 +117,7 @@ export const codexExtractor: RequestExtractor<CodexResponsesRequest, CodexRespon
       path: pathToString(item.path),
       messageIndex: index,
       partIndex: 0,
-      role: item.path.includes("instructions") ? "system" : "user",
+      role: item.role,
     }));
   },
 

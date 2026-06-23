@@ -21,6 +21,7 @@ import {
   unmaskSecretsResponse,
   unmaskSecretsStreamChunk,
 } from "../secrets/mask";
+import { formatMaskedSpansForLog, logScanRoles } from "../services/log-content";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
 import {
@@ -171,13 +172,14 @@ function getForwardHeaders(c: Context): Record<string, string> {
 }
 
 function formatCodexForLog(request: CodexResponsesRequest): string | undefined {
-  const spans = codexExtractor.extractTexts(request).filter((span) => span.role !== "system");
-  if (spans.length === 0) return undefined;
-
-  return spans
-    .map((span) => `[${span.role || "unknown"} ${span.path}] ${span.text}`)
-    .join("\n")
-    .slice(0, 20000);
+  const config = getConfig();
+  const scanRoles = logScanRoles({
+    piiRoles: config.pii_detection.scan_roles,
+    piiActive: config.pii_detection.enabled || config.masking.denylist.length > 0,
+    secretRoles: config.secrets_detection.scan_roles,
+    secretsActive: config.secrets_detection.enabled,
+  });
+  return formatMaskedSpansForLog(codexExtractor.extractTexts(request), scanRoles);
 }
 
 function respondBlocked(

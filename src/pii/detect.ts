@@ -221,21 +221,19 @@ export class PIIDetector {
     const spans = extractor.extractTexts(request);
 
     // Detect PII for each span independently
-    const scanRoles = config.pii_detection.scan_roles
-      ? new Set(config.pii_detection.scan_roles)
-      : null;
+    const scanRoles = new Set(config.pii_detection.scan_roles);
     const allowlist = config.masking.allowlist;
     const denylist = config.masking.denylist;
 
     const spanEntities: PIIEntity[][] = await Promise.all(
       spans.map(async (span) => {
         if (!span.text) return [];
-        const denylistedEntities = findDenylistedEntities(span.text, denylist, knownPlaceholders);
 
-        if (scanRoles && span.role && !scanRoles.has(span.role)) {
-          return mergeDenylistEntities([], denylistedEntities);
+        if (!span.role || !scanRoles.has(span.role)) {
+          return [];
         }
 
+        const denylistedEntities = findDenylistedEntities(span.text, denylist, knownPlaceholders);
         const detectedEntities = config.pii_detection.enabled
           ? await this.detectPII(span.text)
           : [];

@@ -10,12 +10,12 @@ import { callLocal } from "../providers/local";
 import { callOpenAI, getOpenAIInfo, type ProviderResult } from "../providers/openai/client";
 import { createUnmaskingStream } from "../providers/openai/stream-transformer";
 import {
-  type OpenAIMessage,
   type OpenAIRequest,
   OpenAIRequestSchema,
   type OpenAIResponse,
 } from "../providers/openai/types";
 import { unmaskSecretsResponse } from "../secrets/mask";
+import { formatMaskedSpansForLog, logScanRoles } from "../services/log-content";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
 import {
@@ -23,7 +23,6 @@ import {
   type SecretsProcessResult,
   secretPlaceholders,
 } from "../services/secrets";
-import { extractTextContent } from "../utils/content";
 import {
   createLogData,
   errorFormats,
@@ -151,14 +150,17 @@ interface LocalOptions {
 
 // --- Helpers ---
 
-function formatMessagesForLog(messages: OpenAIMessage[]): string {
-  return messages
-    .map((m) => {
-      const text = extractTextContent(m.content);
-      const isMultimodal = Array.isArray(m.content);
-      return `[${m.role}${isMultimodal ? " multimodal" : ""}] ${text}`;
-    })
-    .join("\n");
+function formatRequestForLog(request: OpenAIRequest): string | undefined {
+  const config = getConfig();
+  return formatMaskedSpansForLog(
+    openaiExtractor.extractTexts(request),
+    logScanRoles({
+      piiRoles: config.pii_detection.scan_roles,
+      piiActive: config.pii_detection.enabled || config.masking.denylist.length > 0,
+      secretRoles: config.secrets_detection.scan_roles,
+      secretsActive: config.secrets_detection.enabled,
+    }),
+  );
 }
 
 // --- Response handlers ---
@@ -224,7 +226,7 @@ async function sendToOpenAI(c: Context, originalRequest: OpenAIRequest, opts: Op
   const { request, piiResult, piiMaskingContext, secretsResult, startTime, authHeader } = opts;
 
   const maskedContent =
-    piiResult.hasPII || secretsResult.masked ? formatMessagesForLog(request.messages) : undefined;
+    piiResult.hasPII || secretsResult.masked ? formatRequestForLog(request) : undefined;
 
   setResponseHeaders(
     c,
@@ -293,7 +295,7 @@ async function sendToLocal(c: Context, originalRequest: OpenAIRequest, opts: Loc
   }
 
   const maskedContent =
-    piiResult.hasPII || secretsResult.masked ? formatMessagesForLog(request.messages) : undefined;
+    piiResult.hasPII || secretsResult.masked ? formatRequestForLog(request) : undefined;
 
   setResponseHeaders(
     c,

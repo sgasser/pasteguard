@@ -67,6 +67,7 @@ export function maskSpans<T extends Span>(
         maskedText: span.text,
         messageIndex: span.messageIndex,
         partIndex: span.partIndex,
+        nestedPartIndex: span.nestedPartIndex,
       });
       continue;
     }
@@ -85,6 +86,7 @@ export function maskSpans<T extends Span>(
       maskedText,
       messageIndex: span.messageIndex,
       partIndex: span.partIndex,
+      nestedPartIndex: span.nestedPartIndex,
     });
   }
 

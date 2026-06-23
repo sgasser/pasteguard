@@ -16,7 +16,7 @@ logging:
 |--------|---------|-------------|
 | `database` | `./data/pasteguard.db` | SQLite database path |
 | `retention_days` | `30` | Days to keep logs. `0` = forever |
-| `log_masked_content` | `true` | Log masked version for dashboard |
+| `log_masked_content` | `true` | Store request text in the dashboard after masking |
 
 ## Database
 
@@ -47,16 +47,18 @@ logging:
 
 ## Content Logging
 
-### Masked Content (default)
+### Masked Content
 
-Logs the masked version for dashboard preview:
+Stores a dashboard preview for text that PasteGuard scanned:
 
 ```yaml
 logging:
   log_masked_content: true
 ```
 
-Shows what was actually sent upstream with PII and secrets replaced by placeholders.
+This is the default. It stores only roles in `scan_roles`, after PII and secrets are replaced
+with placeholders. System prompts, developer prompts, assistant messages, and agent context do not
+appear in the preview.
 
 ### No Content
 
@@ -67,11 +69,11 @@ logging:
   log_masked_content: false
 ```
 
-Only metadata (timestamps, models, PII detected) is logged.
+Only metadata is logged.
 
 ## Security
 
-- Raw request/response content is **never** logged — only the masked version, and only when `log_masked_content` is enabled
-- With `secrets_detection.action: route_local`, content is not logged at all when secrets are detected, since secrets stay unmasked for the local provider
-- Only secret types are logged if `log_detected_types: true`
-- Masked content shows placeholders like `[[EMAIL_ADDRESS_1]]` and `[[API_KEY_SK_1]]`, not real values
+- The dashboard preview stores only scanned spans (`scan_roles`) after masking; other roles never appear.
+- With `secrets_detection.action: route_local`, content is not logged when secrets are detected.
+- Secret logs store secret types only, never the raw secret value.
+- Placeholders look like `[[EMAIL_ADDRESS_1]]` or `[[API_KEY_SK_1]]`.

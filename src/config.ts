@@ -116,6 +116,17 @@ const PhoneRegionsSchema = z
   .pipe(z.array(PhoneRegionSchema))
   .default([]);
 
+const KNOWN_SCAN_ROLES = ["user", "tool", "function", "mcp", "system", "developer", "assistant"];
+const DEFAULT_SCAN_ROLES = ["user", "tool", "function", "mcp"];
+const scanRolesField = z
+  .array(
+    z.string().refine((role) => KNOWN_SCAN_ROLES.includes(role), {
+      message: `Unknown scan role (allowed: ${KNOWN_SCAN_ROLES.join(", ")})`,
+    }),
+  )
+  .default([...DEFAULT_SCAN_ROLES])
+  .transform((roles) => (roles.length > 0 ? roles : [...DEFAULT_SCAN_ROLES]));
+
 const PIIDetectionSchema = z.object({
   enabled: z.boolean().default(true),
   detector_url: z.string().url(),
@@ -133,7 +144,7 @@ const PIIDetectionSchema = z.object({
       "IP_ADDRESS",
       "VAT_CODE",
     ]),
-  scan_roles: z.array(z.string()).optional(),
+  scan_roles: scanRolesField,
 });
 
 const ServerSchema = z.object({
@@ -178,7 +189,7 @@ const SecretsDetectionSchema = z.object({
   entities: z.array(z.enum(SecretEntityTypes)).default([...SecretEntityTypes]),
   max_scan_chars: z.coerce.number().int().min(0).default(200000),
   log_detected_types: z.boolean().default(true),
-  scan_roles: z.array(z.string()).optional(),
+  scan_roles: scanRolesField,
 });
 
 const ConfigSchema = z

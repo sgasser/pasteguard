@@ -50,27 +50,6 @@ function extractBlockText(block: ContentBlock): string {
 }
 
 /**
- * Extract text from content (string or block array)
- */
-export function extractAnthropicTextContent(content: string | ContentBlock[] | undefined): string {
-  if (!content) return "";
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content.map(extractBlockText).filter(Boolean).join("\n");
-  }
-  return "";
-}
-
-/**
- * Extract text from system prompt (for logging/debugging)
- */
-export function extractSystemText(system: string | ContentBlock[] | undefined): string {
-  if (!system) return "";
-  if (typeof system === "string") return system;
-  return extractAnthropicTextContent(system);
-}
-
-/**
  * Anthropic request extractor
  *
  * Extracts text from both system (messageIndex: -1) and messages.

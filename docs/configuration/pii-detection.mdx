@@ -114,7 +114,8 @@ Patterns are matched literally by default. Set `regex: true` for JavaScript rege
 
 ## Scan Roles
 
-By default, all message roles are scanned. To scan only user-controlled content:
+By default, PasteGuard scans user messages and tool results. It skips system, developer,
+and assistant text. Set `scan_roles` to replace that default:
 
 ```yaml
 pii_detection:
@@ -122,14 +123,17 @@ pii_detection:
     - user
     - tool
     - function
+    - mcp
 ```
 
-| Role | Description |
-|------|-------------|
-| `user` | User messages (primary source of PII) |
+| Scan label | Description |
+|------------|-------------|
+| `user` | User messages |
 | `assistant` | Assistant responses |
 | `system` | System prompts |
-| `tool` | Tool/function call results |
-| `function` | Legacy function results (OpenAI) |
+| `developer` | Developer prompts |
+| `tool` | Tool results, including file reads and shell output |
+| `function` | Legacy OpenAI function results |
+| `mcp` | PasteGuard internal label for MCP tool items, such as Codex `mcp_tool_call` output |
 
-This reduces detector calls for large system prompts and avoids false positives on app-controlled content.
+If `scan_roles` is set, PasteGuard scans exactly those roles.

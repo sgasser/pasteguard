@@ -64,7 +64,7 @@ export function detectSecretsInRequest<TRequest, TResponse>(
   return detectSecretsInSpans(spans, config);
 }
 
-function detectSecretsInSpans(
+export function detectSecretsInSpans(
   spans: TextSpan[],
   config: SecretsDetectionConfig,
 ): MessageSecretsResult {
@@ -77,11 +77,11 @@ function detectSecretsInSpans(
   }
 
   // Detect secrets in each span
-  const scanRoles = config.scan_roles ? new Set(config.scan_roles) : null;
+  const scanRoles = new Set(config.scan_roles);
 
   const matchCounts = new Map<string, number>();
   const spanLocations: SecretLocation[][] = spans.map((span) => {
-    if (scanRoles && span.role && !scanRoles.has(span.role)) {
+    if (!span.role || !scanRoles.has(span.role)) {
       return [];
     }
     const result = detectSecrets(span.text, config);

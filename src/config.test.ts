@@ -86,6 +86,68 @@ pii_detection:
     }
   });
 
+  test("defaults PII and secrets scan roles to input-controlled content", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.scan_roles).toEqual(["user", "tool", "function", "mcp"]);
+      expect(config.secrets_detection.scan_roles).toEqual(["user", "tool", "function", "mcp"]);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("falls back to default scan roles when configured empty", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+  scan_roles: []
+secrets_detection:
+  scan_roles: []
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.scan_roles).toEqual(["user", "tool", "function", "mcp"]);
+      expect(config.secrets_detection.scan_roles).toEqual(["user", "tool", "function", "mcp"]);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("rejects unknown scan roles", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+  scan_roles:
+    - users
+`);
+
+    try {
+      expect(() => loadConfig(path)).toThrow("Invalid configuration");
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
   test("accepts masking allowlist and denylist patterns", () => {
     const path = writeConfig(`
 mode: mask

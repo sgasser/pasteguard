@@ -88,16 +88,6 @@ pii_detection:
     - IP_ADDRESS
     - VAT_CODE  # EU VAT number (any member state; requires country prefix)
 
-  # Which message roles to scan for PII (optional)
-  # By default, all roles are scanned. Set this to scan only user-controlled content:
-  #   - user:      User messages (primary source of PII)
-  #   - tool:      Tool/function call results (may contain user data)
-  #   - function:  Legacy function results (OpenAI)
-  # scan_roles:
-  #   - user
-  #   - tool
-  #   - function
-
 # Secrets Detection settings (Secrets Shield)
 # Detects private keys, API keys, tokens and other secret credentials in requests
 secrets_detection:
@@ -132,16 +122,6 @@ secrets_detection:
   # Log detected secret types (never logs raw secret content)
   log_detected_types: true
 
-  # Which message roles to scan for secrets (optional)
-  # By default, all roles are scanned. Set this to scan only user-controlled content:
-  #   - user:      User messages (primary source of secrets)
-  #   - tool:      Tool/function call results (may contain secrets)
-  #   - function:  Legacy function results (OpenAI)
-  # scan_roles:
-  #   - user
-  #   - tool
-  #   - function
-
 # Logging settings
 logging:
   # SQLite database for request logs
@@ -150,9 +130,9 @@ logging:
   # Log retention in days (0 = keep forever)
   retention_days: 30
 
-  # Log masked content for dashboard preview (default: true)
-  # Shows what was actually sent to provider with PII and secrets replaced by placeholders
-  # Disable if you don't want any content stored, even masked
+  # Store request text in the dashboard after masking (default: true)
+  # Disable if you don't want request text stored, even after masking.
+  # Only scanned roles (scan_roles) are stored, after PII and secrets are masked.
   log_masked_content: true
 
 # Dashboard settings
