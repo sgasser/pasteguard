@@ -52,13 +52,6 @@ const CodexResponsesRequestSchema = z
   })
   .passthrough();
 
-/**
- * POST /responses
- *
- * Inspected Codex Responses route. This mirrors the OpenAI/Anthropic protected
- * endpoints: detect secrets/PII, mask before upstream, unmask streamed response,
- * and log the request in the dashboard.
- */
 codexRoutes.post(
   "/responses",
   zValidator("json", CodexResponsesRequestSchema, (result, c) => {
@@ -116,10 +109,6 @@ codexRoutes.post(
   },
 );
 
-/**
- * Wildcard pass-through proxy for /models and any future Codex endpoints that do
- * not carry prompt content.
- */
 codexRoutes.all("/*", (c) => {
   const config = getConfig();
   const normalizedBaseUrl = config.providers.codex.base_url.replace(/\/$/, "");

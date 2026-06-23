@@ -1,10 +1,3 @@
-/**
- * Shared route utilities
- *
- * Common utilities for route handlers including error formatting,
- * response headers, and logging helpers.
- */
-
 import type { Context } from "hono";
 import { getConfig } from "../config";
 import { ProviderError } from "../providers/errors";
@@ -17,9 +10,6 @@ import type { SecretsProcessResult } from "../services/secrets";
 // Error Response Types & Formatting
 // ============================================================================
 
-/**
- * Error response format for OpenAI
- */
 export interface OpenAIErrorResponse {
   error: {
     message: string;
@@ -29,9 +19,6 @@ export interface OpenAIErrorResponse {
   };
 }
 
-/**
- * Error response format for Anthropic
- */
 export interface AnthropicErrorResponse {
   type: "error";
   error: {
@@ -40,9 +27,6 @@ export interface AnthropicErrorResponse {
   };
 }
 
-/**
- * Format adapters for different API schemas
- */
 export const errorFormats = {
   openai: {
     error(
@@ -88,9 +72,6 @@ export interface SecretsHeaderData {
   masked: boolean;
 }
 
-/**
- * Set common PasteGuard response headers
- */
 export function setResponseHeaders(
   c: Context,
   mode: string,
@@ -114,9 +95,6 @@ export function setResponseHeaders(
   }
 }
 
-/**
- * Set headers for blocked request (secrets detected)
- */
 export function setBlockedHeaders(c: Context, secretTypes: string[]): void {
   c.header("X-PasteGuard-Secrets-Detected", "true");
   c.header("X-PasteGuard-Secrets-Types", secretTypes.join(","));
@@ -132,27 +110,18 @@ export function setStreamingHeaders(c: Context): void {
 // Logging Helpers
 // ============================================================================
 
-/**
- * PII detection result for logging
- */
 export interface PIILogData {
   hasPII: boolean;
   entityTypes: string[];
   scanTimeMs: number;
 }
 
-/**
- * Secrets detection result for logging
- */
 export interface SecretsLogData {
   detected?: boolean;
   types?: string[];
   masked: boolean;
 }
 
-/**
- * Convert PIIDetectResult to PIILogData
- */
 export function toPIILogData(piiResult: PIIDetectResult): PIILogData {
   return {
     hasPII: piiResult.hasPII,
@@ -161,18 +130,12 @@ export function toPIILogData(piiResult: PIIDetectResult): PIILogData {
   };
 }
 
-/**
- * Convert PIIDetectResult to PIIHeaderData
- */
 export function toPIIHeaderData(piiResult: PIIDetectResult): PIIHeaderData {
   return {
     hasPII: piiResult.hasPII,
   };
 }
 
-/**
- * Convert SecretsProcessResult to SecretsLogData
- */
 export function toSecretsLogData<T>(
   secretsResult: SecretsProcessResult<T>,
 ): SecretsLogData | undefined {
@@ -184,9 +147,6 @@ export function toSecretsLogData<T>(
   };
 }
 
-/**
- * Convert SecretsProcessResult to SecretsHeaderData
- */
 export function toSecretsHeaderData<T>(
   secretsResult: SecretsProcessResult<T>,
 ): SecretsHeaderData | undefined {
@@ -210,9 +170,6 @@ export interface CreateLogDataOptions {
   errorMessage?: string;
 }
 
-/**
- * Create log data object for request logging
- */
 export function createLogData(options: CreateLogDataOptions): RequestLogData {
   const config = getConfig();
   const { provider, model, startTime, pii, secrets, maskedContent, statusCode, errorMessage } =
@@ -251,13 +208,6 @@ export interface ProviderErrorContext {
   userAgent: string | null;
 }
 
-/**
- * Handle provider errors with logging
- *
- * Returns the appropriate response for the error type.
- * For ProviderError, returns the original error body.
- * For other errors, returns a formatted error response.
- */
 export function handleProviderError(
   c: Context,
   error: unknown,

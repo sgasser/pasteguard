@@ -1,14 +1,3 @@
-/**
- * Anthropic-compatible messages route
- *
- * Flow:
- * 1. Validate request
- * 2. Process secrets (detect, maybe block, mask, or route_local)
- * 3. Detect PII
- * 4. Route mode: if PII found, send to local provider
- * 5. Mask mode: mask PII if found, send to Anthropic, unmask response
- */
-
 import { zValidator } from "@hono/zod-validator";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -51,9 +40,6 @@ import {
 
 export const anthropicRoutes = new Hono();
 
-/**
- * POST /v1/messages - Anthropic-compatible messages endpoint
- */
 anthropicRoutes.post(
   "/v1/messages",
   zValidator("json", AnthropicRequestSchema, (result, c) => {
@@ -163,11 +149,6 @@ anthropicRoutes.post(
   },
 );
 
-/**
- * Proxy all other requests to Anthropic
- *
- * Transparent header forwarding - all auth headers from client are passed through.
- */
 anthropicRoutes.all("/*", async (c) => {
   const config = getConfig();
 

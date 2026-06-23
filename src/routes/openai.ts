@@ -1,16 +1,3 @@
-/**
- * OpenAI-compatible chat completion route
- *
- * Flow:
- * 1. Validate request
- * 2. Process secrets (detect, maybe block or mask)
- * 3. Detect PII
- * 4. Based on mode:
- *    - mask: mask PII, send to OpenAI, unmask response
- *    - route: send to local (if PII) or OpenAI (if clean)
- * 5. Return response
- */
-
 import { zValidator } from "@hono/zod-validator";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -52,9 +39,6 @@ import {
 
 export const openaiRoutes = new Hono();
 
-/**
- * POST /v1/chat/completions
- */
 openaiRoutes.post(
   "/v1/chat/completions",
   zValidator("json", OpenAIRequestSchema, (result, c) => {
@@ -131,9 +115,6 @@ openaiRoutes.post(
   },
 );
 
-/**
- * Wildcard proxy for /models, /embeddings, /audio/*, /images/*, etc.
- */
 openaiRoutes.all("/*", (c) => {
   const config = getConfig();
   const { baseUrl } = getOpenAIInfo(config.providers.openai);

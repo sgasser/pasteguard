@@ -27,9 +27,6 @@ export interface RequestLog {
   error_message: string | null;
 }
 
-/**
- * Statistics summary
- */
 export interface Stats {
   total_requests: number;
   pii_requests: number;
@@ -58,9 +55,6 @@ export function normalizeRequestSource(
   return "api";
 }
 
-/**
- * SQLite-based logger for request tracking
- */
 export class Logger {
   private db: Database;
   private retentionDays: number;
@@ -161,9 +155,6 @@ export class Logger {
     );
   }
 
-  /**
-   * Gets recent logs
-   */
   getLogs(limit: number = 100, offset: number = 0): RequestLog[] {
     const stmt = this.db.prepare(`
       SELECT
@@ -196,9 +187,6 @@ export class Logger {
     }));
   }
 
-  /**
-   * Gets statistics
-   */
   getStats(): Stats {
     // Total requests
     const totalResult = this.db.prepare(`SELECT COUNT(*) as count FROM request_logs`).get() as {
@@ -267,9 +255,6 @@ export class Logger {
     };
   }
 
-  /**
-   * Gets entity breakdown
-   */
   getEntityStats(): Array<{ entity: string; count: number }> {
     const logs = this.db
       .prepare(`
@@ -294,9 +279,6 @@ export class Logger {
       .sort((a, b) => b.count - a.count);
   }
 
-  /**
-   * Cleans up old logs based on retention policy
-   */
   cleanup(): number {
     if (this.retentionDays <= 0) {
       return 0; // Keep forever
@@ -314,9 +296,6 @@ export class Logger {
     return result.changes;
   }
 
-  /**
-   * Closes database connection
-   */
   close(): void {
     this.db.close();
   }

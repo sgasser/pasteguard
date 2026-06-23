@@ -13,17 +13,8 @@ export type {
   SecretLocation,
 } from "./patterns/types";
 
-/**
- * Detects secret material (e.g. private keys, API keys, tokens) in text
- *
- * Uses the pattern registry to scan for various secret types:
- * - Private keys: OpenSSH, PEM (RSA, generic, encrypted)
- * - API keys: OpenAI, AWS, GitHub
- * - Tokens: JWT, Bearer
- * - Environment variables: Passwords, secrets, connection strings
- *
- * Respects max_scan_chars limit for performance.
- */
+// Scans private keys, API keys, tokens, env secrets, and connection strings.
+// Respects max_scan_chars to cap regex work on large prompts.
 export function detectSecrets(
   text: string,
   config: SecretsDetectionConfig,
@@ -64,9 +55,6 @@ export function detectSecrets(
   };
 }
 
-/**
- * Detects secrets in a request using an extractor
- */
 export function detectSecretsInRequest<TRequest, TResponse>(
   request: TRequest,
   config: SecretsDetectionConfig,
@@ -76,9 +64,6 @@ export function detectSecretsInRequest<TRequest, TResponse>(
   return detectSecretsInSpans(spans, config);
 }
 
-/**
- * Detects secrets in text spans (low-level)
- */
 function detectSecretsInSpans(
   spans: TextSpan[],
   config: SecretsDetectionConfig,

@@ -1,17 +1,11 @@
 // Conflict resolution based on Microsoft Presidio's logic
 // https://github.com/microsoft/presidio/blob/main/presidio-anonymizer/presidio_anonymizer/anonymizer_engine.py
 
-/**
- * Base interface for items with position (used by both PII and secrets)
- */
 export interface Span {
   start: number;
   end: number;
 }
 
-/**
- * Extended interface for PII entities with confidence scores
- */
 export interface EntityWithScore extends Span {
   score: number;
   entity_type: string;
@@ -76,7 +70,6 @@ function removeConflicting<T extends EntityWithScore>(entities: T[]): T[] {
   return result;
 }
 
-/** For PII entities with scores. Merges same-type overlaps, removes cross-type conflicts. */
 export function resolveConflicts<T extends EntityWithScore>(entities: T[]): T[] {
   if (entities.length <= 1) return [...entities];
 
@@ -96,10 +89,7 @@ export function resolveConflicts<T extends EntityWithScore>(entities: T[]): T[] 
   return removeConflicting(afterMerge);
 }
 
-/**
- * Simple conflict resolution for items without scores (secrets)
- * Keeps non-overlapping spans, longer span wins ties.
- */
+// Secrets have no confidence score, so overlapping ties keep the longer span.
 export function resolveOverlaps<T extends Span>(items: T[]): T[] {
   if (items.length <= 1) return [...items];
 

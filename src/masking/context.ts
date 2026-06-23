@@ -1,26 +1,12 @@
-/**
- * Placeholder context and text transformation utilities
- */
-
 import { findPartialPlaceholderStart } from "../masking/placeholders";
 import type { Span } from "./conflict-resolver";
 
-/**
- * Generic context for placeholder-based transformations
- * Used by both PII masking and secrets masking
- */
 export interface PlaceholderContext {
-  /** Maps placeholder -> original value */
   mapping: Record<string, string>;
-  /** Maps original value -> placeholder (for deduplication) */
   reverseMapping: Record<string, string>;
-  /** Counter per type for sequential numbering */
   counters: Record<string, number>;
 }
 
-/**
- * Creates a new placeholder context
- */
 export function createPlaceholderContext(): PlaceholderContext {
   return {
     mapping: {},
@@ -29,11 +15,6 @@ export function createPlaceholderContext(): PlaceholderContext {
   };
 }
 
-/**
- * Increments counter for type and generates placeholder using format function
- *
- * Shared counter logic for both PII masking and secrets masking.
- */
 export function incrementAndGenerate(
   type: string,
   context: PlaceholderContext,
@@ -44,15 +25,6 @@ export function incrementAndGenerate(
   return format(type, count);
 }
 
-/**
- * Restores placeholders in text with original values
- *
- * Generic function used by both PII unmasking and secrets unmasking.
- *
- * @param text - Text containing placeholders
- * @param context - Context with placeholder mappings
- * @param formatValue - Optional function to format restored values (e.g., add markers)
- */
 export function restorePlaceholders(
   text: string,
   context: PlaceholderContext,
@@ -73,19 +45,6 @@ export function restorePlaceholders(
   return result;
 }
 
-/**
- * Replaces items in text with placeholders
- *
- * Generic function used by both PII masking and secrets masking.
- * Handles: conflict resolution, placeholder assignment, and replacement.
- *
- * @param text - Text to process
- * @param items - Items with start/end positions to replace
- * @param context - Placeholder context for tracking mappings
- * @param getType - Function to get the type string from an item
- * @param generatePlaceholder - Function to generate placeholder for a type
- * @param resolveConflicts - Function to resolve overlapping items
- */
 export function replaceWithPlaceholders<T extends Span>(
   text: string,
   items: T[],
@@ -134,16 +93,6 @@ export function replaceWithPlaceholders<T extends Span>(
   return result;
 }
 
-/**
- * Processes a stream chunk, buffering partial placeholders
- *
- * Generic function used by both PII unmasking and secrets unmasking.
- *
- * @param buffer - Previous buffer content
- * @param newChunk - New chunk to process
- * @param context - Placeholder context
- * @param restore - Function to restore placeholders in text
- */
 export function processStreamChunk(
   buffer: string,
   newChunk: string,
@@ -172,13 +121,6 @@ export function processStreamChunk(
   };
 }
 
-/**
- * Flushes remaining buffer at end of stream
- *
- * @param buffer - Remaining buffer content
- * @param context - Placeholder context
- * @param restore - Function to restore placeholders in text
- */
 export function flushBuffer(
   buffer: string,
   context: PlaceholderContext,

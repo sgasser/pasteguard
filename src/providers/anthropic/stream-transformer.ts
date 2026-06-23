@@ -1,12 +1,5 @@
-/**
- * Anthropic SSE stream transformer for unmasking PII and secrets
- *
- * Anthropic uses a different SSE format than OpenAI:
- * - event: message_start / content_block_start / content_block_delta / etc.
- * - data: {...}
- *
- * Text content comes in content_block_delta events with delta.type === "text_delta"
- */
+// Anthropic SSE differs from OpenAI: event lines identify message/content events,
+// and text arrives as content_block_delta data with delta.type === "text_delta".
 
 import type { MaskingConfig } from "../../config";
 import type { PlaceholderContext } from "../../masking/context";
@@ -14,9 +7,6 @@ import { flushMaskingBuffer, unmaskStreamChunk } from "../../pii/mask";
 import { flushSecretsMaskingBuffer, unmaskSecretsStreamChunk } from "../../secrets/mask";
 import type { ContentBlockDeltaEvent, TextDelta } from "./types";
 
-/**
- * Creates a transform stream that unmasks Anthropic SSE content
- */
 export function createAnthropicUnmaskingStream(
   source: ReadableStream<Uint8Array>,
   piiContext: PlaceholderContext | undefined,

@@ -1,7 +1,3 @@
-/**
- * PII masking
- */
-
 import type { MaskingConfig } from "../config";
 import { resolveConflicts } from "../masking/conflict-resolver";
 import { incrementAndGenerate } from "../masking/context";
@@ -22,33 +18,21 @@ import type { PIIDetectionResult, PIIEntity } from "./detect";
 
 export { createMaskingContext, type PlaceholderContext } from "../masking/service";
 
-/**
- * Result of masking operation
- */
 export interface MaskResult {
   masked: string;
   context: PlaceholderContext;
 }
 
-/**
- * Generates a placeholder for a PII entity type
- */
 function generatePlaceholder(entityType: string, context: PlaceholderContext): string {
   return incrementAndGenerate(entityType, context, (type, count) =>
     generatePlaceholderFromFormat(PII_PLACEHOLDER_FORMAT, type, count),
   );
 }
 
-/**
- * Creates formatValue function from masking config
- */
 function getFormatValue(config: MaskingConfig): ((original: string) => string) | undefined {
   return config.show_markers ? (original: string) => `${config.marker_text}${original}` : undefined;
 }
 
-/**
- * Masks PII entities in text, replacing them with placeholders
- */
 export function mask(
   text: string,
   entities: PIIEntity[],
@@ -72,16 +56,10 @@ export function mask(
   };
 }
 
-/**
- * Unmasks text by replacing placeholders with original values
- */
 export function unmask(text: string, context: PlaceholderContext, config: MaskingConfig): string {
   return unmaskText(text, context, getFormatValue(config));
 }
 
-/**
- * Streaming unmask helper - processes chunks and unmasks when complete placeholders are found
- */
 export function unmaskStreamChunk(
   buffer: string,
   newChunk: string,
@@ -91,9 +69,6 @@ export function unmaskStreamChunk(
   return unmaskChunk(buffer, newChunk, context, getFormatValue(config));
 }
 
-/**
- * Flushes remaining buffer at end of stream
- */
 export function flushMaskingBuffer(
   buffer: string,
   context: PlaceholderContext,
@@ -102,19 +77,11 @@ export function flushMaskingBuffer(
   return flushBuffer(buffer, context, getFormatValue(config));
 }
 
-/**
- * Result of masking a request
- */
 export interface MaskRequestResult<TRequest> {
-  /** The masked request */
   request: TRequest;
-  /** Masking context for unmasking response */
   context: PlaceholderContext;
 }
 
-/**
- * Masks PII in a request using an extractor
- */
 export function maskRequest<TRequest, TResponse>(
   request: TRequest,
   detection: PIIDetectionResult,
@@ -153,9 +120,6 @@ function maskSpansWithEntities(
   );
 }
 
-/**
- * Unmasks a response using a request extractor
- */
 export function unmaskResponse<TRequest, TResponse>(
   response: TResponse,
   context: PlaceholderContext,
