@@ -144,7 +144,7 @@ def _credit_card(text: str) -> list[Span]:
     return out
 
 
-def _phone_regions(phone_regions: list[str] | None) -> list[str | None]:
+def _phone_regions(phone_regions: list[str] | None) -> list[str]:
     if phone_regions:
         normalized = []
         seen = set()
@@ -154,13 +154,16 @@ def _phone_regions(phone_regions: list[str] | None) -> list[str | None]:
                 continue
             normalized.append(region)
             seen.add(region)
-        return normalized or [None]
+        return normalized
 
     return DEFAULT_PHONE_REGIONS
 
 
 def _phone(text: str, phone_regions: list[str] | None = None) -> list[Span]:
-    regions = _phone_regions(phone_regions)
+    regions: list[str | None] = []
+    regions.extend(_phone_regions(phone_regions))
+    if not regions:
+        regions.append(None)
     out: list[Span] = []
     for candidate_region in regions:
         for match in phonenumbers.PhoneNumberMatcher(
