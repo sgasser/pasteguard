@@ -122,6 +122,12 @@ export function setBlockedHeaders(c: Context, secretTypes: string[]): void {
   c.header("X-PasteGuard-Secrets-Types", secretTypes.join(","));
 }
 
+export function setStreamingHeaders(c: Context): void {
+  c.header("Content-Type", "text/event-stream");
+  c.header("Cache-Control", "no-cache");
+  c.header("Connection", "keep-alive");
+}
+
 // ============================================================================
 // Logging Helpers
 // ============================================================================

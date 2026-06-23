@@ -34,6 +34,7 @@ import {
   handleProviderError,
   setBlockedHeaders,
   setResponseHeaders,
+  setStreamingHeaders,
   toPIIHeaderData,
   toPIILogData,
   toSecretsHeaderData,
@@ -370,9 +371,7 @@ function respondStreaming(
   secretsContext?: PlaceholderContext,
   maskingConfig = getConfig().masking,
 ) {
-  c.header("Content-Type", "text/event-stream");
-  c.header("Cache-Control", "no-cache");
-  c.header("Connection", "keep-alive");
+  setStreamingHeaders(c);
 
   if (piiContext || secretsContext) {
     return c.body(createCodexUnmaskingStream(stream, piiContext, maskingConfig, secretsContext));

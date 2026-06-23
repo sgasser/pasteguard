@@ -42,6 +42,7 @@ import {
   handleProviderError,
   setBlockedHeaders,
   setResponseHeaders,
+  setStreamingHeaders,
   toPIIHeaderData,
   toPIILogData,
   toSecretsHeaderData,
@@ -327,9 +328,7 @@ async function sendToLocal(c: Context, originalRequest: AnthropicRequest, opts: 
     );
 
     if (result.isStreaming) {
-      c.header("Content-Type", "text/event-stream");
-      c.header("Cache-Control", "no-cache");
-      c.header("Connection", "keep-alive");
+      setStreamingHeaders(c);
       return c.body(result.response as ReadableStream);
     }
 
@@ -417,9 +416,7 @@ function respondStreaming(
   secretsContext: PlaceholderContext | undefined,
 ) {
   const config = getConfig();
-  c.header("Content-Type", "text/event-stream");
-  c.header("Cache-Control", "no-cache");
-  c.header("Connection", "keep-alive");
+  setStreamingHeaders(c);
 
   if (piiMaskingContext || secretsContext) {
     const unmaskingStream = createAnthropicUnmaskingStream(

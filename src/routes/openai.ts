@@ -43,6 +43,7 @@ import {
   handleProviderError,
   setBlockedHeaders,
   setResponseHeaders,
+  setStreamingHeaders,
   toPIIHeaderData,
   toPIILogData,
   toSecretsHeaderData,
@@ -337,9 +338,7 @@ async function sendToLocal(c: Context, originalRequest: OpenAIRequest, opts: Loc
     );
 
     if (result.isStreaming) {
-      c.header("Content-Type", "text/event-stream");
-      c.header("Cache-Control", "no-cache");
-      c.header("Connection", "keep-alive");
+      setStreamingHeaders(c);
       return c.body(result.response as ReadableStream);
     }
 
@@ -371,9 +370,7 @@ function respondStreaming(
   secretsContext?: PlaceholderContext,
   maskingConfig?: MaskingConfig,
 ) {
-  c.header("Content-Type", "text/event-stream");
-  c.header("Cache-Control", "no-cache");
-  c.header("Connection", "keep-alive");
+  setStreamingHeaders(c);
 
   if (piiContext || secretsContext) {
     const stream = createUnmaskingStream(
