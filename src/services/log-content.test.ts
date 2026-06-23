@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatMaskedSpansForLog, shouldLogMaskedContent } from "./log-content";
+import { formatMaskedSpansForLog, safeLogScanRoles, shouldLogMaskedContent } from "./log-content";
 
 describe("shouldLogMaskedContent", () => {
   const maskedWithSecret = "My key is [[API_KEY_SK_1]] and email [[EMAIL_ADDRESS_1]]";
@@ -172,5 +172,52 @@ describe("formatMaskedSpansForLog", () => {
     );
 
     expect(result).toBe("[unknown] Unlabeled [[EMAIL_ADDRESS_1]]");
+  });
+});
+
+describe("safeLogScanRoles", () => {
+  test("uses the intersection when PII and secrets detection are both active", () => {
+    const roles = safeLogScanRoles({
+      piiRoles: ["user"],
+      piiActive: true,
+      secretsRoles: ["tool"],
+      secretsActive: true,
+    });
+
+    expect(roles).toEqual([]);
+  });
+
+  test("does not log spans that were only scanned by one active detector", () => {
+    const roles = safeLogScanRoles({
+      piiRoles: ["user"],
+      piiActive: true,
+      secretsRoles: ["tool"],
+      secretsActive: true,
+    });
+    const result = formatMaskedSpansForLog(
+      [
+        {
+          text: "tool output raw PII jane@example.com plus [[CONNECTION_STRING_1]]",
+          path: "messages[1].content",
+          messageIndex: 1,
+          partIndex: 0,
+          role: "tool",
+        },
+      ],
+      roles,
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  test("uses the active detector roles when only one detector is active", () => {
+    const roles = safeLogScanRoles({
+      piiRoles: ["user"],
+      piiActive: false,
+      secretsRoles: ["tool"],
+      secretsActive: true,
+    });
+
+    expect(roles).toEqual(["tool"]);
   });
 });

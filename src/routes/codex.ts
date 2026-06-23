@@ -21,7 +21,7 @@ import {
   unmaskSecretsResponse,
   unmaskSecretsStreamChunk,
 } from "../secrets/mask";
-import { formatMaskedSpansForLog, mergeScanRoles } from "../services/log-content";
+import { formatMaskedSpansForLog, safeLogScanRoles } from "../services/log-content";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
 import {
@@ -173,13 +173,14 @@ function getForwardHeaders(c: Context): Record<string, string> {
 
 function formatCodexForLog(request: CodexResponsesRequest): string | undefined {
   const config = getConfig();
-  const scanRoles = mergeScanRoles(
-    config.pii_detection.scan_roles,
-    config.secrets_detection.scan_roles,
-  );
   return formatMaskedSpansForLog(
     codexExtractor.extractTexts(request),
-    scanRoles,
+    safeLogScanRoles({
+      piiRoles: config.pii_detection.scan_roles,
+      piiActive: config.pii_detection.enabled || config.masking.denylist.length > 0,
+      secretsRoles: config.secrets_detection.scan_roles,
+      secretsActive: config.secrets_detection.enabled,
+    }),
     config.logging.masked_content_scope,
   );
 }

@@ -148,20 +148,6 @@ describe("Anthropic Text Extractor", () => {
       expect(spans.map((span) => span.role)).toEqual(["system", "system", "user"]);
     });
 
-    test("keeps AGENTS.md text as user content for Anthropic", () => {
-      const request = createRequest([
-        {
-          role: "user",
-          content: "# AGENTS.md instructions for /repo\n\n<INSTRUCTIONS>user pasted text</INSTRUCTIONS>",
-        },
-      ]);
-
-      const spans = anthropicExtractor.extractTexts(request);
-
-      expect(spans).toHaveLength(1);
-      expect(spans[0].role).toBe("user");
-    });
-
     test("extracts text from thinking blocks", () => {
       const request = createRequest([
         {

@@ -3,7 +3,7 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { getConfig } from "../config";
 import type { PlaceholderContext } from "../masking/context";
-import { anthropicExtractor } from "../masking/extractors/anthropic";
+import { anthropicExtractor, extractAnthropicTextContent } from "../masking/extractors/anthropic";
 import { unmaskResponse as unmaskPIIResponse } from "../pii/mask";
 import { callAnthropic } from "../providers/anthropic/client";
 import { createAnthropicUnmaskingStream } from "../providers/anthropic/stream-transformer";
@@ -11,10 +11,11 @@ import {
   type AnthropicRequest,
   AnthropicRequestSchema,
   type AnthropicResponse,
+  type ContentBlock,
 } from "../providers/anthropic/types";
 import { callLocalAnthropic } from "../providers/local";
 import { unmaskSecretsResponse } from "../secrets/mask";
-import { formatMaskedSpansForLog, mergeScanRoles } from "../services/log-content";
+import { formatMaskedSpansForLog, safeLogScanRoles } from "../services/log-content";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
 import {
@@ -80,6 +81,11 @@ anthropicRoutes.post(
         "Anthropic provider not configured. Add providers.anthropic to config.yaml.",
         400,
       );
+    }
+
+    request = normalizeAnthropicMessageRoles(request);
+    if (request.messages.length === 0) {
+      return respondError(c, "At least one user or assistant message is required.", 400);
     }
 
     // Step 1: Process secrets
@@ -172,6 +178,42 @@ anthropicRoutes.all("/*", async (c) => {
   });
 });
 
+export function normalizeAnthropicMessageRoles(request: AnthropicRequest): AnthropicRequest {
+  const systemBlocks: ContentBlock[] = [];
+  const messages: AnthropicRequest["messages"] = [];
+
+  for (const message of request.messages) {
+    if (message.role === "system" || message.role === "developer") {
+      systemBlocks.push(...messageContentToSystemBlocks(message.content));
+    } else {
+      messages.push(message);
+    }
+  }
+
+  if (systemBlocks.length === 0) return request;
+
+  return {
+    ...request,
+    system: [...systemToBlocks(request.system), ...systemBlocks],
+    messages,
+  };
+}
+
+function systemToBlocks(system: AnthropicRequest["system"]): ContentBlock[] {
+  if (!system) return [];
+  if (typeof system === "string") return [{ type: "text", text: system }];
+  return system;
+}
+
+function messageContentToSystemBlocks(content: AnthropicRequest["messages"][number]["content"]) {
+  if (typeof content === "string") {
+    return content ? [{ type: "text" as const, text: content }] : [];
+  }
+
+  const text = extractAnthropicTextContent(content);
+  return text ? [{ type: "text" as const, text }] : [];
+}
+
 // --- Types ---
 
 interface SendOptions {
@@ -195,7 +237,12 @@ function formatRequestForLog(request: AnthropicRequest): string | undefined {
   const config = getConfig();
   return formatMaskedSpansForLog(
     anthropicExtractor.extractTexts(request),
-    mergeScanRoles(config.pii_detection.scan_roles, config.secrets_detection.scan_roles),
+    safeLogScanRoles({
+      piiRoles: config.pii_detection.scan_roles,
+      piiActive: config.pii_detection.enabled || config.masking.denylist.length > 0,
+      secretsRoles: config.secrets_detection.scan_roles,
+      secretsActive: config.secrets_detection.enabled,
+    }),
     config.logging.masked_content_scope,
   );
 }

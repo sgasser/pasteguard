@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { AnthropicRequestSchema } from "../providers/anthropic/types";
-import { anthropicRoutes } from "./anthropic";
+import { anthropicRoutes, normalizeAnthropicMessageRoles } from "./anthropic";
 
 const app = new Hono();
 app.route("/anthropic", anthropicRoutes);
@@ -40,6 +40,31 @@ describe("POST /anthropic/v1/messages", () => {
     });
 
     expect(result.messages[1].role).toBe("system");
+  });
+
+  test("normalizes system and developer messages before forwarding", () => {
+    const request = AnthropicRequestSchema.parse({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 100,
+      system: "Top-level system",
+      messages: [
+        { role: "user", content: "Hello" },
+        { role: "system", content: "Injected system" },
+        {
+          role: "developer",
+          content: [{ type: "text", text: "Developer instruction" }],
+        },
+      ],
+    });
+
+    const normalized = normalizeAnthropicMessageRoles(request);
+
+    expect(normalized.messages.map((message) => message.role)).toEqual(["user"]);
+    expect(normalized.system).toEqual([
+      { type: "text", text: "Top-level system" },
+      { type: "text", text: "Injected system" },
+      { type: "text", text: "Developer instruction" },
+    ]);
   });
 
   test("returns 400 for invalid role", async () => {

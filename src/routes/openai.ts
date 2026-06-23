@@ -15,7 +15,7 @@ import {
   type OpenAIResponse,
 } from "../providers/openai/types";
 import { unmaskSecretsResponse } from "../secrets/mask";
-import { formatMaskedSpansForLog, mergeScanRoles } from "../services/log-content";
+import { formatMaskedSpansForLog, safeLogScanRoles } from "../services/log-content";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
 import {
@@ -154,7 +154,12 @@ function formatRequestForLog(request: OpenAIRequest): string | undefined {
   const config = getConfig();
   return formatMaskedSpansForLog(
     openaiExtractor.extractTexts(request),
-    mergeScanRoles(config.pii_detection.scan_roles, config.secrets_detection.scan_roles),
+    safeLogScanRoles({
+      piiRoles: config.pii_detection.scan_roles,
+      piiActive: config.pii_detection.enabled || config.masking.denylist.length > 0,
+      secretsRoles: config.secrets_detection.scan_roles,
+      secretsActive: config.secrets_detection.enabled,
+    }),
     config.logging.masked_content_scope,
   );
 }

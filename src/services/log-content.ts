@@ -29,11 +29,21 @@ export function formatMaskedSpansForLog(
   return lines.length > 0 ? lines.join("\n").slice(0, 20000) : undefined;
 }
 
-export function mergeScanRoles(
-  piiRoles: readonly string[],
-  secretRoles: readonly string[],
-): string[] {
-  return [...new Set([...piiRoles, ...secretRoles])];
+export function safeLogScanRoles(options: {
+  piiRoles: readonly string[];
+  piiActive: boolean;
+  secretsRoles: readonly string[];
+  secretsActive: boolean;
+}): string[] {
+  const activeRoleSets = [
+    options.piiActive ? options.piiRoles : undefined,
+    options.secretsActive ? options.secretsRoles : undefined,
+  ].filter((roles): roles is readonly string[] => Boolean(roles));
+
+  if (activeRoleSets.length === 0) return [];
+
+  const [first, ...rest] = activeRoleSets;
+  return [...new Set(first)].filter((role) => rest.every((roles) => roles.includes(role)));
 }
 
 function labelSpan(span: TextSpan): string {
