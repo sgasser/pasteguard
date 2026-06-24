@@ -86,7 +86,7 @@ curl -X POST http://localhost:3000/api/mask \
 curl -X POST http://localhost:3000/api/mask \
   -H "Content-Type: application/json" \
   -d '{
-    "text": "-----BEGIN RSA PRIVATE KEY-----\nMIIE...",
+    "text": "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----",
     "detect": ["secrets"]
   }'
 ```
@@ -95,7 +95,7 @@ curl -X POST http://localhost:3000/api/mask \
 curl -X POST http://localhost:3000/api/mask \
   -H "Content-Type: application/json" \
   -d '{
-    "text": "Contact john@example.com with key -----BEGIN RSA PRIVATE KEY-----..."
+    "text": "Contact john@example.com with key -----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----"
   }'
 ```
 
