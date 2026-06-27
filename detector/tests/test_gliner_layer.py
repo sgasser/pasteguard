@@ -6,6 +6,7 @@ full model integration is covered by benchmarks/pii-accuracy.
 
 import pytest
 
+import detector.gliner_layer as gliner_layer
 from detector.gliner_layer import (
     _MAX_TOKENS,
     _SUPPRESS_LABELS,
@@ -55,3 +56,41 @@ def test_per_label_floors_present_and_ordered():
     # Person carries a stricter floor than location: higher volume and no
     # structural validator, so a higher floor curbs false positives.
     assert PER_LABEL_FLOOR["location"] <= PER_LABEL_FLOOR["person"]
+
+
+def test_predict_window_reuses_cached_model_output(monkeypatch):
+    class FakeModel:
+        def __init__(self):
+            self.calls = 0
+
+        def predict_entities(self, text, labels, threshold):
+            self.calls += 1
+            assert labels == gliner_layer._PREDICT_LABELS
+            assert threshold == max(0.0, gliner_layer._PREDICT_FLOOR)
+            start = text.index("Mario Rossi")
+            return [
+                {
+                    "start": start,
+                    "end": start + len("Mario Rossi"),
+                    "label": "person",
+                    "score": 0.99,
+                }
+            ]
+
+    fake_model = FakeModel()
+    monkeypatch.setattr(gliner_layer, "_model", fake_model)
+    monkeypatch.setattr(gliner_layer, "load_model", lambda: None)
+    gliner_layer._predict_window.cache_clear()
+
+    try:
+        text = "Mario Rossi lives in Rome."
+
+        first = gliner_layer.detect_gliner(text)
+        second = gliner_layer.detect_gliner(text)
+
+        assert first == second
+        assert len(first) == 1
+        assert text[first[0].start : first[0].end] == "Mario Rossi"
+        assert fake_model.calls == 1
+    finally:
+        gliner_layer._predict_window.cache_clear()
