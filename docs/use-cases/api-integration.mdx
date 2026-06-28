@@ -1,10 +1,12 @@
 ---
-title: API Integration
-sidebarTitle: API Integration
-description: Mask PII in your AI-powered application with OpenAI, Anthropic, LangChain, and LlamaIndex
+title: Apps & APIs
+sidebarTitle: Apps & APIs
+description: Add PII and secrets protection to apps and SDKs that call AI providers
 ---
 
-Point your SDK to PasteGuard instead of the provider directly. Every request gets PII and secrets protection automatically.
+Use this path for apps, SDKs, internal AI products, customer-facing AI features, and automation that calls model providers through HTTP APIs.
+
+Point the app to PasteGuard instead of the provider directly. PasteGuard masks PII and secrets, forwards the request, and restores supported placeholders in the response.
 
 ## OpenAI SDK
 
@@ -50,6 +52,14 @@ const client = new Anthropic({
 
 </CodeGroup>
 
+## Self-Hosted App Examples
+
+Self-hosted products such as Open WebUI and LibreChat can also use PasteGuard as their OpenAI-compatible endpoint.
+
+<Card title="Open WebUI and LibreChat" icon="table-columns" href="/use-cases/apps">
+  Example configuration for self-hosted chat products
+</Card>
+
 ## LangChain
 
 ```python
@@ -71,3 +81,12 @@ llm = OpenAILike(
     is_chat_model=True
 )
 ```
+
+## When To Use This Path
+
+Use this path when you are building or operating the app:
+
+- Internal support, legal, finance, or operations apps
+- Customer-facing AI features that may process user data
+- Self-hosted AI interfaces for teams
+- Regulated teams that need a local or self-hosted control point before requests reach a provider

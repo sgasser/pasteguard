@@ -40,14 +40,15 @@
       "group": "Use Cases",
       "pages": [
         "use-cases/chat",
-        "use-cases/apps",
+        "use-cases/api-integration",
         "use-cases/coding-tools",
-        "use-cases/api-integration"
+        "use-cases/regulated-teams"
       ]
     },
     {
       "group": "Concepts",
       "pages": [
+        "concepts/local-first-privacy",
         "concepts/mask-mode",
         "concepts/route-mode",
         "concepts/pii-detection",

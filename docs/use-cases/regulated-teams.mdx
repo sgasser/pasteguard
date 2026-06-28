@@ -1,0 +1,72 @@
+---
+title: Regulated Teams
+sidebarTitle: Regulated Teams
+description: Use AI with sensitive context without sending raw private values to model providers
+---
+
+Regulated teams often want AI help, but the useful context is exactly the context they cannot paste into a third-party provider unchanged.
+
+PasteGuard gives these teams a local or self-hosted privacy layer before requests leave their environment.
+
+## Common Status Quo
+
+Teams usually choose one of these options before adopting a privacy layer:
+
+- Avoid cloud AI for sensitive work
+- Redact client or production data manually
+- Use a weaker local model because cloud providers cannot receive raw data
+- Build one-off masking code inside each app
+
+PasteGuard is designed to replace that manual step with a consistent control point.
+
+## Who It Fits
+
+PasteGuard is useful when sensitive values appear in normal AI work:
+
+- Finance and banking work with customer or transaction context
+- Legal and advisory work with privileged or client-confidential material
+- Healthcare-adjacent operations with patient or provider details
+- Insurance, accounting, consulting, HR, and recruiting work
+- Regulated SaaS teams handling logs, support tickets, and production context
+
+## Product Paths
+
+<CardGroup cols={3}>
+  <Card title="Browser Chat" icon="comment" href="/use-cases/chat">
+    Browser extension beta for ChatGPT, Claude, and Gemini.
+  </Card>
+  <Card title="Apps & APIs" icon="plug" href="/use-cases/api-integration">
+    Apps, SDKs, internal AI products, and provider-compatible APIs.
+  </Card>
+  <Card title="Coding Agents" icon="code" href="/use-cases/coding-tools">
+    Codex, Claude Code, logs, tickets, codebase context, and secrets.
+  </Card>
+</CardGroup>
+
+## Deployment Model
+
+PasteGuard can run locally for individual use, or self-hosted for team and infrastructure use.
+
+Use local or self-hosted deployment when your team needs tighter control over:
+
+- Where private values are processed
+- Which provider receives masked requests
+- What request metadata is logged
+- How sensitive requests are routed to local models
+- How masking rules are configured
+
+<Warning>
+PasteGuard is not a compliance certification and does not make an organization compliant by itself. It can help keep sensitive values out of prompts before they reach a provider.
+</Warning>
+
+## What To Validate In A Pilot
+
+For a regulated pilot, validate the trust questions before adding more features:
+
+- Can users complete real work without manual redaction?
+- Do they understand which values stayed local?
+- Do they trust the restoration flow?
+- Do they need local, self-hosted, or managed deployment?
+- Which logs and audit exports are required before production use?
+
+Start with [Local-First Privacy](/concepts/local-first-privacy), then connect the path your team uses most: [Browser Chat](/use-cases/chat), [Apps & APIs](/use-cases/api-integration), or [Coding Agents](/use-cases/coding-tools).

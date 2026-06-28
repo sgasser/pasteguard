@@ -1,42 +1,52 @@
 ---
 title: Introduction
-description: AI gets the context. Not your secrets. Open-source privacy proxy for OpenAI, Anthropic, and any AI.
+description: AI gets the context. Not your private data. PasteGuard protects Browser Chat, Apps & APIs, and Coding Agents.
 ---
 
-PasteGuard automatically hides names, emails, and API keys before you send prompts to AI. Your data never leaves your machine.
+PasteGuard masks PII and secrets before they reach ChatGPT, Claude, Gemini, your API provider, Codex, or Claude Code. You keep the originals. Providers see placeholders.
 
-Detects personal data and secrets in many languages.
+It is built for teams that want to use AI with real context but cannot send raw client, customer, production, or credential data to model providers.
 
 <Frame>
-  <img className="block dark:hidden" src="/images/comparison-light.png" alt="PasteGuard Comparison" />
-  <img className="hidden dark:block" src="/images/comparison-dark.png" alt="PasteGuard Comparison" />
+  <img className="block dark:hidden" src="/images/comparison-light.png" alt="PasteGuard masks names, emails, and API keys before they reach AI" />
+  <img className="hidden dark:block" src="/images/comparison-dark.png" alt="PasteGuard masks names, emails, and API keys before they reach AI" />
 </Frame>
 
-## Works Everywhere
+## One Privacy Layer
 
-<CardGroup cols={2}>
-  <Card title="Chat" icon="comment" href="/use-cases/chat">
-    ChatGPT, Claude, Gemini
+<CardGroup cols={3}>
+  <Card title="Browser Chat" icon="comment" href="/use-cases/chat">
+    ChatGPT, Claude, and Gemini. Browser extension beta.
   </Card>
-  <Card title="Apps" icon="table-columns" href="/use-cases/apps">
-    Open WebUI, LibreChat
+  <Card title="Apps & APIs" icon="plug" href="/use-cases/api-integration">
+    Apps, SDKs, and internal AI products.
   </Card>
-  <Card title="Coding Tools" icon="code" href="/use-cases/coding-tools">
-    Cursor, Claude Code, Copilot, Windsurf
-  </Card>
-  <Card title="API Integration" icon="plug" href="/use-cases/api-integration">
-    OpenAI SDK, Anthropic SDK, LangChain
+  <Card title="Coding Agents" icon="code" href="/use-cases/coding-tools">
+    Codex, Claude Code, Cursor, Windsurf, and other coding agents.
   </Card>
 </CardGroup>
 
-## Two Privacy Modes
+## Built For Raw Data Limits
+
+PasteGuard does not certify your organization as compliant. It gives teams a local or self-hosted control point before requests reach AI providers.
+
+Use it when the current options are manual redaction, no cloud AI for sensitive work, a weaker local-only model, or custom masking code in every app.
+
+<CardGroup cols={2}>
+  <Card title="Regulated Teams" icon="shield-check" href="/use-cases/regulated-teams">
+    Patterns for finance, legal, healthcare, consulting, and other sensitive work.
+  </Card>
+  <Card title="Local-First Privacy" icon="lock" href="/concepts/local-first-privacy">
+    What stays local, what reaches providers, and how placeholders are restored.
+  </Card>
+</CardGroup>
+
+## Privacy Modes
 
 | Mode | How it works |
 |------|--------------|
-| **Mask** | Replace PII with placeholders, send to the upstream AI service, restore in response |
-| **Route** | PII requests stay on your local LLM (Ollama, vLLM, llama.cpp), others go to the configured cloud provider |
-
-PasteGuard runs on your servers. Personal data never leaves your infrastructure, and the LLM provider never sees real names, emails, or secrets.
+| **Mask** | Replace PII and secrets with placeholders, send to the upstream AI service, restore supported placeholders in the response |
+| **Route** | Requests with sensitive data stay on your local LLM; other requests go to the configured cloud provider |
 
 ## Next Steps
 
@@ -44,7 +54,7 @@ PasteGuard runs on your servers. Personal data never leaves your infrastructure,
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Run PasteGuard as a local proxy
   </Card>
-  <Card title="Configuration" icon="gear" href="/configuration/overview">
-    Customize detection and providers
+  <Card title="Installation" icon="box" href="/installation">
+    Configure Docker, persistent logs, and detector settings
   </Card>
 </CardGroup>
