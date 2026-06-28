@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Run PasteGuard as a local proxy
+description: Run PasteGuard locally and connect Browser Chat, Apps & APIs, or Coding Agents
 ---
 
 ## 1. Start PasteGuard
@@ -12,12 +12,26 @@ docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:latest
 PasteGuard runs on `http://localhost:3000`. Open `http://localhost:3000` to see the dashboard.
 
 <Note>
-For custom configuration or persistent logs, see [Installation](/installation).
+For custom configuration, Docker Compose, or persistent logs, see [Installation](/installation).
 </Note>
 
-## 2. API Endpoints
+## 2. Choose Your Path
 
-Point your tools or SDKs to PasteGuard:
+<CardGroup cols={3}>
+  <Card title="Browser Chat" icon="comment" href="/use-cases/chat">
+    Use the browser extension beta with ChatGPT, Claude, and Gemini.
+  </Card>
+  <Card title="Apps & APIs" icon="plug" href="/use-cases/api-integration">
+    Change one base URL for your app or SDK.
+  </Card>
+  <Card title="Coding Agents" icon="code" href="/use-cases/coding-tools">
+    Point Codex, Claude Code, Cursor, and other coding agents at PasteGuard.
+  </Card>
+</CardGroup>
+
+## 3. API Endpoints
+
+Point your app, SDK, or coding agent to PasteGuard:
 
 | Target | PasteGuard URL |
 |----------|----------------|
@@ -25,7 +39,7 @@ Point your tools or SDKs to PasteGuard:
 | Anthropic | `http://localhost:3000/anthropic` |
 | Codex CLI | `http://localhost:3000/codex` |
 
-## 3. Verify It Works
+## 4. Verify It Works
 
 Send a test request and check the response headers:
 
@@ -37,38 +51,22 @@ curl -i http://localhost:3000/openai/v1/chat/completions \
 ```
 
 Look for:
-```
+
+```text
 X-PasteGuard-PII-Detected: true
 X-PasteGuard-PII-Masked: true
 ```
 
 The name and email were masked before reaching OpenAI and restored in the response.
 
-## 4. View Dashboard
+## 5. View Dashboard
 
 Open `http://localhost:3000` in your browser to see:
 
 - Request history
-- Detected PII entities
+- Detected PII and secrets
 - Masked content sent to upstream APIs or Codex CLI
 
 <Frame>
   <img src="/images/dashboard.png" alt="PasteGuard Dashboard" />
 </Frame>
-
-## Now Configure Your Tool
-
-<CardGroup cols={2}>
-  <Card title="Chat" icon="comment" href="/use-cases/chat">
-    ChatGPT, Claude, Gemini
-  </Card>
-  <Card title="Apps" icon="table-columns" href="/use-cases/apps">
-    Open WebUI, LibreChat
-  </Card>
-  <Card title="Coding Tools" icon="code" href="/use-cases/coding-tools">
-    Cursor, Claude Code, Copilot, Windsurf
-  </Card>
-  <Card title="API Integration" icon="plug" href="/use-cases/api-integration">
-    OpenAI SDK, Anthropic SDK, LangChain
-  </Card>
-</CardGroup>

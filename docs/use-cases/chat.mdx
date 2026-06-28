@@ -1,25 +1,41 @@
 ---
-title: Chat
-sidebarTitle: Chat
-description: Mask PII when pasting into ChatGPT, Claude, and Gemini
+title: Browser Chat
+sidebarTitle: Browser Chat
+description: Mask private data before it reaches ChatGPT, Claude, or Gemini
 ---
 
-Paste customer data into ChatGPT — the AI sees `[[PERSON_1]]` and `[[EMAIL_ADDRESS_1]]`. When you copy the response, placeholders are replaced with the originals.
+Browser Chat protects what people already do: paste real context into ChatGPT, Claude, and Gemini.
+
+PasteGuard masks names, emails, account details, customer notes, contracts, support tickets, and other sensitive values before they reach the chat provider. You keep the originals. The AI sees placeholders.
+
+<Note>
+The browser extension is currently in beta.
+</Note>
 
 ## Supported Platforms
 
-- ChatGPT (chatgpt.com)
-- Claude (claude.ai)
-- Google Gemini (gemini.google.com)
+- ChatGPT (`chatgpt.com`)
+- Claude (`claude.ai`)
+- Google Gemini (`gemini.google.com`)
 
 ## How It Works
 
-1. **Paste** — You paste text containing PII into the chat input
-2. **Mask** — The extension detects and masks PII via your local PasteGuard server
-3. **Chat** — The masked text is inserted into the chat. The AI only sees placeholders.
-4. **Copy** — When you copy the AI's response, placeholders are replaced with the original values
+1. **Paste**: You paste text containing PII or secrets into the chat input.
+2. **Mask**: The extension sends text to your local PasteGuard server for masking.
+3. **Chat**: Masked text is inserted into the chat. The provider sees placeholders such as `[[PERSON_1]]` and `[[EMAIL_ADDRESS_1]]`.
+4. **Copy**: When you copy a supported AI response, placeholders are replaced with the original values.
 
-Placeholder numbering stays consistent across messages in the same conversation. Streamed responses are highlighted in real-time.
+Placeholder numbering stays consistent across messages in the same conversation. Streamed responses are highlighted in real time.
+
+## Who This Helps
+
+Browser Chat is useful for teams that want AI help with real work but cannot paste raw sensitive data into third-party chat products:
+
+- Advisors and consultants working with client data
+- Legal teams handling contracts or privileged context
+- Support and success teams working with customer tickets
+- Recruiting and HR teams handling candidate or employee data
+- Finance, insurance, and healthcare-adjacent work with strict confidentiality needs
 
 ## Requirements
 
@@ -31,10 +47,10 @@ docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:latest
 
 See [Quickstart](/quickstart) for setup details.
 
-## Beta
+## Install Browser Extension
 
-The browser extension is in beta. Open source (Apache 2.0).
+The browser extension uses the same detection and masking engine as the local proxy.
 
-<Card title="Join the Beta" icon="flask" href="https://tally.so/r/J9pNLr">
-  Get early access to the browser extension
+<Card title="Install browser extension" icon="flask" href="https://pasteguard.com/browser-extension">
+  Add PasteGuard to Firefox or Chrome
 </Card>

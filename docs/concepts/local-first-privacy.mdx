@@ -1,0 +1,72 @@
+---
+title: Local-First Privacy
+description: What stays local, what reaches AI providers, and how PasteGuard restores placeholders
+---
+
+PasteGuard is designed to put a privacy layer before AI providers. The goal is simple: useful context can still reach the model, but sensitive values are replaced before the request leaves your environment.
+
+## What Stays Local
+
+In a local or self-hosted deployment, PasteGuard keeps the sensitive originals inside your environment.
+
+Examples:
+
+- Names
+- Email addresses
+- Phone numbers
+- Account identifiers
+- API keys
+- Bearer tokens
+- Private keys
+- Connection strings
+
+PasteGuard stores a temporary placeholder mapping so supported responses can be restored before they return to the user.
+
+## What Providers See
+
+Providers receive masked prompts such as:
+
+```text
+Write a follow-up to [[PERSON_1]] at [[EMAIL_ADDRESS_1]] about the renewal.
+```
+
+The model still gets useful structure and context, but not the original private value.
+
+## Restoration
+
+In mask mode, PasteGuard restores supported placeholders in the model response before returning it to the user.
+
+For example:
+
+```text
+Provider response: I can draft a note to [[PERSON_1]].
+User receives: I can draft a note to Dr. Sarah Chen.
+```
+
+Restoration depends on the provider endpoint and response format. OpenAI Chat Completions, Anthropic Messages, and Codex Responses have provider-specific extraction and restoration paths.
+
+## Browser Extension
+
+The browser extension is currently in beta. It uses a local PasteGuard server for masking and restoration so browser chat can follow the same privacy model as the proxy.
+
+## Logs And Dashboard
+
+PasteGuard includes a local dashboard that shows request history, detected entities, and masked content sent upstream when logging is enabled.
+
+Review [Logging](/configuration/logging) before using PasteGuard with production or regulated data. Configure retention and masked-content logging according to your organization's policy.
+
+## Route Mode
+
+Route mode is stricter than mask mode. Requests containing sensitive data can be sent to a local model instead of a cloud provider.
+
+Use route mode when a use case should not send even masked sensitive requests to a cloud model.
+
+<Card title="Route Mode" icon="route" href="/concepts/route-mode">
+  Configure local routing for sensitive requests
+</Card>
+
+## What PasteGuard Does Not Claim
+
+PasteGuard does not by itself certify compliance with DORA, GDPR, HIPAA, SOC 2, or any other framework.
+
+It gives teams a local or self-hosted control point before requests reach model providers.

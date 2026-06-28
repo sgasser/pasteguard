@@ -1,34 +1,23 @@
 ---
-title: Coding Tools
-description: Protect your codebase context and secrets in Claude Code, Cursor, and other AI coding assistants
+title: Coding Agents
+sidebarTitle: Coding Agents
+description: Protect codebase context, logs, tickets, and secrets in Codex, Claude Code, and other coding agents
 ---
 
-PasteGuard protects your codebase when you use AI coding assistants. Config files with database credentials, customer data in test fixtures, API keys in environment files — all masked before reaching the provider.
+Coding agents often receive more than code. They see logs, stack traces, support tickets, config snippets, test fixtures, environment examples, and production context.
+
+PasteGuard sits between the coding agent and the provider, masks PII and secrets before the request leaves your environment, and restores supported placeholders in responses.
 
 ## What Gets Detected
 
-- **Secrets** — API keys, private keys, database passwords, tokens in config files and `.env` files
-- **PII** — Customer names, emails, phone numbers in code comments, test data, or log output
+- **Secrets**: API keys, private keys, database passwords, bearer tokens, JWTs, connection strings, and `.env` values
+- **PII**: Customer names, emails, phone numbers, locations, account data, test fixtures, comments, and log output
 
-PII detection works [in many languages](/installation). Full entity lists: [PII Detection](/concepts/pii-detection), [Secrets Detection](/concepts/secrets-detection).
-
-## Claude Code
-
-One environment variable:
-
-```bash
-ANTHROPIC_BASE_URL=http://localhost:3000/anthropic claude
-```
-
-To make it permanent, add to your shell profile:
-
-```bash
-export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
-```
+PII detection works [in many languages](/concepts/pii-detection). Full entity lists: [PII Detection](/concepts/pii-detection), [Secrets Detection](/concepts/secrets-detection).
 
 ## Codex CLI
 
-Codex users signed in with ChatGPT should use PasteGuard's Codex endpoint, not the OpenAI API endpoint:
+Codex users signed in with ChatGPT should use PasteGuard's Codex endpoint:
 
 ```toml
 model_provider = "pasteguard-codex"
@@ -51,23 +40,37 @@ codex exec --skip-git-repo-check 'Reply with exactly: ok'
 Codex Responses requests are scanned, masked, unmasked, and shown in the dashboard. In route mode, sensitive Codex requests are blocked because PasteGuard does not route Codex Responses traffic to a local provider.
 </Note>
 
+## Claude Code
+
+One environment variable:
+
+```bash
+ANTHROPIC_BASE_URL=http://localhost:3000/anthropic claude
+```
+
+To make it permanent, add to your shell profile:
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
+```
+
 ## Cursor
 
-1. Open **Settings** → **Models**
-2. Scroll to **API Keys** section
-3. Enable **Override OpenAI Base URL** toggle
+1. Open **Settings** -> **Models**
+2. Scroll to **API Keys**
+3. Enable **Override OpenAI Base URL**
 4. Enter: `http://localhost:3000/openai/v1`
 5. Add your OpenAI API key
 
-## Environment Variables
+## Other Coding Agents
 
-Most AI coding tools respect the standard environment variables:
+Most coding agents respect standard provider base URL settings:
 
 ```bash
-# OpenAI-compatible tools
+# OpenAI-compatible agents
 export OPENAI_API_BASE=http://localhost:3000/openai/v1
 
-# Anthropic tools (Claude Code, etc.)
+# Anthropic-compatible agents
 export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
 ```
 
@@ -75,6 +78,6 @@ export ANTHROPIC_BASE_URL=http://localhost:3000/anthropic
 
 | Target | PasteGuard URL |
 |----------|----------------|
-| OpenAI | `http://localhost:3000/openai/v1` |
-| Anthropic | `http://localhost:3000/anthropic` |
+| OpenAI-compatible agents | `http://localhost:3000/openai/v1` |
+| Anthropic-compatible agents | `http://localhost:3000/anthropic` |
 | Codex CLI | `http://localhost:3000/codex` |

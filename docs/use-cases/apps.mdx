@@ -1,10 +1,10 @@
 ---
-title: Apps
-sidebarTitle: Apps
-description: Protect data in Open WebUI, LibreChat, and other self-hosted AI setups
+title: Open WebUI and LibreChat
+sidebarTitle: Open WebUI and LibreChat
+description: Example configuration for self-hosted chat products inside Apps & APIs
 ---
 
-PasteGuard sits between your self-hosted chat interface and the LLM provider. Users interact with Open WebUI, LibreChat, or similar tools — PasteGuard handles privacy automatically in the background.
+Open WebUI and LibreChat are examples inside the Apps & APIs path. Users keep the same chat UI while PasteGuard handles masking, forwarding, restoration, and dashboard logging in the background.
 
 ## Open WebUI
 
@@ -15,7 +15,7 @@ OPENAI_API_BASE_URL=http://localhost:3000/openai/v1
 OPENAI_API_KEY=your_openai_api_key
 ```
 
-<Note>In Docker Compose, use the service name instead of `localhost` (e.g., `http://pasteguard:3000/openai/v1`).</Note>
+<Note>In Docker Compose, use the service name instead of `localhost`, such as `http://pasteguard:3000/openai/v1`.</Note>
 
 ## LibreChat
 
@@ -27,7 +27,7 @@ cache: true
 endpoints:
   custom:
     - name: "PasteGuard"
-      apiKey: "${OPENAI_API_KEY}"  # Your API key, forwarded to OpenAI
+      apiKey: "${OPENAI_API_KEY}"
       baseURL: "http://localhost:3000/openai/v1"
       models:
         default: ["gpt-5.2"]
@@ -42,8 +42,8 @@ Self-hosted setups can use either privacy mode depending on your requirements:
 
 | Mode | Best for | How it works |
 |------|----------|--------------|
-| **Mask** | Teams using cloud LLMs (OpenAI, Anthropic) | Replaces PII with placeholders, sends to cloud provider, restores in response |
-| **Route** | Teams with a local LLM (Ollama, vLLM) | Requests containing PII stay on your local LLM, others go to the cloud provider |
+| **Mask** | Teams using cloud LLMs | Replaces PII and secrets with placeholders, sends to the cloud provider, restores supported placeholders in the response |
+| **Route** | Teams with a local LLM | Requests containing sensitive data stay on your local LLM, others go to the cloud provider |
 
 Route Mode requires a local LLM provider configured in `config.yaml`. See [Route Mode](/concepts/route-mode) for setup details.
 
