@@ -67,7 +67,7 @@ Change one base URL. PasteGuard masks the request, forwards it to the configured
 
 ## Built For Strict Privacy Rules
 
-PasteGuard is not a compliance certification and does not make your system compliant by itself. It is designed for teams that need a local or self-hosted control point before AI providers.
+PasteGuard is a privacy control point before AI providers. It can support regulated workflows, but it does not replace your legal, security, or compliance program.
 
 Use it when your current options are:
 
