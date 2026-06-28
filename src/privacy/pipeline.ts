@@ -1,8 +1,12 @@
 import type { Config } from "../config";
 import type { PlaceholderContext } from "../masking/context";
 import type { RequestExtractor } from "../masking/types";
-import { detectPII, maskPII, type PIIDetectResult } from "./pii";
-import { processSecretsRequest, type SecretsProcessResult, secretPlaceholders } from "./secrets";
+import { detectPII, maskPII, type PIIDetectResult } from "../pii/request";
+import {
+  processSecretsRequest,
+  type SecretsProcessResult,
+  secretPlaceholders,
+} from "../secrets/request";
 
 export type PrivacyPipelineConfig = Pick<Config, "mode" | "secrets_detection">;
 

@@ -23,7 +23,7 @@ mock.module("../pii/detect", () => ({
   }),
 }));
 
-mock.module("../services/logger", () => ({
+mock.module("../logging/logger", () => ({
   logRequest: mockLogRequest,
 }));
 

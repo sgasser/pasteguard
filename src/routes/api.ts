@@ -8,6 +8,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { getConfig, type SecretsDetectionConfig } from "../config";
+import { logRequest, normalizeRequestSource } from "../logging/logger";
 import { createPlaceholderContext, type PlaceholderContext } from "../masking/context";
 import {
   filterAllowlistedEntities,
@@ -18,7 +19,6 @@ import {
 import { mask as maskPII } from "../pii/mask";
 import { detectSecrets } from "../secrets/detect";
 import { maskSecrets } from "../secrets/mask";
-import { logRequest, normalizeRequestSource } from "../services/logger";
 import { createLogData } from "./utils";
 
 export const apiRoutes = new Hono();

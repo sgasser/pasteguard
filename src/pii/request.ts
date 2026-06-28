@@ -1,11 +1,11 @@
 /**
- * PII Service - detect and mask PII in requests
+ * PII request helpers - detect and mask PII in requests
  */
 
 import type { PlaceholderContext } from "../masking/context";
 import type { RequestExtractor } from "../masking/types";
-import { getPIIDetector, type PIIDetectionResult } from "../pii/detect";
-import { createMaskingContext, maskRequest } from "../pii/mask";
+import { getPIIDetector, type PIIDetectionResult } from "./detect";
+import { createMaskingContext, maskRequest } from "./mask";
 
 export interface PIIDetectResult {
   detection: PIIDetectionResult;
@@ -60,8 +60,8 @@ export function maskPII<TRequest, TResponse>(
 }
 
 export type { PlaceholderContext } from "../masking/context";
-export type { PIIDetectionResult, PIIEntity } from "../pii/detect";
-export { createMaskingContext } from "../pii/mask";
+export type { PIIDetectionResult, PIIEntity } from "./detect";
+export { createMaskingContext } from "./mask";
 
 /**
  * Check if the detector is healthy

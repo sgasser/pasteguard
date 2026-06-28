@@ -4,6 +4,8 @@ import { Hono } from "hono";
 import { proxy } from "hono/proxy";
 import { z } from "zod";
 import { getConfig } from "../config";
+import { formatMaskedRequestForLog } from "../logging/log-content";
+import { logRequest } from "../logging/logger";
 import type { PlaceholderContext } from "../masking/context";
 import {
   type CodexResponsesRequest,
@@ -11,17 +13,15 @@ import {
   codexExtractor,
 } from "../masking/extractors/codex";
 import { restoreResponse } from "../masking/restorer";
-import { createCodexUnmaskingStream } from "../providers/codex/stream-transformer";
-import { ProviderError } from "../providers/errors";
-import { formatMaskedRequestForLog } from "../services/log-content";
-import { logRequest } from "../services/logger";
-import type { PIIDetectResult } from "../services/pii";
+import type { PIIDetectResult } from "../pii/request";
 import {
   PrivacyPipelineDetectionError,
   type PrivacyPipelineResult,
   processPrivacyPipeline,
-} from "../services/privacy-pipeline";
-import type { SecretsProcessResult } from "../services/secrets";
+} from "../privacy/pipeline";
+import { createCodexUnmaskingStream } from "../providers/codex/stream-transformer";
+import { ProviderError } from "../providers/errors";
+import type { SecretsProcessResult } from "../secrets/request";
 import {
   createLogData,
   errorFormats,

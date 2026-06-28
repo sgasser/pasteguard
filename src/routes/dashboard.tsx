@@ -4,7 +4,7 @@ import { basicAuth } from "hono/basic-auth";
 import { tailwind } from "hono-tailwind";
 import { z } from "zod";
 import { getConfig } from "../config";
-import { getLogger } from "../services/logger";
+import { getLogger } from "../logging/logger";
 import DashboardPage from "../views/dashboard/page";
 
 const LogsQuerySchema = z.object({

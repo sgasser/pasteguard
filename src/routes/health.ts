@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { getConfig } from "../config";
+import { healthCheck as checkDetector } from "../pii/request";
 import { checkLocalHealth } from "../providers/local";
-import { healthCheck as checkDetector } from "../services/pii";
 
 export const healthRoutes = new Hono();
 

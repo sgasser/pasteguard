@@ -48,5 +48,5 @@ Primary endpoints:
 - `src/routes/` contains HTTP route handlers.
 - `src/providers/` contains provider clients and stream transformers.
 - `src/masking/extractors/` contains provider-specific text extraction and insertion.
-- `src/services/logger.ts` owns SQLite dashboard logging.
+- `src/logging/logger.ts` owns SQLite dashboard logging.
 - `docs/mint.json` registers API reference docs.

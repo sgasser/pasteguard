@@ -1,10 +1,10 @@
 import type { Context } from "hono";
 import { getConfig } from "../config";
+import type { RequestLogData, RequestSource } from "../logging/logger";
+import { logRequest } from "../logging/logger";
+import type { PIIDetectResult } from "../pii/request";
 import { ProviderError } from "../providers/errors";
-import type { RequestLogData, RequestSource } from "../services/logger";
-import { logRequest } from "../services/logger";
-import type { PIIDetectResult } from "../services/pii";
-import type { SecretsProcessResult } from "../services/secrets";
+import type { SecretsProcessResult } from "../secrets/request";
 
 // ============================================================================
 // Error Response Types & Formatting

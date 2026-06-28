@@ -4,6 +4,7 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { getConfig } from "./config";
+import { getLogger } from "./logging/logger";
 import { getPIIDetector } from "./pii/detect";
 import { anthropicRoutes } from "./routes/anthropic";
 import { apiRoutes } from "./routes/api";
@@ -12,7 +13,6 @@ import { dashboardRoutes } from "./routes/dashboard";
 import { healthRoutes } from "./routes/health";
 import { infoRoutes } from "./routes/info";
 import { openaiRoutes } from "./routes/openai";
-import { getLogger } from "./services/logger";
 
 type Variables = {
   requestId: string;

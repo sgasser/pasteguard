@@ -1,12 +1,12 @@
 /**
- * Secrets Service - detect and mask secrets in requests
+ * Secrets request helpers - detect and mask secrets in requests
  */
 
 import type { SecretsDetectionConfig } from "../config";
 import type { PlaceholderContext } from "../masking/context";
 import type { RequestExtractor } from "../masking/types";
-import { detectSecretsInRequest, type MessageSecretsResult } from "../secrets/detect";
-import { maskRequest } from "../secrets/mask";
+import { detectSecretsInRequest, type MessageSecretsResult } from "./detect";
+import { maskRequest } from "./mask";
 
 export interface SecretsProcessResult<TRequest> {
   blocked: boolean;

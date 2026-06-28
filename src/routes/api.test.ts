@@ -20,7 +20,7 @@ mock.module("../pii/detect", () => ({
 }));
 
 // Mock the logger to avoid database operations
-mock.module("../services/logger", () => ({
+mock.module("../logging/logger", () => ({
   logRequest: mock(() => {}),
   normalizeRequestSource: mock((provider: string, sourceHeader?: string | null) =>
     provider === "api" && sourceHeader === "browser-extension" ? "browser_extension" : provider,

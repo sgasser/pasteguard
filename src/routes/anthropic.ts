@@ -2,9 +2,17 @@ import { zValidator } from "@hono/zod-validator";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { getConfig } from "../config";
+import { formatMaskedRequestForLog } from "../logging/log-content";
+import { logRequest } from "../logging/logger";
 import type { PlaceholderContext } from "../masking/context";
 import { anthropicExtractor } from "../masking/extractors/anthropic";
 import { restoreResponse } from "../masking/restorer";
+import type { PIIDetectResult } from "../pii/request";
+import {
+  PrivacyPipelineDetectionError,
+  type PrivacyPipelineResult,
+  processPrivacyPipeline,
+} from "../privacy/pipeline";
 import { callAnthropic } from "../providers/anthropic/client";
 import { createAnthropicUnmaskingStream } from "../providers/anthropic/stream-transformer";
 import {
@@ -13,15 +21,7 @@ import {
   type AnthropicResponse,
 } from "../providers/anthropic/types";
 import { callLocalAnthropic } from "../providers/local";
-import { formatMaskedRequestForLog } from "../services/log-content";
-import { logRequest } from "../services/logger";
-import type { PIIDetectResult } from "../services/pii";
-import {
-  PrivacyPipelineDetectionError,
-  type PrivacyPipelineResult,
-  processPrivacyPipeline,
-} from "../services/privacy-pipeline";
-import type { SecretsProcessResult } from "../services/secrets";
+import type { SecretsProcessResult } from "../secrets/request";
 import {
   createLogData,
   errorFormats,

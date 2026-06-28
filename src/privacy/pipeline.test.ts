@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { openaiExtractor } from "../masking/extractors/openai";
 import type { PIIDetectionResult } from "../pii/detect";
 import type { OpenAIRequest } from "../providers/openai/types";
-import type { PrivacyPipelineConfig } from "./privacy-pipeline";
+import type { PrivacyPipelineConfig } from "./pipeline";
 
 const sampleSecret = "sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx";
 
@@ -29,9 +29,7 @@ mock.module("../pii/detect", () => ({
   }),
 }));
 
-const { PrivacyPipelineDetectionError, processPrivacyPipeline } = await import(
-  "./privacy-pipeline"
-);
+const { PrivacyPipelineDetectionError, processPrivacyPipeline } = await import("./pipeline");
 
 const baseConfig: PrivacyPipelineConfig = {
   mode: "mask",
