@@ -58,9 +58,7 @@ openaiRoutes.post(
 
     let privacy: PrivacyPipelineResult<OpenAIRequest>;
     try {
-      privacy = await processPrivacyPipeline(request, config, openaiExtractor, {
-        maskPII: config.mode === "mask",
-      });
+      privacy = await processPrivacyPipeline(request, config, openaiExtractor);
     } catch (error) {
       if (error instanceof PrivacyPipelineDetectionError) {
         console.error("PII detection error:", error.cause ?? error);

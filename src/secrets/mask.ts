@@ -2,19 +2,10 @@
  * Secrets masking
  */
 
-import type { MaskingConfig } from "../config";
 import { resolveOverlaps } from "../masking/conflict-resolver";
 import { incrementAndGenerate } from "../masking/context";
 import { generateSecretPlaceholder } from "../masking/placeholders";
-import { createRestoreFormatter } from "../masking/restore-policy";
-import { restoreText } from "../masking/restorer";
-import {
-  createMaskingContext,
-  flushMaskingBuffer as flushBuffer,
-  maskSpans,
-  type PlaceholderContext,
-  unmaskStreamChunk as unmaskChunk,
-} from "../masking/service";
+import { createMaskingContext, maskSpans, type PlaceholderContext } from "../masking/service";
 import type { RequestExtractor, TextSpan } from "../masking/types";
 import type { MessageSecretsResult, SecretLocation } from "./detect";
 
@@ -62,52 +53,6 @@ export function maskSecrets(
     masked: result.maskedSpans[0]?.maskedText ?? text,
     context: result.context,
   };
-}
-
-/**
- * Unmasks text by replacing placeholders with original secrets
- */
-export function unmaskSecrets(
-  text: string,
-  context: PlaceholderContext,
-  config: MaskingConfig,
-): string {
-  return restoreText(text, context, config);
-}
-
-/**
- * Streaming unmask helper - processes chunks and unmasks when complete placeholders are found
- */
-export function unmaskSecretsStreamChunk(
-  buffer: string,
-  newChunk: string,
-  context: PlaceholderContext,
-  config: MaskingConfig,
-): { output: string; remainingBuffer: string } {
-  return unmaskChunk(buffer, newChunk, context, createRestoreFormatter(config));
-}
-
-/**
- * Flushes remaining buffer at end of stream
- */
-export function flushSecretsMaskingBuffer(
-  buffer: string,
-  context: PlaceholderContext,
-  config: MaskingConfig,
-): string {
-  return flushBuffer(buffer, context, createRestoreFormatter(config));
-}
-
-/**
- * Unmasks secrets in a response using an extractor
- */
-export function unmaskSecretsResponse<TRequest, TResponse>(
-  response: TResponse,
-  context: PlaceholderContext,
-  config: MaskingConfig,
-  extractor: RequestExtractor<TRequest, TResponse>,
-): TResponse {
-  return extractor.unmaskResponse(response, context, createRestoreFormatter(config));
 }
 
 /**

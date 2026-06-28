@@ -84,9 +84,7 @@ anthropicRoutes.post(
 
     let privacy: PrivacyPipelineResult<AnthropicRequest>;
     try {
-      privacy = await processPrivacyPipeline(request, config, anthropicExtractor, {
-        maskPII: config.mode === "mask",
-      });
+      privacy = await processPrivacyPipeline(request, config, anthropicExtractor);
     } catch (error) {
       if (error instanceof PrivacyPipelineDetectionError) {
         console.error("PII detection error:", error.cause ?? error);

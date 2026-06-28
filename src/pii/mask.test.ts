@@ -1,32 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { MaskingConfig } from "../config";
+import { restorePlaceholders } from "../masking/context";
 import { openaiExtractor } from "../masking/extractors/openai";
-import type { OpenAIMessage, OpenAIRequest, OpenAIResponse } from "../providers/openai/types";
+import type { OpenAIMessage, OpenAIRequest } from "../providers/openai/types";
 import { createPIIResultFromSpans } from "../test-utils/detection-results";
 import type { PIIEntity } from "./detect";
-import {
-  createMaskingContext,
-  flushMaskingBuffer,
-  mask,
-  maskRequest,
-  unmask,
-  unmaskResponse,
-  unmaskStreamChunk,
-} from "./mask";
-
-const defaultConfig: MaskingConfig = {
-  show_markers: false,
-  marker_text: "[protected]",
-  allowlist: [],
-  denylist: [],
-};
-
-const configWithMarkers: MaskingConfig = {
-  show_markers: true,
-  marker_text: "[protected]",
-  allowlist: [],
-  denylist: [],
-};
+import { mask, maskRequest } from "./mask";
 
 /** Helper to create a minimal request from messages */
 function createRequest(messages: OpenAIMessage[]): OpenAIRequest {
@@ -61,54 +39,6 @@ describe("PII placeholder format", () => {
     const result = mask("Hans Müller: hans@firma.de", entities);
 
     expect(result.masked).toBe("[[PERSON_1]]: [[EMAIL_ADDRESS_1]]");
-  });
-});
-
-describe("marker feature", () => {
-  test("adds markers when show_markers is true", () => {
-    const context = createMaskingContext();
-    context.mapping["[[EMAIL_ADDRESS_1]]"] = "john@example.com";
-
-    const result = unmask("Email: [[EMAIL_ADDRESS_1]]", context, configWithMarkers);
-    expect(result).toBe("Email: [protected]john@example.com");
-  });
-
-  test("no markers when show_markers is false", () => {
-    const context = createMaskingContext();
-    context.mapping["[[EMAIL_ADDRESS_1]]"] = "john@example.com";
-
-    const result = unmask("Email: [[EMAIL_ADDRESS_1]]", context, defaultConfig);
-    expect(result).toBe("Email: john@example.com");
-  });
-
-  test("markers work with streaming", () => {
-    const context = createMaskingContext();
-    context.mapping["[[PERSON_1]]"] = "John Doe";
-
-    const { output } = unmaskStreamChunk("", "Hello [[PERSON_1]]!", context, configWithMarkers);
-    expect(output).toBe("Hello [protected]John Doe!");
-  });
-
-  test("markers work with response unmasking", () => {
-    const context = createMaskingContext();
-    context.mapping["[[PERSON_1]]"] = "John Doe";
-
-    const response: OpenAIResponse = {
-      id: "test",
-      object: "chat.completion",
-      created: 1234567890,
-      model: "gpt-4",
-      choices: [
-        {
-          index: 0,
-          message: { role: "assistant", content: "Hello [[PERSON_1]]" },
-          finish_reason: "stop",
-        },
-      ],
-    };
-
-    const result = unmaskResponse(response, context, configWithMarkers, openaiExtractor);
-    expect(result.choices[0].message.content).toBe("Hello [protected]John Doe");
   });
 });
 
@@ -157,46 +87,6 @@ describe("maskRequest with PIIDetectionResult", () => {
     const content = masked.messages[0].content as Array<{ type: string; text?: string }>;
     expect(content[0].text).toBe("Contact [[EMAIL_ADDRESS_1]]");
     expect(content[1].type).toBe("image_url");
-  });
-});
-
-describe("streaming with PII placeholders", () => {
-  test("buffers partial [[TYPE placeholder", () => {
-    const context = createMaskingContext();
-    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
-
-    const { output, remainingBuffer } = unmaskStreamChunk(
-      "",
-      "Hello [[EMAIL_ADD",
-      context,
-      defaultConfig,
-    );
-
-    expect(output).toBe("Hello ");
-    expect(remainingBuffer).toBe("[[EMAIL_ADD");
-  });
-
-  test("completes buffered placeholder across chunks", () => {
-    const context = createMaskingContext();
-    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
-
-    const { output, remainingBuffer } = unmaskStreamChunk(
-      "[[EMAIL_ADD",
-      "RESS_1]] there",
-      context,
-      defaultConfig,
-    );
-
-    expect(output).toBe("test@test.com there");
-    expect(remainingBuffer).toBe("");
-  });
-
-  test("flushes remaining buffer at end of stream", () => {
-    const context = createMaskingContext();
-    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
-
-    const flushed = flushMaskingBuffer("[[EMAIL_ADD", context, defaultConfig);
-    expect(flushed).toBe("[[EMAIL_ADD");
   });
 });
 
@@ -255,74 +145,10 @@ describe("mask -> unmask roundtrip", () => {
     expect(masked).not.toContain("+49123456789");
 
     const llmResponse = `I see ${masked.match(/\[\[PERSON_1\]\]/)?.[0]}, email ${masked.match(/\[\[EMAIL_ADDRESS_1\]\]/)?.[0]}`;
-    const unmasked = unmask(llmResponse, context, defaultConfig);
+    const unmasked = restorePlaceholders(llmResponse, context);
 
     expect(unmasked).toContain("Hans Müller");
     expect(unmasked).toContain("hans@firma.de");
-  });
-});
-
-describe("HTML context handling", () => {
-  test("unmasks placeholders in HTML without encoding issues", () => {
-    const context = createMaskingContext();
-    context.mapping["[[PERSON_1]]"] = "Dr. Sarah Chen";
-    context.mapping["[[EMAIL_ADDRESS_1]]"] = "sarah.chen@hospital.org";
-
-    const htmlResponse = `<p>Contact [[PERSON_1]] at [[EMAIL_ADDRESS_1]]</p>`;
-    const result = unmask(htmlResponse, context, defaultConfig);
-
-    expect(result).toBe("<p>Contact Dr. Sarah Chen at sarah.chen@hospital.org</p>");
-  });
-
-  test("works with complex HTML structures", () => {
-    const context = createMaskingContext();
-    context.mapping["[[PERSON_1]]"] = "Dr. Sarah Chen";
-    context.mapping["[[EMAIL_ADDRESS_1]]"] = "sarah@hospital.org";
-
-    const complexHtml = `
-      <div class="profile">
-        <h1>[[PERSON_1]]</h1>
-        <a href="mailto:[[EMAIL_ADDRESS_1]]">[[EMAIL_ADDRESS_1]]</a>
-      </div>
-    `;
-
-    const result = unmask(complexHtml, context, defaultConfig);
-
-    expect(result).toContain("Dr. Sarah Chen");
-    expect(result).toContain("sarah@hospital.org");
-    expect(result).not.toContain("[[");
-  });
-});
-
-describe("unmaskResponse", () => {
-  test("unmasks all choices in response", () => {
-    const context = createMaskingContext();
-    context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";
-    context.mapping["[[PERSON_1]]"] = "John Doe";
-
-    const response: OpenAIResponse = {
-      id: "chatcmpl-123",
-      object: "chat.completion",
-      created: 1234567890,
-      model: "gpt-4",
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: "assistant",
-            content: "Contact [[PERSON_1]] at [[EMAIL_ADDRESS_1]]",
-          },
-          finish_reason: "stop",
-        },
-      ],
-      usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
-    };
-
-    const result = unmaskResponse(response, context, defaultConfig, openaiExtractor);
-
-    expect(result.choices[0].message.content).toBe("Contact John Doe at test@test.com");
-    expect(result.id).toBe("chatcmpl-123");
-    expect(result.model).toBe("gpt-4");
   });
 });
 
@@ -334,14 +160,14 @@ describe("edge cases", () => {
     const { masked, context } = mask(text, entities);
     expect(masked).toBe("Kontakt: [[PERSON_1]]");
 
-    const unmasked = unmask(masked, context, defaultConfig);
+    const unmasked = restorePlaceholders(masked, context);
     expect(unmasked).toBe("Kontakt: François Müller");
   });
 
   test("handles empty text", () => {
     const { masked, context } = mask("", []);
     expect(masked).toBe("");
-    expect(unmask("", context, defaultConfig)).toBe("");
+    expect(restorePlaceholders("", context)).toBe("");
   });
 
   test("reuses placeholder for duplicate values", () => {

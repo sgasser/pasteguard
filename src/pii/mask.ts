@@ -1,19 +1,10 @@
-import type { MaskingConfig } from "../config";
 import { resolveConflicts } from "../masking/conflict-resolver";
 import { incrementAndGenerate } from "../masking/context";
 import {
   generatePlaceholder as generatePlaceholderFromFormat,
   PII_PLACEHOLDER_FORMAT,
 } from "../masking/placeholders";
-import { createRestoreFormatter } from "../masking/restore-policy";
-import { restoreText } from "../masking/restorer";
-import {
-  flushMaskingBuffer as flushBuffer,
-  type MaskSpansResult,
-  maskSpans,
-  type PlaceholderContext,
-  unmaskStreamChunk as unmaskChunk,
-} from "../masking/service";
+import { type MaskSpansResult, maskSpans, type PlaceholderContext } from "../masking/service";
 import type { RequestExtractor, TextSpan } from "../masking/types";
 import type { PIIDetectionResult, PIIEntity } from "./detect";
 
@@ -51,27 +42,6 @@ export function mask(
     masked: result.maskedSpans[0]?.maskedText ?? text,
     context: result.context,
   };
-}
-
-export function unmask(text: string, context: PlaceholderContext, config: MaskingConfig): string {
-  return restoreText(text, context, config);
-}
-
-export function unmaskStreamChunk(
-  buffer: string,
-  newChunk: string,
-  context: PlaceholderContext,
-  config: MaskingConfig,
-): { output: string; remainingBuffer: string } {
-  return unmaskChunk(buffer, newChunk, context, createRestoreFormatter(config));
-}
-
-export function flushMaskingBuffer(
-  buffer: string,
-  context: PlaceholderContext,
-  config: MaskingConfig,
-): string {
-  return flushBuffer(buffer, context, createRestoreFormatter(config));
 }
 
 export interface MaskRequestResult<TRequest> {
@@ -115,13 +85,4 @@ function maskSpansWithEntities(
     resolveConflicts,
     existingContext,
   );
-}
-
-export function unmaskResponse<TRequest, TResponse>(
-  response: TResponse,
-  context: PlaceholderContext,
-  config: MaskingConfig,
-  extractor: RequestExtractor<TRequest, TResponse>,
-): TResponse {
-  return extractor.unmaskResponse(response, context, createRestoreFormatter(config));
 }

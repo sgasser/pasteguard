@@ -101,21 +101,6 @@ export function createMaskingContext(): PlaceholderContext {
 }
 
 /**
- * Unmasks text by replacing placeholders with original values
- *
- * @param text - Text containing placeholders
- * @param context - Masking context with mappings
- * @param formatValue - Optional function to format restored values
- */
-export function unmask(
-  text: string,
-  context: PlaceholderContext,
-  formatValue?: (original: string) => string,
-): string {
-  return restorePlaceholders(text, context, formatValue);
-}
-
-/**
  * Processes a stream chunk, buffering partial placeholders
  *
  * @param buffer - Previous buffer content

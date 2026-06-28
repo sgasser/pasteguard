@@ -66,9 +66,7 @@ codexRoutes.post(
 
     let privacy: PrivacyPipelineResult<CodexResponsesRequest>;
     try {
-      privacy = await processPrivacyPipeline(request, config, codexExtractor, {
-        maskPII: config.mode === "mask",
-      });
+      privacy = await processPrivacyPipeline(request, config, codexExtractor);
     } catch (error) {
       if (error instanceof PrivacyPipelineDetectionError) {
         console.error("PII detection error:", error.cause ?? error);

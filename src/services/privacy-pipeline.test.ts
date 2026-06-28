@@ -101,7 +101,6 @@ describe("processPrivacyPipeline", () => {
     );
 
     expect(result.request.messages[0].content).toBe("Email [[EMAIL_ADDRESS_1]]");
-    expect(result.piiMasked).toBe(true);
     expect(result.piiMaskingContext?.mapping["[[EMAIL_ADDRESS_1]]"]).toBe("jane@example.com");
   });
 

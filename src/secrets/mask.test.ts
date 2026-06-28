@@ -1,34 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import type { MaskingConfig } from "../config";
-import { anthropicExtractor } from "../masking/extractors/anthropic";
-import { type CodexResponsesResponse, codexExtractor } from "../masking/extractors/codex";
+import { restorePlaceholders } from "../masking/context";
 import { openaiExtractor } from "../masking/extractors/openai";
-import type { AnthropicResponse } from "../providers/anthropic/types";
-import type { OpenAIMessage, OpenAIRequest, OpenAIResponse } from "../providers/openai/types";
+import type { OpenAIMessage, OpenAIRequest } from "../providers/openai/types";
 import { createSecretsResultFromSpans } from "../test-utils/detection-results";
 import type { SecretLocation } from "./detect";
-import {
-  createSecretsMaskingContext,
-  flushSecretsMaskingBuffer,
-  maskRequest,
-  maskSecrets,
-  unmaskSecrets,
-  unmaskSecretsResponse,
-  unmaskSecretsStreamChunk,
-} from "./mask";
+import { createSecretsMaskingContext, maskRequest, maskSecrets } from "./mask";
 
 const sampleSecret = "sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx";
 const stripeSecret = "sk_live_abc123def456ghi789jkl012";
-const defaultConfig: MaskingConfig = {
-  show_markers: false,
-  marker_text: "[protected]",
-  allowlist: [],
-  denylist: [],
-};
-const markerConfig: MaskingConfig = {
-  ...defaultConfig,
-  show_markers: true,
-};
 
 /** Helper to create a minimal request from messages */
 function createRequest(messages: OpenAIMessage[]): OpenAIRequest {
@@ -152,59 +131,6 @@ describe("maskRequest with MessageSecretsResult", () => {
   });
 });
 
-describe("streaming with secrets placeholders", () => {
-  test("buffers partial [[ placeholder", () => {
-    const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
-
-    const { output, remainingBuffer } = unmaskSecretsStreamChunk(
-      "",
-      "Key: [[API_KEY",
-      context,
-      defaultConfig,
-    );
-
-    expect(output).toBe("Key: ");
-    expect(remainingBuffer).toBe("[[API_KEY");
-  });
-
-  test("completes buffered placeholder across chunks", () => {
-    const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
-
-    const { output, remainingBuffer } = unmaskSecretsStreamChunk(
-      "[[API_KEY",
-      "_SK_1]] done",
-      context,
-      defaultConfig,
-    );
-
-    expect(output).toBe(`${sampleSecret} done`);
-    expect(remainingBuffer).toBe("");
-  });
-
-  test("flushes incomplete buffer as-is", () => {
-    const context = createSecretsMaskingContext();
-    const result = flushSecretsMaskingBuffer("[[API_KEY", context, defaultConfig);
-    expect(result).toBe("[[API_KEY");
-  });
-
-  test("adds markers to streamed secret restoration when show_markers is true", () => {
-    const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
-
-    const { output, remainingBuffer } = unmaskSecretsStreamChunk(
-      "",
-      "Key: [[API_KEY_SK_1]]",
-      context,
-      markerConfig,
-    );
-
-    expect(output).toBe(`Key: [protected]${sampleSecret}`);
-    expect(remainingBuffer).toBe("");
-  });
-});
-
 describe("mask -> unmask roundtrip", () => {
   test("preserves original data through roundtrip", () => {
     const originalText = `
@@ -225,130 +151,8 @@ Please store them securely.
     expect(masked).not.toContain(sampleSecret);
     expect(masked).toContain("[[API_KEY_SK_1]]");
 
-    const restored = unmaskSecrets(masked, context, defaultConfig);
+    const restored = restorePlaceholders(masked, context);
     expect(restored).toBe(originalText);
-  });
-
-  test("does not add markers when show_markers is false", () => {
-    const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
-
-    const restored = unmaskSecrets("Key: [[API_KEY_SK_1]]", context, defaultConfig);
-
-    expect(restored).toBe(`Key: ${sampleSecret}`);
-  });
-});
-
-describe("unmaskSecretsResponse", () => {
-  test("unmasks all OpenAI choices in response", () => {
-    const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
-
-    const response: OpenAIResponse = {
-      id: "test",
-      object: "chat.completion",
-      created: Date.now(),
-      model: "gpt-4",
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: "assistant",
-            content: "Your key is [[API_KEY_SK_1]]",
-          },
-          finish_reason: "stop",
-        },
-      ],
-    };
-
-    const result = unmaskSecretsResponse(response, context, defaultConfig, openaiExtractor);
-    expect(result.choices[0].message.content).toBe(`Your key is ${sampleSecret}`);
-  });
-
-  test("adds markers to OpenAI response secrets when show_markers is true", () => {
-    const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
-
-    const response: OpenAIResponse = {
-      id: "test",
-      object: "chat.completion",
-      created: Date.now(),
-      model: "gpt-4",
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: "assistant",
-            content: "Your key is [[API_KEY_SK_1]]",
-          },
-          finish_reason: "stop",
-        },
-      ],
-    };
-
-    const result = unmaskSecretsResponse(response, context, markerConfig, openaiExtractor);
-    expect(result.choices[0].message.content).toBe(`Your key is [protected]${sampleSecret}`);
-  });
-
-  test("adds markers to Anthropic response secrets when show_markers is true", () => {
-    const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
-
-    const response: AnthropicResponse = {
-      id: "msg_test",
-      type: "message",
-      role: "assistant",
-      content: [{ type: "text", text: "Your key is [[API_KEY_SK_1]]" }],
-      model: "claude-3-5-sonnet",
-      stop_reason: "end_turn",
-      stop_sequence: null,
-      usage: { input_tokens: 10, output_tokens: 5 },
-    };
-
-    const result = unmaskSecretsResponse(response, context, markerConfig, anthropicExtractor);
-    expect(result.content[0]).toEqual({
-      type: "text",
-      text: `Your key is [protected]${sampleSecret}`,
-    });
-  });
-
-  test("adds markers to Codex response secrets when show_markers is true", () => {
-    const context = createSecretsMaskingContext();
-    context.mapping["[[API_KEY_SK_1]]"] = sampleSecret;
-
-    const response: CodexResponsesResponse = {
-      output: [{ content: [{ type: "output_text", text: "Your key is [[API_KEY_SK_1]]" }] }],
-    };
-
-    const result = unmaskSecretsResponse(response, context, markerConfig, codexExtractor);
-    expect(result).toEqual({
-      output: [
-        { content: [{ type: "output_text", text: `Your key is [protected]${sampleSecret}` }] },
-      ],
-    });
-  });
-
-  test("preserves response structure", () => {
-    const context = createSecretsMaskingContext();
-    const response: OpenAIResponse = {
-      id: "test-id",
-      object: "chat.completion",
-      created: 12345,
-      model: "gpt-4-turbo",
-      choices: [
-        {
-          index: 0,
-          message: { role: "assistant", content: "Hello" },
-          finish_reason: "stop",
-        },
-      ],
-      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-    };
-
-    const result = unmaskSecretsResponse(response, context, defaultConfig, openaiExtractor);
-    expect(result.id).toBe("test-id");
-    expect(result.model).toBe("gpt-4-turbo");
-    expect(result.usage).toEqual({ prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 });
   });
 });
 
