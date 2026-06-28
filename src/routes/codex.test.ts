@@ -36,6 +36,8 @@ const originalFetch = globalThis.fetch;
 const config = getConfig();
 const originalMode = config.mode;
 const originalSecretsAction = config.secrets_detection.action;
+const originalShowMarkers = config.masking.show_markers;
+const originalMarkerText = config.masking.marker_text;
 
 interface CapturedRequest {
   url: string;
@@ -48,6 +50,8 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
   config.mode = originalMode;
   config.secrets_detection.action = originalSecretsAction;
+  config.masking.show_markers = originalShowMarkers;
+  config.masking.marker_text = originalMarkerText;
   mockAnalyzeRequest.mockResolvedValue({
     hasPII: false,
     spanEntities: [],
@@ -310,6 +314,41 @@ describe("Codex proxy", () => {
     expect(dataLine).toBeDefined();
     const parsed = JSON.parse(dataLine!.slice(6)) as { delta: string };
     expect(parsed.delta).toBe(`Key ${secret}`);
+  });
+
+  test("adds markers to streamed Codex secrets when show_markers is true", async () => {
+    config.masking.show_markers = true;
+    config.masking.marker_text = "[protected]";
+
+    const secret =
+      "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAtest\n-----END RSA PRIVATE KEY-----";
+
+    globalThis.fetch = (async (_input: string | URL | Request, _init?: RequestInit) =>
+      Promise.resolve(
+        new Response(
+          'data: {"type":"response.output_text.delta","delta":"Key [[PEM_PRIVATE_KEY_1]]"}\n\n',
+          {
+            status: 200,
+            headers: { "Content-Type": "text/event-stream" },
+          },
+        ),
+      )) as typeof fetch;
+
+    const res = await app.request("/codex/responses", {
+      method: "POST",
+      body: JSON.stringify({ model: "gpt-5.5", input: `Key ${secret}` }),
+      headers: {
+        Authorization: "Bearer chatgpt-token",
+        "Content-Type": "application/json",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const dataLine = text.split("\n").find((line) => line.startsWith("data: "));
+    expect(dataLine).toBeDefined();
+    const parsed = JSON.parse(dataLine!.slice(6)) as { delta: string };
+    expect(parsed.delta).toBe(`Key [protected]${secret}`);
   });
 
   test("logs only an error when a non-streaming Codex response is invalid JSON", async () => {

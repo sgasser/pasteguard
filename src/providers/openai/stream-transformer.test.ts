@@ -9,6 +9,10 @@ const defaultConfig: MaskingConfig = {
   allowlist: [],
   denylist: [],
 };
+const markerConfig: MaskingConfig = {
+  ...defaultConfig,
+  show_markers: true,
+};
 
 function createSSEStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -212,5 +216,23 @@ describe("createUnmaskingStream", () => {
     expect(result).toContain('"reference_ids":["ref"]');
     expect(result).toContain('"type":"text"');
     expect(result).toContain('"text":"Hello John"');
+  });
+
+  test("adds markers to streamed secrets when show_markers is true", async () => {
+    const piiContext = createMaskingContext();
+    const secretsContext = createMaskingContext();
+    secretsContext.mapping["[[API_KEY_SK_1]]"] = "sk-secret";
+
+    const chunks = [
+      `data: {"choices":[{"delta":{"content":"Key: [[API_KEY"}}]}\n\n`,
+      `data: {"choices":[{"delta":{"content":"_SK_1]]"}}]}\n\n`,
+    ];
+    const source = createSSEStream(chunks);
+
+    const unmaskedStream = createUnmaskingStream(source, piiContext, markerConfig, secretsContext);
+    const result = await consumeStream(unmaskedStream);
+
+    expect(result).toContain("[protected]sk-secret");
+    expect(result).not.toContain("[[API_KEY_SK_1]]");
   });
 });

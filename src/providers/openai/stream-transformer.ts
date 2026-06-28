@@ -32,6 +32,7 @@ function unmaskTextContent(
       nextSecretsBuffer,
       processedText,
       secretsContext,
+      config,
     );
     nextSecretsBuffer = remainingBuffer;
     processedText = output;
@@ -145,7 +146,7 @@ export function createUnmaskingStream(
             }
 
             if (secretsBuffer && secretsContext) {
-              flushed += flushSecretsMaskingBuffer(secretsBuffer, secretsContext);
+              flushed += flushSecretsMaskingBuffer(secretsBuffer, secretsContext, config);
             } else if (secretsBuffer) {
               flushed += secretsBuffer;
             }

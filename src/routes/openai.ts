@@ -255,18 +255,18 @@ async function sendToOpenAI(c: Context, originalRequest: OpenAIRequest, opts: Op
       return respondStreaming(
         c,
         result,
+        config.masking,
         piiMaskingContext,
         secretsResult.maskingContext,
-        config.masking,
       );
     }
 
     return respondJson(
       c,
       result.response,
+      config.masking,
       piiMaskingContext,
       secretsResult.maskingContext,
-      config.masking,
     );
   } catch (error) {
     return handleProviderError(
@@ -349,9 +349,9 @@ async function sendToLocal(c: Context, originalRequest: OpenAIRequest, opts: Loc
 function respondStreaming(
   c: Context,
   result: ProviderResult & { isStreaming: true },
+  maskingConfig: MaskingConfig,
   piiContext?: PlaceholderContext,
   secretsContext?: PlaceholderContext,
-  maskingConfig?: MaskingConfig,
 ) {
   setStreamingHeaders(c);
 
@@ -359,7 +359,7 @@ function respondStreaming(
     const stream = createUnmaskingStream(
       result.response,
       piiContext,
-      maskingConfig!,
+      maskingConfig,
       secretsContext,
     );
     return c.body(stream);
@@ -371,17 +371,17 @@ function respondStreaming(
 function respondJson(
   c: Context,
   response: OpenAIResponse,
+  maskingConfig: MaskingConfig,
   piiContext?: PlaceholderContext,
   secretsContext?: PlaceholderContext,
-  maskingConfig?: MaskingConfig,
 ) {
   let result = response;
 
   if (piiContext) {
-    result = unmaskPIIResponse(result, piiContext, maskingConfig!, openaiExtractor);
+    result = unmaskPIIResponse(result, piiContext, maskingConfig, openaiExtractor);
   }
   if (secretsContext) {
-    result = unmaskSecretsResponse(result, secretsContext, openaiExtractor);
+    result = unmaskSecretsResponse(result, secretsContext, maskingConfig, openaiExtractor);
   }
 
   return c.json(result);

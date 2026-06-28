@@ -384,7 +384,7 @@ function respondJson(
     result = unmaskPIIResponse(result, piiContext, maskingConfig, codexExtractor);
   }
   if (secretsContext) {
-    result = unmaskSecretsResponse(result, secretsContext, codexExtractor);
+    result = unmaskSecretsResponse(result, secretsContext, maskingConfig, codexExtractor);
   }
 
   return c.json(result);
@@ -431,6 +431,7 @@ function createCodexUnmaskingStream(
             secretsBuffer,
             span.text,
             secretsContext,
+            maskingConfig,
           );
           secretsBuffer = remainingBuffer;
           return { ...span, maskedText: output };
@@ -494,7 +495,7 @@ function createCodexUnmaskingStream(
         if (secretsContext && secretsBuffer) {
           finalOutput += `data: ${JSON.stringify({
             type: "response.output_text.delta",
-            delta: flushSecretsMaskingBuffer(secretsBuffer, secretsContext),
+            delta: flushSecretsMaskingBuffer(secretsBuffer, secretsContext, maskingConfig),
           })}\n\n`;
         }
         if (finalOutput) {

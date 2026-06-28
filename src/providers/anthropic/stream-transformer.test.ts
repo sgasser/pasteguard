@@ -9,6 +9,10 @@ const defaultConfig: MaskingConfig = {
   allowlist: [],
   denylist: [],
 };
+const markerConfig: MaskingConfig = {
+  ...defaultConfig,
+  show_markers: true,
+};
 
 /**
  * Helper to create a ReadableStream from Anthropic SSE data
@@ -219,6 +223,26 @@ describe("createAnthropicUnmaskingStream", () => {
     const result = await consumeStream(unmaskedStream);
 
     expect(result).toContain("secret-key-value");
+  });
+
+  test("adds markers to streamed secrets when show_markers is true", async () => {
+    const piiContext = createMaskingContext();
+    const secretsContext = createMaskingContext();
+    secretsContext.mapping["[[SECRET_API_KEY_1]]"] = "sk-secret";
+
+    const chunks = [createTextDelta("Key: [[SECRET_"), createTextDelta("API_KEY_1]]")];
+    const source = createSSEStream(chunks);
+
+    const unmaskedStream = createAnthropicUnmaskingStream(
+      source,
+      piiContext,
+      markerConfig,
+      secretsContext,
+    );
+    const result = await consumeStream(unmaskedStream);
+
+    expect(result).toContain("[protected]sk-secret");
+    expect(result).not.toContain("[[SECRET_API_KEY_1]]");
   });
 
   test("unmasks both PII and secrets", async () => {

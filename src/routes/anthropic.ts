@@ -419,7 +419,7 @@ function respondJson(
   }
 
   if (secretsContext) {
-    result = unmaskSecretsResponse(result, secretsContext, anthropicExtractor);
+    result = unmaskSecretsResponse(result, secretsContext, config.masking, anthropicExtractor);
   }
 
   return c.json(result);

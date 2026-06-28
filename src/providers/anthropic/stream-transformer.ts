@@ -38,7 +38,7 @@ export function createAnthropicUnmaskingStream(
             }
 
             if (secretsBuffer && secretsContext) {
-              flushed += flushSecretsMaskingBuffer(secretsBuffer, secretsContext);
+              flushed += flushSecretsMaskingBuffer(secretsBuffer, secretsContext, config);
             } else if (secretsBuffer) {
               flushed += secretsBuffer;
             }
@@ -103,6 +103,7 @@ export function createAnthropicUnmaskingStream(
                       secretsBuffer,
                       processedText,
                       secretsContext,
+                      config,
                     );
                     secretsBuffer = remainingBuffer;
                     processedText = output;

@@ -2,6 +2,7 @@
  * Secrets masking
  */
 
+import type { MaskingConfig } from "../config";
 import { resolveOverlaps } from "../masking/conflict-resolver";
 import { incrementAndGenerate } from "../masking/context";
 import { generateSecretPlaceholder } from "../masking/placeholders";
@@ -36,6 +37,10 @@ function generatePlaceholder(secretType: string, context: PlaceholderContext): s
   return incrementAndGenerate(secretType, context, generateSecretPlaceholder);
 }
 
+function getFormatValue(config: MaskingConfig): ((original: string) => string) | undefined {
+  return config.show_markers ? (original: string) => `${config.marker_text}${original}` : undefined;
+}
+
 /**
  * Masks secrets in text, replacing them with placeholders
  */
@@ -65,8 +70,12 @@ export function maskSecrets(
 /**
  * Unmasks text by replacing placeholders with original secrets
  */
-export function unmaskSecrets(text: string, context: PlaceholderContext): string {
-  return unmaskText(text, context);
+export function unmaskSecrets(
+  text: string,
+  context: PlaceholderContext,
+  config: MaskingConfig,
+): string {
+  return unmaskText(text, context, getFormatValue(config));
 }
 
 /**
@@ -76,15 +85,20 @@ export function unmaskSecretsStreamChunk(
   buffer: string,
   newChunk: string,
   context: PlaceholderContext,
+  config: MaskingConfig,
 ): { output: string; remainingBuffer: string } {
-  return unmaskChunk(buffer, newChunk, context);
+  return unmaskChunk(buffer, newChunk, context, getFormatValue(config));
 }
 
 /**
  * Flushes remaining buffer at end of stream
  */
-export function flushSecretsMaskingBuffer(buffer: string, context: PlaceholderContext): string {
-  return flushBuffer(buffer, context);
+export function flushSecretsMaskingBuffer(
+  buffer: string,
+  context: PlaceholderContext,
+  config: MaskingConfig,
+): string {
+  return flushBuffer(buffer, context, getFormatValue(config));
 }
 
 /**
@@ -93,9 +107,10 @@ export function flushSecretsMaskingBuffer(buffer: string, context: PlaceholderCo
 export function unmaskSecretsResponse<TRequest, TResponse>(
   response: TResponse,
   context: PlaceholderContext,
+  config: MaskingConfig,
   extractor: RequestExtractor<TRequest, TResponse>,
 ): TResponse {
-  return extractor.unmaskResponse(response, context);
+  return extractor.unmaskResponse(response, context, getFormatValue(config));
 }
 
 /**
