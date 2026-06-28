@@ -3,8 +3,7 @@
 
 import type { MaskingConfig } from "../../config";
 import type { PlaceholderContext } from "../../masking/context";
-import { flushMaskingBuffer, unmaskStreamChunk } from "../../pii/mask";
-import { flushSecretsMaskingBuffer, unmaskSecretsStreamChunk } from "../../secrets/mask";
+import { StreamRestorer } from "../../masking/stream-restorer";
 import type { ContentBlockDeltaEvent, TextDelta } from "./types";
 
 export function createAnthropicUnmaskingStream(
@@ -15,9 +14,8 @@ export function createAnthropicUnmaskingStream(
 ): ReadableStream<Uint8Array> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
-  let piiBuffer = "";
-  let secretsBuffer = "";
   let lineBuffer = "";
+  const restorer = new StreamRestorer({ piiContext, secretsContext, config });
 
   return new ReadableStream({
     async start(controller) {
@@ -28,20 +26,7 @@ export function createAnthropicUnmaskingStream(
           const { done, value } = await reader.read();
 
           if (done) {
-            // Flush remaining buffers
-            let flushed = "";
-
-            if (piiBuffer && piiContext) {
-              flushed = flushMaskingBuffer(piiBuffer, piiContext, config);
-            } else if (piiBuffer) {
-              flushed = piiBuffer;
-            }
-
-            if (secretsBuffer && secretsContext) {
-              flushed += flushSecretsMaskingBuffer(secretsBuffer, secretsContext, config);
-            } else if (secretsBuffer) {
-              flushed += secretsBuffer;
-            }
+            const flushed = restorer.flush();
 
             // Send flushed content as final text delta
             if (flushed) {
@@ -83,31 +68,7 @@ export function createAnthropicUnmaskingStream(
                 if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
                   const event = parsed as ContentBlockDeltaEvent;
                   const textDelta = event.delta as TextDelta;
-                  let processedText = textDelta.text;
-
-                  // Unmask PII
-                  if (piiContext && processedText) {
-                    const { output, remainingBuffer } = unmaskStreamChunk(
-                      piiBuffer,
-                      processedText,
-                      piiContext,
-                      config,
-                    );
-                    piiBuffer = remainingBuffer;
-                    processedText = output;
-                  }
-
-                  // Unmask secrets
-                  if (secretsContext && processedText) {
-                    const { output, remainingBuffer } = unmaskSecretsStreamChunk(
-                      secretsBuffer,
-                      processedText,
-                      secretsContext,
-                      config,
-                    );
-                    secretsBuffer = remainingBuffer;
-                    processedText = output;
-                  }
+                  const processedText = restorer.restoreChunk(textDelta.text);
 
                   // Only emit if we have content
                   if (processedText) {

@@ -1,45 +1,7 @@
 import type { MaskingConfig } from "../../config";
 import type { PlaceholderContext } from "../../masking/context";
-import { flushMaskingBuffer, unmaskStreamChunk } from "../../pii/mask";
-import { flushSecretsMaskingBuffer, unmaskSecretsStreamChunk } from "../../secrets/mask";
+import { StreamRestorer } from "../../masking/stream-restorer";
 import type { OpenAIContentPart } from "../../utils/content";
-
-function unmaskTextContent(
-  text: string,
-  piiBuffer: string,
-  piiContext: PlaceholderContext | undefined,
-  config: MaskingConfig,
-  secretsBuffer: string,
-  secretsContext?: PlaceholderContext,
-): { text: string; piiBuffer: string; secretsBuffer: string } {
-  let processedText = text;
-  let nextPiiBuffer = piiBuffer;
-  let nextSecretsBuffer = secretsBuffer;
-
-  if (piiContext) {
-    const { output, remainingBuffer } = unmaskStreamChunk(
-      nextPiiBuffer,
-      processedText,
-      piiContext,
-      config,
-    );
-    nextPiiBuffer = remainingBuffer;
-    processedText = output;
-  }
-
-  if (secretsContext && processedText) {
-    const { output, remainingBuffer } = unmaskSecretsStreamChunk(
-      nextSecretsBuffer,
-      processedText,
-      secretsContext,
-      config,
-    );
-    nextSecretsBuffer = remainingBuffer;
-    processedText = output;
-  }
-
-  return { text: processedText, piiBuffer: nextPiiBuffer, secretsBuffer: nextSecretsBuffer };
-}
 
 export function createUnmaskingStream(
   source: ReadableStream<Uint8Array>,
@@ -49,9 +11,8 @@ export function createUnmaskingStream(
 ): ReadableStream<Uint8Array> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
-  let piiBuffer = "";
-  let secretsBuffer = "";
   let lineBuffer = "";
+  const restorer = new StreamRestorer({ piiContext, secretsContext, config });
 
   return new ReadableStream({
     async start(controller) {
@@ -71,19 +32,10 @@ export function createUnmaskingStream(
             const content = parsed.choices?.[0]?.delta?.content;
 
             if (typeof content === "string" && content !== "") {
-              const unmasked = unmaskTextContent(
-                content,
-                piiBuffer,
-                piiContext,
-                config,
-                secretsBuffer,
-                secretsContext,
-              );
-              piiBuffer = unmasked.piiBuffer;
-              secretsBuffer = unmasked.secretsBuffer;
+              const text = restorer.restoreChunk(content);
 
-              if (unmasked.text) {
-                parsed.choices[0].delta.content = unmasked.text;
+              if (text) {
+                parsed.choices[0].delta.content = text;
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
               }
             } else if (Array.isArray(content)) {
@@ -92,22 +44,13 @@ export function createUnmaskingStream(
                   return [part];
                 }
 
-                const unmasked = unmaskTextContent(
-                  part.text,
-                  piiBuffer,
-                  piiContext,
-                  config,
-                  secretsBuffer,
-                  secretsContext,
-                );
-                piiBuffer = unmasked.piiBuffer;
-                secretsBuffer = unmasked.secretsBuffer;
+                const text = restorer.restoreChunk(part.text);
 
-                if (!unmasked.text) {
+                if (!text) {
                   return [];
                 }
 
-                return [{ ...part, text: unmasked.text }];
+                return [{ ...part, text }];
               });
 
               if (processedContent.length > 0) {
@@ -137,19 +80,7 @@ export function createUnmaskingStream(
               lineBuffer = "";
             }
 
-            let flushed = "";
-
-            if (piiBuffer && piiContext) {
-              flushed = flushMaskingBuffer(piiBuffer, piiContext, config);
-            } else if (piiBuffer) {
-              flushed = piiBuffer;
-            }
-
-            if (secretsBuffer && secretsContext) {
-              flushed += flushSecretsMaskingBuffer(secretsBuffer, secretsContext, config);
-            } else if (secretsBuffer) {
-              flushed += secretsBuffer;
-            }
+            const flushed = restorer.flush();
 
             if (flushed) {
               const finalEvent = {
