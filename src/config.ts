@@ -153,11 +153,18 @@ const ServerSchema = z.object({
   request_timeout: z.coerce.number().int().min(0).default(600),
 });
 
-const LoggingSchema = z.object({
-  database: z.string().default("./data/pasteguard.db"),
-  retention_days: z.coerce.number().int().min(0).default(30),
-  log_masked_content: z.boolean().default(true),
-});
+const LoggingSchema = z
+  .object({
+    driver: z.enum(["sqlite", "postgres"]).default("sqlite"),
+    database: z.string().default("./data/pasteguard.db"),
+    postgres_url: z.string().optional(),
+    retention_days: z.coerce.number().int().min(0).default(30),
+    log_masked_content: z.boolean().default(true),
+  })
+  .refine((logging) => logging.driver !== "postgres" || Boolean(logging.postgres_url), {
+    path: ["postgres_url"],
+    message: "logging.postgres_url is required when logging.driver is 'postgres'",
+  });
 
 const DashboardAuthSchema = z.object({
   username: z.string(),

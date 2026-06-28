@@ -93,9 +93,9 @@ export default {
 };
 
 // Startup validation
-validateStartup().then(() => {
+validateStartup().then(async () => {
   printStartupBanner(config, host, port);
-  const stopCleanup = startCleanupScheduler(config);
+  const stopCleanup = await startCleanupScheduler(config);
   setupGracefulShutdown(stopCleanup);
 });
 
@@ -177,7 +177,7 @@ Secrets Detection:
 `);
 }
 
-function startCleanupScheduler(config: ReturnType<typeof getConfig>): () => void {
+async function startCleanupScheduler(config: ReturnType<typeof getConfig>): Promise<() => void> {
   let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   if (config.logging.retention_days > 0) {
@@ -185,7 +185,7 @@ function startCleanupScheduler(config: ReturnType<typeof getConfig>): () => void
 
     // Run cleanup on startup
     try {
-      const deleted = logger.cleanup();
+      const deleted = await logger.cleanup();
       if (deleted > 0) {
         console.log(
           `Log cleanup: removed ${deleted} entries older than ${config.logging.retention_days} days`,
@@ -198,16 +198,18 @@ function startCleanupScheduler(config: ReturnType<typeof getConfig>): () => void
     // Schedule daily cleanup
     cleanupInterval = setInterval(
       () => {
-        try {
-          const count = logger.cleanup();
-          if (count > 0) {
-            console.log(
-              `Log cleanup: removed ${count} entries older than ${config.logging.retention_days} days`,
-            );
+        void (async () => {
+          try {
+            const count = await logger.cleanup();
+            if (count > 0) {
+              console.log(
+                `Log cleanup: removed ${count} entries older than ${config.logging.retention_days} days`,
+              );
+            }
+          } catch (error) {
+            console.error("Log cleanup failed:", error);
           }
-        } catch (error) {
-          console.error("Log cleanup failed:", error);
-        }
+        })();
       },
       24 * 60 * 60 * 1000,
     );
@@ -224,12 +226,14 @@ function setupGracefulShutdown(stopCleanup: () => void) {
   function shutdown() {
     console.log("\nShutting down...");
     stopCleanup();
-    try {
-      getLogger().close();
-    } catch {
-      // Logger might not be initialized
-    }
-    process.exit(0);
+    void (async () => {
+      try {
+        await getLogger().close();
+      } catch {
+        // Logger might not be initialized
+      }
+      process.exit(0);
+    })();
   }
 
   process.on("SIGTERM", shutdown);

@@ -5,6 +5,7 @@ description: Configure request logging
 
 ```yaml
 logging:
+  driver: sqlite
   database: ./data/pasteguard.db
   retention_days: 30
   log_masked_content: true
@@ -14,16 +15,22 @@ logging:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `database` | `./data/pasteguard.db` | SQLite database path |
+| `driver` | `sqlite` | Storage backend: `sqlite` or `postgres` |
+| `database` | `./data/pasteguard.db` | SQLite database path (used when `driver` is `sqlite`) |
+| `postgres_url` | — | Postgres connection string (required when `driver` is `postgres`) |
 | `retention_days` | `30` | Days to keep logs. `0` = forever |
 | `log_masked_content` | `true` | Store request text in the dashboard after masking |
 
 ## Database
 
-Logs are stored in SQLite:
+Both backends share the same schema; the dashboard works identically on either. The schema is
+created and migrated automatically on startup.
+
+### SQLite (default)
 
 ```yaml
 logging:
+  driver: sqlite
   database: ./data/pasteguard.db
 ```
 
@@ -33,6 +40,24 @@ In Docker, this is persisted via volume:
 volumes:
   - ./data:/pasteguard/data
 ```
+
+### Postgres
+
+Use Postgres for shared or higher-volume deployments:
+
+```yaml
+logging:
+  driver: postgres
+  postgres_url: ${POSTGRES_URL:-postgres://pasteguard:pasteguard@localhost:5432/pasteguard}
+```
+
+`postgres_url` is required when `driver` is `postgres`; startup fails with a clear error if it is
+missing. The value supports environment-variable substitution, so you can keep credentials out of
+the config file.
+
+Existing SQLite databases are not migrated to Postgres automatically — switching `driver` starts
+logging into the new backend. An existing SQLite database created by an older PasteGuard version is
+upgraded in place the first time the new version starts.
 
 ## Retention
 

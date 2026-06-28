@@ -124,8 +124,14 @@ secrets_detection:
 
 # Logging settings
 logging:
-  # SQLite database for request logs
+  # Storage backend for request logs: "sqlite" (default) or "postgres"
+  driver: sqlite
+
+  # SQLite database for request logs (used when driver is "sqlite")
   database: ./data/pasteguard.db
+
+  # Postgres connection string (required when driver is "postgres")
+  # postgres_url: ${POSTGRES_URL:-postgres://pasteguard:pasteguard@localhost:5432/pasteguard}
 
   # Log retention in days (0 = keep forever)
   retention_days: 30

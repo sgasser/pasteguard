@@ -1,6 +1,12 @@
-import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
-import { getConfig } from "../config";
+import { type Selectable, type SelectQueryBuilder, sql } from "kysely";
+import { type Config, getConfig } from "../config";
+import {
+  createLogDatabase,
+  type LogDatabase,
+  type LogKysely,
+  migrateLogDatabase,
+  type RequestLogsTable,
+} from "./db";
 import { shouldLogMaskedContent } from "./log-content";
 
 export type RequestProvider = "openai" | "anthropic" | "codex" | "local" | "api";
@@ -13,7 +19,7 @@ export interface RequestLog {
   provider: RequestProvider;
   source: RequestSource;
   model: string;
-  pii_detected: boolean;
+  pii_detected: boolean | 0 | 1;
   entities: string;
   latency_ms: number;
   scan_time_ms: number;
@@ -40,6 +46,11 @@ export interface Stats {
   requests_last_hour: number;
 }
 
+type CountRow = { count: number | string | bigint };
+type AverageRow = { avg: number | string | null };
+type TotalRow = { total: number | string | bigint | null };
+type CountQuery = SelectQueryBuilder<LogDatabase, "request_logs", { count: number }>;
+
 export function normalizeRequestSource(
   provider: RequestProvider,
   sourceHeader?: string | null,
@@ -55,217 +66,208 @@ export function normalizeRequestSource(
   return "api";
 }
 
+function toNumber(value: number | string | bigint | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  return Number(value);
+}
+
+function toStoredFlag(value: boolean | 0 | 1): 0 | 1 {
+  return value === true || value === 1 ? 1 : 0;
+}
+
+// The dashboard row shape is whatever getLogs selects: every request_logs
+// column except the unused created_at. Derive it from the schema so the two
+// can't drift.
+type RequestLogRow = Omit<Selectable<RequestLogsTable>, "created_at">;
+
+function normalizeLogRow(row: RequestLogRow): RequestLog {
+  const provider = row.provider as RequestProvider;
+
+  return {
+    id: toNumber(row.id),
+    timestamp: row.timestamp,
+    mode: row.mode as "route" | "mask",
+    provider,
+    source: (row.source as RequestSource | null) || normalizeRequestSource(provider),
+    model: row.model,
+    pii_detected: toStoredFlag(row.pii_detected as 0 | 1),
+    entities: row.entities ?? "",
+    latency_ms: toNumber(row.latency_ms),
+    scan_time_ms: toNumber(row.scan_time_ms),
+    prompt_tokens: row.prompt_tokens === null ? null : toNumber(row.prompt_tokens),
+    completion_tokens: row.completion_tokens === null ? null : toNumber(row.completion_tokens),
+    user_agent: row.user_agent,
+    masked_content: row.masked_content,
+    secrets_detected: row.secrets_detected === null ? null : toNumber(row.secrets_detected),
+    secrets_types: row.secrets_types,
+    status_code: row.status_code === null ? null : toNumber(row.status_code),
+    error_message: row.error_message,
+  };
+}
+
+function buildStats(values: {
+  total: number | string | bigint;
+  pii: number | string | bigint;
+  proxy: number | string | bigint;
+  local: number | string | bigint;
+  api: number | string | bigint;
+  browserExtension: number | string | bigint;
+  avgScanTime: number | string | null;
+  totalTokens: number | string | bigint | null;
+  requestsLastHour: number | string | bigint;
+}): Stats {
+  const total = toNumber(values.total);
+  const pii = toNumber(values.pii);
+
+  return {
+    total_requests: total,
+    pii_requests: pii,
+    pii_percentage: total > 0 ? Math.round((pii / total) * 100 * 10) / 10 : 0,
+    proxy_requests: toNumber(values.proxy),
+    local_requests: toNumber(values.local),
+    api_requests: toNumber(values.api),
+    browser_extension_requests: toNumber(values.browserExtension),
+    avg_scan_time_ms: Math.round(toNumber(values.avgScanTime)),
+    total_tokens: toNumber(values.totalTokens),
+    requests_last_hour: toNumber(values.requestsLastHour),
+  };
+}
+
 export class Logger {
-  private db: Database;
+  private db: LogKysely;
+  private ready: Promise<void>;
   private retentionDays: number;
 
-  constructor() {
-    const config = getConfig();
+  constructor(options: { config?: Config; db?: LogKysely } = {}) {
+    const config = options.config ?? getConfig();
     this.retentionDays = config.logging.retention_days;
 
-    // Ensure data directory exists
-    const dbPath = config.logging.database;
-    const dir = dbPath.substring(0, dbPath.lastIndexOf("/"));
-    if (dir) {
-      mkdirSync(dir, { recursive: true });
+    if (options.db) {
+      this.db = options.db;
+      this.ready = Promise.resolve();
+    } else {
+      const { db, driver } = createLogDatabase(config);
+      this.db = db;
+      this.ready = migrateLogDatabase(db, driver);
     }
-
-    this.db = new Database(dbPath);
-    this.initializeDatabase();
   }
 
-  private initializeDatabase(): void {
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS request_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT NOT NULL,
-        mode TEXT NOT NULL DEFAULT 'route',
-        provider TEXT NOT NULL,
-        source TEXT,
-        model TEXT NOT NULL,
-        pii_detected INTEGER NOT NULL DEFAULT 0,
-        entities TEXT,
-        latency_ms INTEGER NOT NULL,
-        scan_time_ms INTEGER NOT NULL DEFAULT 0,
-        prompt_tokens INTEGER,
-        completion_tokens INTEGER,
-        user_agent TEXT,
-        masked_content TEXT,
-        secrets_detected INTEGER,
-        secrets_types TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Migrate existing databases: add missing columns
-    const columns = this.db.prepare("PRAGMA table_info(request_logs)").all() as Array<{
-      name: string;
-    }>;
-    if (!columns.find((c) => c.name === "secrets_detected")) {
-      this.db.run("ALTER TABLE request_logs ADD COLUMN secrets_detected INTEGER");
-      this.db.run("ALTER TABLE request_logs ADD COLUMN secrets_types TEXT");
-    }
-    if (!columns.find((c) => c.name === "status_code")) {
-      this.db.run("ALTER TABLE request_logs ADD COLUMN status_code INTEGER");
-      this.db.run("ALTER TABLE request_logs ADD COLUMN error_message TEXT");
-    }
-    if (!columns.find((c) => c.name === "source")) {
-      this.db.run("ALTER TABLE request_logs ADD COLUMN source TEXT");
-      this.db.run("UPDATE request_logs SET source = provider WHERE source IS NULL");
-    }
-
-    // Create indexes for performance
-    this.db.run(`
-      CREATE INDEX IF NOT EXISTS idx_timestamp ON request_logs(timestamp)
-    `);
-    this.db.run(`
-      CREATE INDEX IF NOT EXISTS idx_provider ON request_logs(provider)
-    `);
-    this.db.run(`
-      CREATE INDEX IF NOT EXISTS idx_pii_detected ON request_logs(pii_detected)
-    `);
+  async log(entry: Omit<RequestLog, "id">): Promise<void> {
+    await this.ready;
+    await this.db
+      .insertInto("request_logs")
+      .values({
+        timestamp: entry.timestamp,
+        mode: entry.mode,
+        provider: entry.provider,
+        source: entry.source,
+        model: entry.model,
+        pii_detected: toStoredFlag(entry.pii_detected),
+        entities: entry.entities,
+        latency_ms: entry.latency_ms,
+        scan_time_ms: entry.scan_time_ms,
+        prompt_tokens: entry.prompt_tokens,
+        completion_tokens: entry.completion_tokens,
+        user_agent: entry.user_agent,
+        masked_content: entry.masked_content,
+        secrets_detected: entry.secrets_detected ?? null,
+        secrets_types: entry.secrets_types ?? null,
+        status_code: entry.status_code ?? null,
+        error_message: entry.error_message ?? null,
+      })
+      .execute();
   }
 
-  log(entry: Omit<RequestLog, "id">): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO request_logs
-        (timestamp, mode, provider, source, model, pii_detected, entities, latency_ms, scan_time_ms, prompt_tokens, completion_tokens, user_agent, masked_content, secrets_detected, secrets_types, status_code, error_message)
-      VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+  async getLogs(limit: number = 100, offset: number = 0): Promise<RequestLog[]> {
+    await this.ready;
+    const logs = await this.db
+      .selectFrom("request_logs")
+      .select([
+        "id",
+        "timestamp",
+        "mode",
+        "provider",
+        "source",
+        "model",
+        "pii_detected",
+        "entities",
+        "latency_ms",
+        "scan_time_ms",
+        "prompt_tokens",
+        "completion_tokens",
+        "user_agent",
+        "masked_content",
+        "secrets_detected",
+        "secrets_types",
+        "status_code",
+        "error_message",
+      ])
+      .orderBy("timestamp", "desc")
+      .limit(limit)
+      .offset(offset)
+      .execute();
 
-    stmt.run(
-      entry.timestamp,
-      entry.mode,
-      entry.provider,
-      entry.source,
-      entry.model,
-      entry.pii_detected ? 1 : 0,
-      entry.entities,
-      entry.latency_ms,
-      entry.scan_time_ms,
-      entry.prompt_tokens,
-      entry.completion_tokens,
-      entry.user_agent,
-      entry.masked_content,
-      entry.secrets_detected ?? null,
-      entry.secrets_types ?? null,
-      entry.status_code ?? null,
-      entry.error_message ?? null,
-    );
+    return logs.map(normalizeLogRow);
   }
 
-  getLogs(limit: number = 100, offset: number = 0): RequestLog[] {
-    const stmt = this.db.prepare(`
-      SELECT
-        id,
-        timestamp,
-        mode,
-        provider,
-        source,
-        model,
-        pii_detected,
-        entities,
-        latency_ms,
-        scan_time_ms,
-        prompt_tokens,
-        completion_tokens,
-        user_agent,
-        masked_content,
-        secrets_detected,
-        secrets_types,
-        status_code,
-        error_message
-      FROM request_logs
-      ORDER BY timestamp DESC
-      LIMIT ? OFFSET ?
-    `);
-
-    return (stmt.all(limit, offset) as RequestLog[]).map((log) => ({
-      ...log,
-      source: log.source || normalizeRequestSource(log.provider),
-    }));
-  }
-
-  getStats(): Stats {
-    // Total requests
-    const totalResult = this.db.prepare(`SELECT COUNT(*) as count FROM request_logs`).get() as {
-      count: number;
-    };
-
-    // PII requests
-    const piiResult = this.db
-      .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE pii_detected = 1`)
-      .get() as { count: number };
-
-    // Proxy (OpenAI + Anthropic + Codex) vs Local vs API
-    const proxyResult = this.db
-      .prepare(
-        `SELECT COUNT(*) as count FROM request_logs WHERE provider IN ('openai', 'anthropic', 'codex')`,
-      )
-      .get() as { count: number };
-    const localResult = this.db
-      .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE provider = 'local'`)
-      .get() as { count: number };
-    const apiResult = this.db
-      .prepare(
-        `SELECT COUNT(*) as count FROM request_logs WHERE provider = 'api' AND source != 'browser_extension'`,
-      )
-      .get() as { count: number };
-    const browserExtensionResult = this.db
-      .prepare(`SELECT COUNT(*) as count FROM request_logs WHERE source = 'browser_extension'`)
-      .get() as { count: number };
-
-    // Average scan time
-    const scanTimeResult = this.db
-      .prepare(`SELECT AVG(scan_time_ms) as avg FROM request_logs`)
-      .get() as { avg: number | null };
-
-    // Total tokens
-    const tokensResult = this.db
-      .prepare(`
-      SELECT COALESCE(SUM(COALESCE(prompt_tokens, 0) + COALESCE(completion_tokens, 0)), 0) as total
-      FROM request_logs
-    `)
-      .get() as { total: number };
-
-    // Requests last hour
+  async getStats(): Promise<Stats> {
+    await this.ready;
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const hourResult = this.db
-      .prepare(`
-      SELECT COUNT(*) as count FROM request_logs
-      WHERE timestamp >= ?
-    `)
-      .get(oneHourAgo) as { count: number };
 
-    const total = totalResult.count;
-    const pii = piiResult.count;
+    const [totalResult, piiResult, proxyResult, localResult, apiResult, browserExtensionResult] =
+      await Promise.all([
+        this.count(),
+        this.count((qb) => qb.where("pii_detected", "=", 1)),
+        this.count((qb) => qb.where("provider", "in", ["openai", "anthropic", "codex"])),
+        this.count((qb) => qb.where("provider", "=", "local")),
+        this.count((qb) =>
+          qb.where("provider", "=", "api").where("source", "!=", "browser_extension"),
+        ),
+        this.count((qb) => qb.where("source", "=", "browser_extension")),
+      ]);
 
-    return {
-      total_requests: total,
-      pii_requests: pii,
-      pii_percentage: total > 0 ? Math.round((pii / total) * 100 * 10) / 10 : 0,
-      proxy_requests: proxyResult.count,
-      local_requests: localResult.count,
-      api_requests: apiResult.count,
-      browser_extension_requests: browserExtensionResult.count,
-      avg_scan_time_ms: Math.round(scanTimeResult.avg || 0),
-      total_tokens: tokensResult.total,
-      requests_last_hour: hourResult.count,
-    };
+    const [scanTimeResult] = await this.db
+      .selectFrom("request_logs")
+      .select((eb) => eb.fn.avg<number>("scan_time_ms").as("avg"))
+      .execute();
+
+    const [tokensResult] = await this.db
+      .selectFrom("request_logs")
+      .select(
+        sql<number>`COALESCE(SUM(COALESCE(${sql.ref("prompt_tokens")}, 0) + COALESCE(${sql.ref(
+          "completion_tokens",
+        )}, 0)), 0)`.as("total"),
+      )
+      .execute();
+
+    const hourResult = await this.count((qb) => qb.where("timestamp", ">=", oneHourAgo));
+
+    return buildStats({
+      total: totalResult.count,
+      pii: piiResult.count,
+      proxy: proxyResult.count,
+      local: localResult.count,
+      api: apiResult.count,
+      browserExtension: browserExtensionResult.count,
+      avgScanTime: (scanTimeResult as AverageRow).avg,
+      totalTokens: (tokensResult as TotalRow).total,
+      requestsLastHour: hourResult.count,
+    });
   }
 
-  getEntityStats(): Array<{ entity: string; count: number }> {
-    const logs = this.db
-      .prepare(`
-      SELECT entities FROM request_logs WHERE entities IS NOT NULL AND entities != ''
-    `)
-      .all() as Array<{ entities: string }>;
+  async getEntityStats(): Promise<Array<{ entity: string; count: number }>> {
+    await this.ready;
+    const logs = await this.db
+      .selectFrom("request_logs")
+      .select("entities")
+      .where("entities", "is not", null)
+      .where("entities", "!=", "")
+      .execute();
 
     const entityCounts = new Map<string, number>();
 
     for (const log of logs) {
-      const entities = log.entities
+      const entities = (log.entities ?? "")
         .split(",")
         .map((e) => e.trim())
         .filter(Boolean);
@@ -279,29 +281,43 @@ export class Logger {
       .sort((a, b) => b.count - a.count);
   }
 
-  cleanup(): number {
+  async cleanup(): Promise<number> {
+    await this.ready;
+
     if (this.retentionDays <= 0) {
-      return 0; // Keep forever
+      return 0;
     }
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - this.retentionDays);
 
-    const result = this.db
-      .prepare(`
-      DELETE FROM request_logs WHERE timestamp < ?
-    `)
-      .run(cutoffDate.toISOString());
+    const result = await this.db
+      .deleteFrom("request_logs")
+      .where("timestamp", "<", cutoffDate.toISOString())
+      .executeTakeFirst();
 
-    return result.changes;
+    return toNumber(result.numDeletedRows);
   }
 
-  close(): void {
-    this.db.close();
+  async close(): Promise<void> {
+    await this.ready;
+    await this.db.destroy();
+  }
+
+  private async count(applyWhere?: (qb: CountQuery) => CountQuery): Promise<CountRow> {
+    let query = this.db
+      .selectFrom("request_logs")
+      .select((eb) => eb.fn.countAll<number>().as("count"));
+
+    if (applyWhere) {
+      query = applyWhere(query);
+    }
+
+    const [result] = await query.execute();
+    return result as CountRow;
   }
 }
 
-// Singleton instance
 let loggerInstance: Logger | null = null;
 
 export function getLogger(): Logger {
@@ -343,29 +359,33 @@ export function logRequest(data: RequestLogData, userAgent: string | null): void
       secretsMasked: data.secretsMasked,
     });
 
-    // Only log secret types if configured to do so
     const shouldLogSecretTypes =
       config.secrets_detection.log_detected_types && data.secretsTypes?.length;
 
-    logger.log({
-      timestamp: data.timestamp,
-      mode: data.mode,
-      provider: data.provider,
-      source: data.source ?? normalizeRequestSource(data.provider),
-      model: data.model,
-      pii_detected: data.piiDetected,
-      entities: data.entities.join(","),
-      latency_ms: data.latencyMs,
-      scan_time_ms: data.scanTimeMs,
-      prompt_tokens: data.promptTokens ?? null,
-      completion_tokens: data.completionTokens ?? null,
-      user_agent: userAgent,
-      masked_content: shouldLogContent ? (data.maskedContent ?? null) : null,
-      secrets_detected: data.secretsDetected !== undefined ? (data.secretsDetected ? 1 : 0) : null,
-      secrets_types: shouldLogSecretTypes ? data.secretsTypes!.join(",") : null,
-      status_code: data.statusCode ?? null,
-      error_message: data.errorMessage ?? null,
-    });
+    void logger
+      .log({
+        timestamp: data.timestamp,
+        mode: data.mode,
+        provider: data.provider,
+        source: data.source ?? normalizeRequestSource(data.provider),
+        model: data.model,
+        pii_detected: data.piiDetected,
+        entities: data.entities.join(","),
+        latency_ms: data.latencyMs,
+        scan_time_ms: data.scanTimeMs,
+        prompt_tokens: data.promptTokens ?? null,
+        completion_tokens: data.completionTokens ?? null,
+        user_agent: userAgent,
+        masked_content: shouldLogContent ? (data.maskedContent ?? null) : null,
+        secrets_detected:
+          data.secretsDetected !== undefined ? (data.secretsDetected ? 1 : 0) : null,
+        secrets_types: shouldLogSecretTypes ? data.secretsTypes!.join(",") : null,
+        status_code: data.statusCode ?? null,
+        error_message: data.errorMessage ?? null,
+      })
+      .catch((error) => {
+        console.error("Failed to log request:", error);
+      });
   } catch (error) {
     console.error("Failed to log request:", error);
   }

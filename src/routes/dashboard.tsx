@@ -32,11 +32,11 @@ if (config.dashboard.auth) {
 /**
  * GET /api/logs - Get recent request logs
  */
-dashboardRoutes.get("/api/logs", zValidator("query", LogsQuerySchema), (c) => {
+dashboardRoutes.get("/api/logs", zValidator("query", LogsQuerySchema), async (c) => {
 	const { limit, offset } = c.req.valid("query");
 
 	const logger = getLogger();
-	const logs = logger.getLogs(limit, offset);
+	const logs = await logger.getLogs(limit, offset);
 
 	return c.json({
 		logs,
@@ -51,11 +51,11 @@ dashboardRoutes.get("/api/logs", zValidator("query", LogsQuerySchema), (c) => {
 /**
  * GET /api/stats - Get statistics
  */
-dashboardRoutes.get("/api/stats", (c) => {
+dashboardRoutes.get("/api/stats", async (c) => {
 	const config = getConfig();
 	const logger = getLogger();
-	const stats = logger.getStats();
-	const entityStats = logger.getEntityStats();
+	const stats = await logger.getStats();
+	const entityStats = await logger.getEntityStats();
 
 	return c.json({
 		...stats,

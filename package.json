@@ -20,6 +20,8 @@
     "@hono/zod-validator": "^0.7.6",
     "hono": "^4.12.23",
     "hono-tailwind": "^2.2.0",
+    "kysely": "^0.29.2",
+    "pg": "^8.22.0",
     "tailwindcss": "^4.3.0",
     "yaml": "^2.9.0",
     "zod": "^3.25.76"
@@ -27,6 +29,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
     "@types/bun": "latest",
+    "@types/pg": "^8.20.0",
     "typescript": "^5.9.3"
   },
   "keywords": [

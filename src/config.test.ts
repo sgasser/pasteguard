@@ -225,6 +225,71 @@ pii_detection:
     }
   });
 
+  test("defaults request logging to SQLite", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.logging.driver).toBe("sqlite");
+      expect(config.logging.database).toBe("./data/pasteguard.db");
+      expect(config.logging.postgres_url).toBeUndefined();
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("accepts Postgres request logging config", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+logging:
+  driver: postgres
+  postgres_url: \${POSTGRES_URL:-postgres://pasteguard:pasteguard@localhost:5432/pasteguard}
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.logging.driver).toBe("postgres");
+      expect(config.logging.postgres_url).toBe(
+        "postgres://pasteguard:pasteguard@localhost:5432/pasteguard",
+      );
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("requires postgres_url for Postgres request logging", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+logging:
+  driver: postgres
+`);
+
+    try {
+      expect(() => loadConfig(path)).toThrow("Invalid configuration");
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
   test("rejects invalid phone region codes", () => {
     const path = writeConfig(`
 mode: mask
