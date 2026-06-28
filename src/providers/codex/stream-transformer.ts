@@ -1,9 +1,6 @@
 import type { MaskingConfig } from "../../config";
 import type { PlaceholderContext } from "../../masking/context";
-import {
-  type CodexResponsesResponse,
-  codexExtractor,
-} from "../../masking/extractors/codex";
+import { type CodexResponsesResponse, codexExtractor } from "../../masking/extractors/codex";
 import { StreamRestorer } from "../../masking/stream-restorer";
 
 export function createCodexUnmaskingStream(

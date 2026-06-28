@@ -14,14 +14,15 @@ import {
   OpenAIRequestSchema,
   type OpenAIResponse,
 } from "../providers/openai/types";
-import { formatMaskedSpansForLog, logScanRoles } from "../services/log-content";
+import { formatMaskedRequestForLog } from "../services/log-content";
 import { logRequest } from "../services/logger";
-import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
+import type { PIIDetectResult } from "../services/pii";
 import {
-  processSecretsRequest,
-  type SecretsProcessResult,
-  secretPlaceholders,
-} from "../services/secrets";
+  PrivacyPipelineDetectionError,
+  type PrivacyPipelineResult,
+  processPrivacyPipeline,
+} from "../services/privacy-pipeline";
+import type { SecretsProcessResult } from "../services/secrets";
 import {
   createLogData,
   errorFormats,
@@ -52,37 +53,37 @@ openaiRoutes.post(
   }),
   async (c) => {
     const startTime = Date.now();
-    let request = c.req.valid("json") as OpenAIRequest;
+    const request = c.req.valid("json") as OpenAIRequest;
     const config = getConfig();
 
-    // Step 1: Process secrets
-    const secretsResult = processSecretsRequest(request, config.secrets_detection, openaiExtractor);
+    let privacy: PrivacyPipelineResult<OpenAIRequest>;
+    try {
+      privacy = await processPrivacyPipeline(request, config, openaiExtractor, {
+        maskPII: config.mode === "mask",
+      });
+    } catch (error) {
+      if (error instanceof PrivacyPipelineDetectionError) {
+        console.error("PII detection error:", error.cause ?? error);
+        return respondDetectionError(c, error.request as OpenAIRequest, startTime);
+      }
+      throw error;
+    }
+
+    const { secretsResult, piiResult } = privacy;
 
     if (secretsResult.blocked) {
       return respondBlocked(c, request, secretsResult, startTime);
     }
 
-    // Apply secrets masking to request
-    if (secretsResult.masked) {
-      request = secretsResult.request;
+    if (!piiResult) {
+      throw new Error("PII detection result missing from privacy pipeline");
     }
 
-    // Step 2: Detect PII and configured denylist terms
-    let piiResult: PIIDetectResult;
-    try {
-      piiResult = await detectPII(request, openaiExtractor, secretPlaceholders(secretsResult));
-    } catch (error) {
-      console.error("PII detection error:", error);
-      return respondDetectionError(c, request, startTime);
-    }
-
-    // Step 3: Process based on mode
     if (config.mode === "mask") {
-      const piiMasked = maskPII(request, piiResult.detection, openaiExtractor);
       return sendToOpenAI(c, request, {
-        request: piiMasked.request,
+        request: privacy.request,
         piiResult,
-        piiMaskingContext: piiMasked.maskingContext,
+        piiMaskingContext: privacy.piiMaskingContext,
         secretsResult,
         startTime,
         authHeader: c.req.header("Authorization"),
@@ -96,7 +97,7 @@ openaiRoutes.post(
 
     if (shouldRouteLocal) {
       return sendToLocal(c, request, {
-        request,
+        request: privacy.requestAfterSecrets,
         piiResult,
         secretsResult,
         startTime,
@@ -104,7 +105,7 @@ openaiRoutes.post(
     }
 
     return sendToOpenAI(c, request, {
-      request,
+      request: privacy.requestAfterSecrets,
       piiResult,
       secretsResult,
       startTime,
@@ -151,15 +152,7 @@ interface LocalOptions {
 
 function formatRequestForLog(request: OpenAIRequest): string | undefined {
   const config = getConfig();
-  return formatMaskedSpansForLog(
-    openaiExtractor.extractTexts(request),
-    logScanRoles({
-      piiRoles: config.pii_detection.scan_roles,
-      piiActive: config.pii_detection.enabled || config.masking.denylist.length > 0,
-      secretRoles: config.secrets_detection.scan_roles,
-      secretsActive: config.secrets_detection.enabled,
-    }),
-  );
+  return formatMaskedRequestForLog(request, openaiExtractor, config);
 }
 
 // --- Response handlers ---

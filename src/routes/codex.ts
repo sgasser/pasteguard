@@ -13,14 +13,15 @@ import {
 import { restoreResponse } from "../masking/restorer";
 import { createCodexUnmaskingStream } from "../providers/codex/stream-transformer";
 import { ProviderError } from "../providers/errors";
-import { formatMaskedSpansForLog, logScanRoles } from "../services/log-content";
+import { formatMaskedRequestForLog } from "../services/log-content";
 import { logRequest } from "../services/logger";
-import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
+import type { PIIDetectResult } from "../services/pii";
 import {
-  processSecretsRequest,
-  type SecretsProcessResult,
-  secretPlaceholders,
-} from "../services/secrets";
+  PrivacyPipelineDetectionError,
+  type PrivacyPipelineResult,
+  processPrivacyPipeline,
+} from "../services/privacy-pipeline";
+import type { SecretsProcessResult } from "../services/secrets";
 import {
   createLogData,
   errorFormats,
@@ -60,23 +61,29 @@ codexRoutes.post(
   }),
   async (c) => {
     const startTime = Date.now();
-    let request = c.req.valid("json") as CodexResponsesRequest;
+    const request = c.req.valid("json") as CodexResponsesRequest;
     const config = getConfig();
 
-    const secretsResult = processSecretsRequest(request, config.secrets_detection, codexExtractor);
+    let privacy: PrivacyPipelineResult<CodexResponsesRequest>;
+    try {
+      privacy = await processPrivacyPipeline(request, config, codexExtractor, {
+        maskPII: config.mode === "mask",
+      });
+    } catch (error) {
+      if (error instanceof PrivacyPipelineDetectionError) {
+        console.error("PII detection error:", error.cause ?? error);
+        return respondDetectionError(c, error.request as CodexResponsesRequest, startTime);
+      }
+      throw error;
+    }
+
+    const { secretsResult, piiResult } = privacy;
     if (secretsResult.blocked) {
       return respondBlocked(c, request, secretsResult, startTime);
     }
-    if (secretsResult.masked) {
-      request = secretsResult.request;
-    }
 
-    let piiResult: PIIDetectResult;
-    try {
-      piiResult = await detectPII(request, codexExtractor, secretPlaceholders(secretsResult));
-    } catch (error) {
-      console.error("PII detection error:", error);
-      return respondDetectionError(c, request, startTime);
+    if (!piiResult) {
+      throw new Error("PII detection result missing from privacy pipeline");
     }
 
     const shouldBlockRouteMode =
@@ -88,13 +95,10 @@ codexRoutes.post(
       return respondRouteModeBlocked(c, request, piiResult, secretsResult, startTime);
     }
 
-    const piiMasked =
-      config.mode === "mask" ? maskPII(request, piiResult.detection, codexExtractor) : undefined;
-
     return sendToCodex(c, request, {
-      request: piiMasked?.request ?? request,
+      request: privacy.request,
       piiResult,
-      piiMaskingContext: piiMasked?.maskingContext,
+      piiMaskingContext: privacy.piiMaskingContext,
       secretsResult,
       startTime,
       headers: getForwardHeaders(c),
@@ -165,13 +169,7 @@ function getForwardHeaders(c: Context): Record<string, string> {
 
 function formatCodexForLog(request: CodexResponsesRequest): string | undefined {
   const config = getConfig();
-  const scanRoles = logScanRoles({
-    piiRoles: config.pii_detection.scan_roles,
-    piiActive: config.pii_detection.enabled || config.masking.denylist.length > 0,
-    secretRoles: config.secrets_detection.scan_roles,
-    secretsActive: config.secrets_detection.enabled,
-  });
-  return formatMaskedSpansForLog(codexExtractor.extractTexts(request), scanRoles);
+  return formatMaskedRequestForLog(request, codexExtractor, config);
 }
 
 function respondBlocked(

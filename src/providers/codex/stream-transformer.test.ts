@@ -64,10 +64,7 @@ describe("createCodexUnmaskingStream", () => {
 
   test("buffers placeholders split across SSE events", async () => {
     const piiContext = context({ "[[EMAIL_ADDRESS_1]]": "jane@example.com" });
-    const source = createSSEStream([
-      codexDelta("Email [[EMAIL_"),
-      codexDelta("ADDRESS_1]] done"),
-    ]);
+    const source = createSSEStream([codexDelta("Email [[EMAIL_"), codexDelta("ADDRESS_1]] done")]);
 
     const result = await consumeStream(
       createCodexUnmaskingStream(source, piiContext, defaultConfig),

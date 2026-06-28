@@ -1,4 +1,5 @@
-import type { TextSpan } from "../masking/types";
+import type { Config } from "../config";
+import type { RequestExtractor, TextSpan } from "../masking/types";
 
 export interface LogContentDecision {
   maskedContent?: string;
@@ -24,6 +25,22 @@ export function formatMaskedSpansForLog(
     .map((span) => `[${labelSpan(span)}] ${span.text}`);
 
   return lines.length > 0 ? lines.join("\n").slice(0, 20000) : undefined;
+}
+
+export function formatMaskedRequestForLog<TRequest, TResponse>(
+  request: TRequest,
+  extractor: RequestExtractor<TRequest, TResponse>,
+  config: Pick<Config, "pii_detection" | "masking" | "secrets_detection">,
+): string | undefined {
+  return formatMaskedSpansForLog(
+    extractor.extractTexts(request),
+    logScanRoles({
+      piiRoles: config.pii_detection.scan_roles,
+      piiActive: config.pii_detection.enabled || config.masking.denylist.length > 0,
+      secretRoles: config.secrets_detection.scan_roles,
+      secretsActive: config.secrets_detection.enabled,
+    }),
+  );
 }
 
 export function logScanRoles(opts: {

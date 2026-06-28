@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { formatMaskedSpansForLog, logScanRoles, shouldLogMaskedContent } from "./log-content";
+import { openaiExtractor } from "../masking/extractors/openai";
+import type { OpenAIRequest } from "../providers/openai/types";
+import {
+  formatMaskedRequestForLog,
+  formatMaskedSpansForLog,
+  logScanRoles,
+  shouldLogMaskedContent,
+} from "./log-content";
 
 describe("shouldLogMaskedContent", () => {
   const maskedWithSecret = "My key is [[API_KEY_SK_1]] and email [[EMAIL_ADDRESS_1]]";
@@ -194,5 +201,47 @@ describe("logScanRoles", () => {
       roles,
     );
     expect(result).toBeUndefined();
+  });
+});
+
+describe("formatMaskedRequestForLog", () => {
+  test("uses shared scan-role intersection for provider requests", () => {
+    const request: OpenAIRequest = {
+      model: "gpt-4",
+      messages: [
+        { role: "system", content: "System [[EMAIL_ADDRESS_1]]" },
+        { role: "user", content: "User [[EMAIL_ADDRESS_2]]" },
+        { role: "assistant", content: "Assistant [[EMAIL_ADDRESS_3]]" },
+      ],
+    };
+
+    const result = formatMaskedRequestForLog(request, openaiExtractor, {
+      pii_detection: {
+        enabled: true,
+        detector_url: "http://localhost:8080",
+        phone_regions: [],
+        score_threshold: 0.7,
+        entities: ["EMAIL_ADDRESS"],
+        scan_roles: ["user", "assistant"],
+      },
+      masking: {
+        show_markers: false,
+        marker_text: "[protected]",
+        allowlist: [],
+        denylist: [],
+      },
+      secrets_detection: {
+        enabled: true,
+        action: "mask",
+        entities: ["API_KEY_SK"],
+        max_scan_chars: 200000,
+        log_detected_types: true,
+        scan_roles: ["user", "tool"],
+      },
+    });
+
+    expect(result).toContain("[user prompt] User [[EMAIL_ADDRESS_2]]");
+    expect(result).not.toContain("System [[EMAIL_ADDRESS_1]]");
+    expect(result).not.toContain("Assistant [[EMAIL_ADDRESS_3]]");
   });
 });

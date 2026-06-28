@@ -13,14 +13,15 @@ import {
   type AnthropicResponse,
 } from "../providers/anthropic/types";
 import { callLocalAnthropic } from "../providers/local";
-import { formatMaskedSpansForLog, logScanRoles } from "../services/log-content";
+import { formatMaskedRequestForLog } from "../services/log-content";
 import { logRequest } from "../services/logger";
-import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
+import type { PIIDetectResult } from "../services/pii";
 import {
-  processSecretsRequest,
-  type SecretsProcessResult,
-  secretPlaceholders,
-} from "../services/secrets";
+  PrivacyPipelineDetectionError,
+  type PrivacyPipelineResult,
+  processPrivacyPipeline,
+} from "../services/privacy-pipeline";
+import type { SecretsProcessResult } from "../services/secrets";
 import {
   createLogData,
   errorFormats,
@@ -51,7 +52,7 @@ anthropicRoutes.post(
   }),
   async (c) => {
     const startTime = Date.now();
-    let request = c.req.valid("json") as AnthropicRequest;
+    const request = c.req.valid("json") as AnthropicRequest;
     const config = getConfig();
 
     // Route mode requires local provider
@@ -81,32 +82,33 @@ anthropicRoutes.post(
       );
     }
 
-    // Step 1: Process secrets
-    const secretsResult = processSecretsRequest(
-      request,
-      config.secrets_detection,
-      anthropicExtractor,
-    );
+    let privacy: PrivacyPipelineResult<AnthropicRequest>;
+    try {
+      privacy = await processPrivacyPipeline(request, config, anthropicExtractor, {
+        maskPII: config.mode === "mask",
+      });
+    } catch (error) {
+      if (error instanceof PrivacyPipelineDetectionError) {
+        console.error("PII detection error:", error.cause ?? error);
+        return respondDetectionError(
+          c,
+          error.request as AnthropicRequest,
+          error.secretsResult as SecretsProcessResult<AnthropicRequest>,
+          startTime,
+        );
+      }
+      throw error;
+    }
 
+    const { secretsResult, piiResult } = privacy;
     if (secretsResult.blocked) {
       return respondBlocked(c, request, secretsResult, startTime);
     }
 
-    // Apply secrets masking to request
-    if (secretsResult.masked) {
-      request = secretsResult.request;
+    if (!piiResult) {
+      throw new Error("PII detection result missing from privacy pipeline");
     }
 
-    // Step 2: Detect PII and configured denylist terms
-    let piiResult: PIIDetectResult;
-    try {
-      piiResult = await detectPII(request, anthropicExtractor, secretPlaceholders(secretsResult));
-    } catch (error) {
-      console.error("PII detection error:", error);
-      return respondDetectionError(c, request, secretsResult, startTime);
-    }
-
-    // Step 3: Route mode - send to local if PII or secrets detected
     const shouldRouteToLocal =
       config.mode === "route" &&
       (piiResult.hasPII ||
@@ -114,31 +116,20 @@ anthropicRoutes.post(
 
     if (shouldRouteToLocal) {
       return sendToLocal(c, request, {
-        request,
+        request: privacy.requestAfterSecrets,
         startTime,
         piiResult,
         secretsResult,
       });
     }
 
-    // Step 4: Mask mode - mask PII if found, send to Anthropic
-    let piiMaskingContext: PlaceholderContext | undefined;
-    let maskedContent: string | undefined;
+    const maskedContent =
+      piiResult.hasPII || secretsResult.masked ? formatRequestForLog(privacy.request) : undefined;
 
-    if (piiResult.hasPII) {
-      const masked = maskPII(request, piiResult.detection, anthropicExtractor);
-      request = masked.request;
-      piiMaskingContext = masked.maskingContext;
-      maskedContent = formatRequestForLog(request);
-    } else if (secretsResult.masked) {
-      maskedContent = formatRequestForLog(request);
-    }
-
-    // Step 5: Send to Anthropic
-    return sendToAnthropic(c, request, {
+    return sendToAnthropic(c, privacy.request, {
       startTime,
       piiResult,
-      piiMaskingContext,
+      piiMaskingContext: privacy.piiMaskingContext,
       secretsResult,
       maskedContent,
     });
@@ -192,15 +183,7 @@ interface LocalOptions {
 
 function formatRequestForLog(request: AnthropicRequest): string | undefined {
   const config = getConfig();
-  return formatMaskedSpansForLog(
-    anthropicExtractor.extractTexts(request),
-    logScanRoles({
-      piiRoles: config.pii_detection.scan_roles,
-      piiActive: config.pii_detection.enabled || config.masking.denylist.length > 0,
-      secretRoles: config.secrets_detection.scan_roles,
-      secretsActive: config.secrets_detection.enabled,
-    }),
-  );
+  return formatMaskedRequestForLog(request, anthropicExtractor, config);
 }
 
 // --- Response handlers ---

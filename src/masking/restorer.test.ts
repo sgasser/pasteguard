@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { MaskingConfig } from "../config";
 import { createPlaceholderContext, type PlaceholderContext } from "./context";
 import { restoreResponse, restoreText } from "./restorer";
-import type { MaskedSpan, RequestExtractor, TextSpan } from "./types";
+import type { RequestExtractor } from "./types";
 
 interface TestResponse {
   text: string;
@@ -78,13 +78,15 @@ describe("restoreResponse", () => {
     const response = { text: "[[PERSON_1]] used [[API_KEY_SK_1]]" };
 
     expect(
-      restoreResponse(response, extractor, { ...defaultConfig, show_markers: true }, {
-        piiContext: context({ "[[PERSON_1]]": "Jane" }),
-        secretsContext: context({ "[[API_KEY_SK_1]]": "sk-secret" }),
-      }),
+      restoreResponse(
+        response,
+        extractor,
+        { ...defaultConfig, show_markers: true },
+        {
+          piiContext: context({ "[[PERSON_1]]": "Jane" }),
+          secretsContext: context({ "[[API_KEY_SK_1]]": "sk-secret" }),
+        },
+      ),
     ).toEqual({ text: "[protected]Jane used [protected]sk-secret" });
   });
 });
-
-const _typeCheckTextSpan: TextSpan | MaskedSpan | undefined = undefined;
-void _typeCheckTextSpan;
