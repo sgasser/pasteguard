@@ -47,7 +47,7 @@ It works in three places:
 
 **ChatGPT, Claude, and Gemini.** Paste customer notes, contracts, support tickets, candidate details, or internal context without sending the raw private values to the chat provider. You see the originals; the AI sees placeholders.
 
-The browser extension is currently in beta.
+The browser extension beta is available for ChatGPT, Claude, and Gemini.
 
 **[Install browser extension](https://pasteguard.com/browser-extension)** · **[Browser Chat docs](https://pasteguard.com/docs/use-cases/chat)**
 
@@ -73,7 +73,7 @@ Use it when your current options are:
 
 - Do not use cloud AI for sensitive work
 - Redact client or production data manually
-- Fall back to a weaker local model because the provider cannot see real context
+- Switch to a local model even when a cloud provider would give better results
 - Build one-off masking code inside every app
 
 ## Quick Start
