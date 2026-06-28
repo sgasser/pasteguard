@@ -10,17 +10,10 @@ import {
   type CodexResponsesResponse,
   codexExtractor,
 } from "../masking/extractors/codex";
-import {
-  flushMaskingBuffer,
-  unmaskResponse as unmaskPIIResponse,
-  unmaskStreamChunk,
-} from "../pii/mask";
+import { restoreResponse } from "../masking/restorer";
+import { flushMaskingBuffer, unmaskStreamChunk } from "../pii/mask";
 import { ProviderError } from "../providers/errors";
-import {
-  flushSecretsMaskingBuffer,
-  unmaskSecretsResponse,
-  unmaskSecretsStreamChunk,
-} from "../secrets/mask";
+import { flushSecretsMaskingBuffer, unmaskSecretsStreamChunk } from "../secrets/mask";
 import { formatMaskedSpansForLog, logScanRoles } from "../services/log-content";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
@@ -378,14 +371,10 @@ function respondJson(
   secretsContext?: PlaceholderContext,
   maskingConfig = getConfig().masking,
 ) {
-  let result = response;
-
-  if (piiContext) {
-    result = unmaskPIIResponse(result, piiContext, maskingConfig, codexExtractor);
-  }
-  if (secretsContext) {
-    result = unmaskSecretsResponse(result, secretsContext, maskingConfig, codexExtractor);
-  }
+  const result = restoreResponse(response, codexExtractor, maskingConfig, {
+    piiContext,
+    secretsContext,
+  });
 
   return c.json(result);
 }

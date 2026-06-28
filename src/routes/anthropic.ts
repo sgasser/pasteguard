@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { getConfig } from "../config";
 import type { PlaceholderContext } from "../masking/context";
 import { anthropicExtractor } from "../masking/extractors/anthropic";
-import { unmaskResponse as unmaskPIIResponse } from "../pii/mask";
+import { restoreResponse } from "../masking/restorer";
 import { callAnthropic } from "../providers/anthropic/client";
 import { createAnthropicUnmaskingStream } from "../providers/anthropic/stream-transformer";
 import {
@@ -13,7 +13,6 @@ import {
   type AnthropicResponse,
 } from "../providers/anthropic/types";
 import { callLocalAnthropic } from "../providers/local";
-import { unmaskSecretsResponse } from "../secrets/mask";
 import { formatMaskedSpansForLog, logScanRoles } from "../services/log-content";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
@@ -412,15 +411,10 @@ function respondJson(
   secretsContext: PlaceholderContext | undefined,
 ) {
   const config = getConfig();
-  let result = response;
-
-  if (piiMaskingContext) {
-    result = unmaskPIIResponse(result, piiMaskingContext, config.masking, anthropicExtractor);
-  }
-
-  if (secretsContext) {
-    result = unmaskSecretsResponse(result, secretsContext, config.masking, anthropicExtractor);
-  }
+  const result = restoreResponse(response, anthropicExtractor, config.masking, {
+    piiContext: piiMaskingContext,
+    secretsContext,
+  });
 
   return c.json(result);
 }

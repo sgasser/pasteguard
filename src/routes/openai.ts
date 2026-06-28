@@ -5,7 +5,7 @@ import { proxy } from "hono/proxy";
 import { getConfig, type MaskingConfig } from "../config";
 import type { PlaceholderContext } from "../masking/context";
 import { openaiExtractor } from "../masking/extractors/openai";
-import { unmaskResponse as unmaskPIIResponse } from "../pii/mask";
+import { restoreResponse } from "../masking/restorer";
 import { callLocal } from "../providers/local";
 import { callOpenAI, getOpenAIInfo, type ProviderResult } from "../providers/openai/client";
 import { createUnmaskingStream } from "../providers/openai/stream-transformer";
@@ -14,7 +14,6 @@ import {
   OpenAIRequestSchema,
   type OpenAIResponse,
 } from "../providers/openai/types";
-import { unmaskSecretsResponse } from "../secrets/mask";
 import { formatMaskedSpansForLog, logScanRoles } from "../services/log-content";
 import { logRequest } from "../services/logger";
 import { detectPII, maskPII, type PIIDetectResult } from "../services/pii";
@@ -375,14 +374,10 @@ function respondJson(
   piiContext?: PlaceholderContext,
   secretsContext?: PlaceholderContext,
 ) {
-  let result = response;
-
-  if (piiContext) {
-    result = unmaskPIIResponse(result, piiContext, maskingConfig, openaiExtractor);
-  }
-  if (secretsContext) {
-    result = unmaskSecretsResponse(result, secretsContext, maskingConfig, openaiExtractor);
-  }
+  const result = restoreResponse(response, openaiExtractor, maskingConfig, {
+    piiContext,
+    secretsContext,
+  });
 
   return c.json(result);
 }

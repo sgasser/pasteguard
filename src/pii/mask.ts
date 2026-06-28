@@ -5,13 +5,14 @@ import {
   generatePlaceholder as generatePlaceholderFromFormat,
   PII_PLACEHOLDER_FORMAT,
 } from "../masking/placeholders";
+import { createRestoreFormatter } from "../masking/restore-policy";
+import { restoreText } from "../masking/restorer";
 import {
   flushMaskingBuffer as flushBuffer,
   type MaskSpansResult,
   maskSpans,
   type PlaceholderContext,
   unmaskStreamChunk as unmaskChunk,
-  unmask as unmaskText,
 } from "../masking/service";
 import type { RequestExtractor, TextSpan } from "../masking/types";
 import type { PIIDetectionResult, PIIEntity } from "./detect";
@@ -27,10 +28,6 @@ function generatePlaceholder(entityType: string, context: PlaceholderContext): s
   return incrementAndGenerate(entityType, context, (type, count) =>
     generatePlaceholderFromFormat(PII_PLACEHOLDER_FORMAT, type, count),
   );
-}
-
-function getFormatValue(config: MaskingConfig): ((original: string) => string) | undefined {
-  return config.show_markers ? (original: string) => `${config.marker_text}${original}` : undefined;
 }
 
 export function mask(
@@ -57,7 +54,7 @@ export function mask(
 }
 
 export function unmask(text: string, context: PlaceholderContext, config: MaskingConfig): string {
-  return unmaskText(text, context, getFormatValue(config));
+  return restoreText(text, context, config);
 }
 
 export function unmaskStreamChunk(
@@ -66,7 +63,7 @@ export function unmaskStreamChunk(
   context: PlaceholderContext,
   config: MaskingConfig,
 ): { output: string; remainingBuffer: string } {
-  return unmaskChunk(buffer, newChunk, context, getFormatValue(config));
+  return unmaskChunk(buffer, newChunk, context, createRestoreFormatter(config));
 }
 
 export function flushMaskingBuffer(
@@ -74,7 +71,7 @@ export function flushMaskingBuffer(
   context: PlaceholderContext,
   config: MaskingConfig,
 ): string {
-  return flushBuffer(buffer, context, getFormatValue(config));
+  return flushBuffer(buffer, context, createRestoreFormatter(config));
 }
 
 export interface MaskRequestResult<TRequest> {
@@ -126,5 +123,5 @@ export function unmaskResponse<TRequest, TResponse>(
   config: MaskingConfig,
   extractor: RequestExtractor<TRequest, TResponse>,
 ): TResponse {
-  return extractor.unmaskResponse(response, context, getFormatValue(config));
+  return extractor.unmaskResponse(response, context, createRestoreFormatter(config));
 }
