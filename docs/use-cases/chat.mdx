@@ -9,7 +9,7 @@ Browser Chat protects what people already do: paste real context into ChatGPT, C
 PasteGuard masks names, emails, account details, customer notes, contracts, support tickets, and other sensitive values before they reach the chat provider. You keep the originals. The AI sees placeholders.
 
 <Note>
-The browser extension beta is available for ChatGPT, Claude, and Gemini.
+The browser extension is experimental and available for ChatGPT, Claude, and Gemini.
 </Note>
 
 ## Supported Platforms
@@ -21,9 +21,9 @@ The browser extension beta is available for ChatGPT, Claude, and Gemini.
 ## How It Works
 
 1. **Paste**: You paste text containing PII or secrets into the chat input.
-2. **Mask**: The extension sends text to your local PasteGuard server for masking.
-3. **Chat**: Masked text is inserted into the chat. The provider sees placeholders such as `[[PERSON_1]]` and `[[EMAIL_ADDRESS_1]]`.
-4. **Copy**: When you copy a supported AI response, placeholders are replaced with the original values.
+2. **Mask**: The extension sends text to your local PasteGuard server's `/api/mask` endpoint.
+3. **Chat**: PasteGuard masks secrets first, then PII, and returns masked text with local placeholder context. The provider sees placeholders such as `[[PERSON_1]]` and `[[EMAIL_ADDRESS_1]]`.
+4. **Copy**: When you copy a supported AI response, placeholders are replaced with the original values using the local context.
 
 Placeholder numbering stays consistent across messages in the same conversation. Streamed responses are highlighted in real time.
 
@@ -47,10 +47,10 @@ docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:latest
 
 See [Quickstart](/quickstart) for setup details.
 
-## Install Browser Extension
+## Browser extension
 
-The browser extension uses the same detection and masking engine as the local proxy.
+The browser extension is experimental and available for Chrome or Firefox. The PasteGuard server is open source (Apache 2.0); the extension source is planned to be published on GitHub after the beta stabilizes.
 
-<Card title="Install browser extension" icon="flask" href="https://pasteguard.com/browser-extension">
-  Add PasteGuard to Firefox or Chrome
+<Card title="Install the extension" icon="download" href="https://pasteguard.com/browser-extension">
+  Add PasteGuard to Chrome or Firefox
 </Card>

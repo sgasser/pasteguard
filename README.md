@@ -47,9 +47,9 @@ It works in three places:
 
 **ChatGPT, Claude, and Gemini.** Paste customer notes, contracts, support tickets, candidate details, or internal context without sending the raw private values to the chat provider. You see the originals; the AI sees placeholders.
 
-The browser extension beta is available for ChatGPT, Claude, and Gemini.
+The experimental browser extension is available for ChatGPT, Claude, and Gemini.
 
-**[Install browser extension](https://pasteguard.com/browser-extension)** · **[Browser Chat docs](https://pasteguard.com/docs/use-cases/chat)**
+**[Install the extension →](https://pasteguard.com/browser-extension)** · **[Chat docs →](https://pasteguard.com/docs/use-cases/chat)**
 
 ### Apps & APIs
 
