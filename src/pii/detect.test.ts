@@ -149,6 +149,44 @@ describe("PIIDetector", () => {
       expect(analyzeRequests).toEqual([expect.objectContaining({ text: "mcp-pii here" })]);
     });
 
+    test("scans spans sequentially to avoid detector-side inference queue timeouts", async () => {
+      const analyzeRequests: string[] = [];
+      let inFlight = 0;
+      let maxInFlight = 0;
+
+      globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+        const urlStr = url.toString();
+
+        if (urlStr.includes("/analyze") && init?.body) {
+          const body = JSON.parse(init.body as string);
+          analyzeRequests.push(body.text);
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          inFlight--;
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        return originalFetch(url, init);
+      }) as unknown as typeof fetch;
+
+      const detector = new PIIDetector();
+      const spans: TextSpan[] = [
+        { text: "first", path: "0", messageIndex: 0, partIndex: 0, role: "user" },
+        { text: "second", path: "1", messageIndex: 1, partIndex: 0, role: "user" },
+        { text: "third", path: "2", messageIndex: 2, partIndex: 0, role: "user" },
+      ];
+
+      const result = await detector.analyzeRequest(spans, spanExtractor);
+
+      expect(result.hasPII).toBe(false);
+      expect(analyzeRequests).toEqual(["first", "second", "third"]);
+      expect(maxInFlight).toBe(1);
+    });
+
     test("honors explicit scan_roles override", async () => {
       const config = getConfig();
       const previousScanRoles = config.pii_detection.scan_roles;

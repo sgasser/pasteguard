@@ -225,22 +225,23 @@ export class PIIDetector {
     const allowlist = config.masking.allowlist;
     const denylist = config.masking.denylist;
 
-    const spanEntities: PIIEntity[][] = await Promise.all(
-      spans.map(async (span) => {
-        if (!span.text) return [];
+    const spanEntities: PIIEntity[][] = [];
+    for (const span of spans) {
+      if (!span.text) {
+        spanEntities.push([]);
+        continue;
+      }
 
-        if (!span.role || !scanRoles.has(span.role)) {
-          return [];
-        }
+      if (!span.role || !scanRoles.has(span.role)) {
+        spanEntities.push([]);
+        continue;
+      }
 
-        const denylistedEntities = findDenylistedEntities(span.text, denylist, knownPlaceholders);
-        const detectedEntities = config.pii_detection.enabled
-          ? await this.detectPII(span.text)
-          : [];
-        const filteredEntities = filterAllowlistedEntities(span.text, detectedEntities, allowlist);
-        return mergeDenylistEntities(filteredEntities, denylistedEntities);
-      }),
-    );
+      const denylistedEntities = findDenylistedEntities(span.text, denylist, knownPlaceholders);
+      const detectedEntities = config.pii_detection.enabled ? await this.detectPII(span.text) : [];
+      const filteredEntities = filterAllowlistedEntities(span.text, detectedEntities, allowlist);
+      spanEntities.push(mergeDenylistEntities(filteredEntities, denylistedEntities));
+    }
 
     const allEntities = spanEntities.flat();
 
