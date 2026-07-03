@@ -130,6 +130,7 @@ const scanRolesField = z
 const PIIDetectionSchema = z.object({
   enabled: z.boolean().default(true),
   detector_url: z.string().url(),
+  detector_timeout: z.coerce.number().int().min(0).default(30),
   phone_regions: PhoneRegionsSchema,
   score_threshold: z.coerce.number().min(0).max(1).default(0.7),
   entities: z

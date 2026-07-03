@@ -144,6 +144,7 @@ export interface PIIDetectionResult {
 
 export class PIIDetector {
   private detectorUrl: string;
+  private detectorTimeoutMs: number;
   private scoreThreshold: number;
   private entityTypes: string[];
   private phoneRegions: string[];
@@ -151,6 +152,7 @@ export class PIIDetector {
   constructor() {
     const config = getConfig();
     this.detectorUrl = config.pii_detection.detector_url;
+    this.detectorTimeoutMs = config.pii_detection.detector_timeout * 1000;
     this.scoreThreshold = config.pii_detection.score_threshold;
     this.entityTypes = config.pii_detection.entities;
     this.phoneRegions = config.pii_detection.phone_regions;
@@ -173,7 +175,8 @@ export class PIIDetector {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(request),
-        signal: AbortSignal.timeout(30_000),
+        signal:
+          this.detectorTimeoutMs > 0 ? AbortSignal.timeout(this.detectorTimeoutMs) : undefined,
       });
 
       if (!response.ok) {

@@ -21,6 +21,7 @@ describe("GET /info", () => {
       ((body.providers as Record<string, { base_url: string }>).codex.base_url as string).length,
     ).toBeGreaterThan(0);
     expect(body.pii_detection).toBeDefined();
+    expect((body.pii_detection as Record<string, unknown>).detector_timeout).toBeDefined();
   });
 
   test("includes secrets_detection and logging sections", async () => {

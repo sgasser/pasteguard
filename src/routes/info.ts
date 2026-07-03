@@ -30,6 +30,7 @@ infoRoutes.get("/info", (c) => {
     providers,
     pii_detection: {
       phone_regions: config.pii_detection.phone_regions,
+      detector_timeout: config.pii_detection.detector_timeout,
       score_threshold: config.pii_detection.score_threshold,
       entities: config.pii_detection.entities,
     },

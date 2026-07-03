@@ -78,6 +78,7 @@ country prefix — see [PII Detection Config](/configuration/pii-detection).
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DETECTOR_URL` | `http://localhost:5002` | Where the proxy reaches the detector. In the all-in-one image this is in-container and rarely changed; override it to point at an external detector. |
+| `DETECTOR_TIMEOUT` | `30` | Seconds to wait for each detector `/analyze` request when using the example config. Increase for very large messages; set to `0` to disable. |
 | `PASTEGUARD_STARTUP_TIMEOUT` | `180` | Seconds to wait for the detector to become ready at startup |
 
 ## Next Steps

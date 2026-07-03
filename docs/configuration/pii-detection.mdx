@@ -6,6 +6,7 @@ description: Configure PII detection settings
 ```yaml
 pii_detection:
   detector_url: http://localhost:5002
+  detector_timeout: 30
   phone_regions: []
   score_threshold: 0.7
   entities:
@@ -24,6 +25,7 @@ pii_detection:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `detector_url` | `http://localhost:5002` | Detector `/analyze` URL |
+| `detector_timeout` | `30` | Timeout in seconds for each detector `/analyze` request. Increase for very large messages; set to `0` to disable |
 | `phone_regions` | `[]` | Optional regions for national-format phone numbers |
 | `score_threshold` | `0.7` | Minimum confidence floor for the neural labels PERSON and LOCATION (0.0-1.0). Checksum-validated identifiers always score `1.0` and are unaffected |
 | `entities` | See below | Entity types to return |

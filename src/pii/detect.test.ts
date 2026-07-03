@@ -407,6 +407,57 @@ describe("PIIDetector", () => {
   });
 
   describe("detectPII", () => {
+    test("uses the configured detector timeout", async () => {
+      const config = getConfig();
+      const previousTimeout = config.pii_detection.detector_timeout;
+      const originalTimeout = AbortSignal.timeout;
+      let timeoutMs: number | undefined;
+      config.pii_detection.detector_timeout = 300;
+      AbortSignal.timeout = mock((ms: number) => {
+        timeoutMs = ms;
+        return undefined as unknown as AbortSignal;
+      }) as unknown as typeof AbortSignal.timeout;
+      mockDetector({});
+
+      try {
+        const detector = new PIIDetector();
+        await detector.detectPII("Hello world");
+
+        expect(timeoutMs).toBe(300_000);
+      } finally {
+        config.pii_detection.detector_timeout = previousTimeout;
+        AbortSignal.timeout = originalTimeout;
+      }
+    });
+
+    test("disables detector request timeout when configured as 0", async () => {
+      const config = getConfig();
+      const previousTimeout = config.pii_detection.detector_timeout;
+      let signal: AbortSignal | null | undefined;
+      config.pii_detection.detector_timeout = 0;
+
+      globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+        if (url.toString().includes("/analyze")) {
+          signal = init?.signal;
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        return originalFetch(url, init);
+      }) as unknown as typeof fetch;
+
+      try {
+        const detector = new PIIDetector();
+        await detector.detectPII("Hello world");
+
+        expect(signal).toBeUndefined();
+      } finally {
+        config.pii_detection.detector_timeout = previousTimeout;
+      }
+    });
+
     test("returns entities from the detector", async () => {
       mockDetector({
         "test@example.com": [{ entity_type: "EMAIL_ADDRESS", start: 0, end: 16, score: 0.99 }],

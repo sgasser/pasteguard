@@ -225,6 +225,45 @@ pii_detection:
     }
   });
 
+  test("defaults PII detector timeout to 30 seconds", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.detector_timeout).toBe(30);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("accepts PII detector timeout override", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+  detector_timeout: \${DETECTOR_TIMEOUT:-300}
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.detector_timeout).toBe(300);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
   test("defaults request logging to SQLite", () => {
     const path = writeConfig(`
 mode: mask

@@ -71,6 +71,10 @@ pii_detection:
   # for local dev (bun run dev against the docker-compose detector service).
   detector_url: ${DETECTOR_URL:-http://localhost:5002}
 
+  # Timeout for each detector /analyze request in seconds.
+  # Increase this for very large messages; set to 0 to disable.
+  detector_timeout: ${DETECTOR_TIMEOUT:-30}
+
   # Add regions only if you need national-format numbers; + numbers work globally.
   phone_regions: []
   # phone_regions: [US, GB, DE, IT, IN]

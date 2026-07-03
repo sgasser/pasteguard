@@ -219,6 +219,7 @@ describe("formatMaskedRequestForLog", () => {
       pii_detection: {
         enabled: true,
         detector_url: "http://localhost:8080",
+        detector_timeout: 30,
         phone_regions: [],
         score_threshold: 0.7,
         entities: ["EMAIL_ADDRESS"],
