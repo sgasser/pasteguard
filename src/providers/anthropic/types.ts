@@ -77,7 +77,9 @@ export const ContentBlockSchema = z.discriminatedUnion("type", [
 // Message and request types
 export const AnthropicMessageSchema = z
   .object({
-    role: z.enum(["user", "assistant"]),
+    // Claude Code can send system reminders as messages when tools are enabled.
+    // Preserve them so PasteGuard stays transparent instead of rejecting upstream traffic.
+    role: z.enum(["user", "assistant", "system"]),
     content: z.union([z.string(), z.array(ContentBlockSchema)]),
   })
   .passthrough();

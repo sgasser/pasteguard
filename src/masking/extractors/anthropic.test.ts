@@ -68,6 +68,24 @@ describe("Anthropic Text Extractor", () => {
       });
     });
 
+    test("extracts Claude Code system role messages", () => {
+      const request = createRequest([
+        { role: "user", content: "Hello" },
+        { role: "system", content: "Tool context reminder" },
+      ]);
+
+      const spans = anthropicExtractor.extractTexts(request);
+
+      expect(spans).toHaveLength(2);
+      expect(spans[1]).toEqual({
+        text: "Tool context reminder",
+        path: "messages[1].content",
+        messageIndex: 1,
+        partIndex: 0,
+        role: "system",
+      });
+    });
+
     test("extracts text from system array", () => {
       const request = createRequest(
         [{ role: "user", content: "Hello" }],
