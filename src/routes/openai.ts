@@ -23,6 +23,7 @@ import {
   type OpenAIResponse,
 } from "../providers/openai/types";
 import type { SecretsProcessResult } from "../secrets/request";
+import { openaiResponsesRoutes } from "./openai-responses";
 import {
   createLogData,
   errorFormats,
@@ -112,7 +113,21 @@ openaiRoutes.post(
   },
 );
 
+openaiRoutes.route("/v1", openaiResponsesRoutes);
+
 openaiRoutes.all("/*", (c) => {
+  const normalizedPath = normalizeOpenAIPath(c.req.path);
+  if (!normalizedPath || normalizedPath === "/v1/responses") {
+    return c.json(
+      errorFormats.openai.error(
+        "Unsupported protected OpenAI endpoint",
+        "invalid_request_error",
+        "not_found",
+      ),
+      404,
+    );
+  }
+
   const config = getConfig();
   const { baseUrl } = getOpenAIInfo(config.providers.openai);
   const path = c.req.path.replace(/^\/openai\/v1/, "");
@@ -127,6 +142,44 @@ openaiRoutes.all("/*", (c) => {
     },
   });
 });
+
+function normalizeOpenAIPath(path: string): string | undefined {
+  let decoded = path;
+  let stable = false;
+
+  try {
+    for (let pass = 0; pass < 8; pass++) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) {
+        stable = true;
+        break;
+      }
+      decoded = next;
+    }
+  } catch {
+    return undefined;
+  }
+
+  if (!stable) return undefined;
+
+  const segments: string[] = [];
+  for (const segment of decoded.replaceAll("\\", "/").split("/")) {
+    const normalized = segment.split(";", 1)[0];
+    if (!normalized || normalized === ".") continue;
+    if (normalized === "..") {
+      segments.pop();
+      continue;
+    }
+    segments.push(normalized);
+  }
+
+  const normalized = `/${segments.join("/")}`;
+  return normalized === "/openai"
+    ? "/"
+    : normalized.startsWith("/openai/")
+      ? normalized.slice("/openai".length)
+      : normalized;
+}
 
 // --- Types ---
 

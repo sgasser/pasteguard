@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { MaskingConfig } from "../../config";
 import { createPlaceholderContext, type PlaceholderContext } from "../../masking/context";
-import { createCodexUnmaskingStream } from "./stream-transformer";
+import { createResponsesUnmaskingStream } from "./stream-transformer";
 
 const defaultConfig: MaskingConfig = {
   show_markers: false,
@@ -50,13 +50,13 @@ function codexDelta(text: string): string {
   return `data: ${JSON.stringify({ type: "response.output_text.delta", delta: text })}\n\n`;
 }
 
-describe("createCodexUnmaskingStream", () => {
+describe("createResponsesUnmaskingStream", () => {
   test("restores complete placeholders", async () => {
     const piiContext = context({ "[[EMAIL_ADDRESS_1]]": "jane@example.com" });
     const source = createSSEStream([codexDelta("Email [[EMAIL_ADDRESS_1]]")]);
 
     const result = await consumeStream(
-      createCodexUnmaskingStream(source, piiContext, defaultConfig),
+      createResponsesUnmaskingStream(source, piiContext, defaultConfig),
     );
 
     expect(result).toContain("Email jane@example.com");
@@ -67,7 +67,7 @@ describe("createCodexUnmaskingStream", () => {
     const source = createSSEStream([codexDelta("Email [[EMAIL_"), codexDelta("ADDRESS_1]] done")]);
 
     const result = await consumeStream(
-      createCodexUnmaskingStream(source, piiContext, defaultConfig),
+      createResponsesUnmaskingStream(source, piiContext, defaultConfig),
     );
 
     expect(result).toContain("jane@example.com done");
@@ -80,7 +80,7 @@ describe("createCodexUnmaskingStream", () => {
     const source = createSSEStream([codexDelta("[[PERSON_1]] used [[API_KEY_SK_1]]")]);
 
     const result = await consumeStream(
-      createCodexUnmaskingStream(
+      createResponsesUnmaskingStream(
         source,
         piiContext,
         { ...defaultConfig, show_markers: true },
@@ -95,7 +95,7 @@ describe("createCodexUnmaskingStream", () => {
     const source = createSSEStream(["data: not-json\n\n", "data: [DONE]\n\n"]);
 
     const result = await consumeStream(
-      createCodexUnmaskingStream(source, undefined, defaultConfig),
+      createResponsesUnmaskingStream(source, undefined, defaultConfig),
     );
 
     expect(result).toContain("data: not-json");
@@ -107,7 +107,7 @@ describe("createCodexUnmaskingStream", () => {
     const source = createSSEStream([codexDelta("Email [[EMAIL")]);
 
     const result = await consumeStream(
-      createCodexUnmaskingStream(source, piiContext, defaultConfig),
+      createResponsesUnmaskingStream(source, piiContext, defaultConfig),
     );
 
     expect(result).toContain('"type":"response.output_text.delta"');

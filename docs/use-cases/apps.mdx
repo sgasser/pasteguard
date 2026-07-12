@@ -17,6 +17,25 @@ OPENAI_API_KEY=your_openai_api_key
 
 <Note>In Docker Compose, use the service name instead of `localhost`, such as `http://pasteguard:3000/openai/v1`.</Note>
 
+### OpenRouter Responses pipe
+
+For an OpenWebUI pipe that calls OpenRouter through the Responses API, configure OpenRouter as PasteGuard's OpenAI provider:
+
+```yaml
+providers:
+  openai:
+    base_url: https://openrouter.ai/api/v1
+```
+
+Then set these pipe valves in Open WebUI:
+
+| Valve | Value |
+|-------|-------|
+| `BASE_URL` | `http://pasteguard:3000/openai/v1` |
+| `DEFAULT_LLM_ENDPOINT` | `responses` |
+
+Requests sent to `POST /openai/v1/responses` are inspected, restored, and shown in the dashboard.
+
 ## LibreChat
 
 Add PasteGuard as a custom endpoint in your LibreChat configuration:

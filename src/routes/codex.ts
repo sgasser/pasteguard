@@ -8,10 +8,10 @@ import { formatMaskedRequestForLog } from "../logging/log-content";
 import { logRequest } from "../logging/logger";
 import type { PlaceholderContext } from "../masking/context";
 import {
-  type CodexResponsesRequest,
-  type CodexResponsesResponse,
-  codexExtractor,
-} from "../masking/extractors/codex";
+  type ResponsesRequest as CodexResponsesRequest,
+  type ResponsesResponse as CodexResponsesResponse,
+  responsesExtractor,
+} from "../masking/extractors/responses";
 import { restoreResponse } from "../masking/restorer";
 import type { PIIDetectResult } from "../pii/request";
 import {
@@ -19,7 +19,7 @@ import {
   type PrivacyPipelineResult,
   processPrivacyPipeline,
 } from "../privacy/pipeline";
-import { createCodexUnmaskingStream } from "../providers/codex/stream-transformer";
+import { createResponsesUnmaskingStream } from "../protocols/responses/stream-transformer";
 import { ProviderError } from "../providers/errors";
 import type { SecretsProcessResult } from "../secrets/request";
 import {
@@ -66,7 +66,7 @@ codexRoutes.post(
 
     let privacy: PrivacyPipelineResult<CodexResponsesRequest>;
     try {
-      privacy = await processPrivacyPipeline(request, config, codexExtractor);
+      privacy = await processPrivacyPipeline(request, config, responsesExtractor);
     } catch (error) {
       if (error instanceof PrivacyPipelineDetectionError) {
         console.error("PII detection error:", error.cause ?? error);
@@ -167,7 +167,7 @@ function getForwardHeaders(c: Context): Record<string, string> {
 
 function formatCodexForLog(request: CodexResponsesRequest): string | undefined {
   const config = getConfig();
-  return formatMaskedRequestForLog(request, codexExtractor, config);
+  return formatMaskedRequestForLog(request, responsesExtractor, config);
 }
 
 function respondBlocked(
@@ -353,7 +353,9 @@ function respondStreaming(
   setStreamingHeaders(c);
 
   if (piiContext || secretsContext) {
-    return c.body(createCodexUnmaskingStream(stream, piiContext, maskingConfig, secretsContext));
+    return c.body(
+      createResponsesUnmaskingStream(stream, piiContext, maskingConfig, secretsContext),
+    );
   }
 
   return c.body(stream);
@@ -366,7 +368,7 @@ function respondJson(
   secretsContext?: PlaceholderContext,
   maskingConfig = getConfig().masking,
 ) {
-  const result = restoreResponse(response, codexExtractor, maskingConfig, {
+  const result = restoreResponse(response, responsesExtractor, maskingConfig, {
     piiContext,
     secretsContext,
   });

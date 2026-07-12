@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { type CodexResponsesRequest, codexExtractor } from "./codex";
+import { type ResponsesRequest, responsesExtractor } from "./responses";
 
-describe("Codex Text Extractor", () => {
+describe("Responses Text Extractor", () => {
   test("infers roles for instructions, messages, tools, and MCP items", () => {
-    const request: CodexResponsesRequest = {
+    const request: ResponsesRequest = {
       model: "gpt-5.5",
       instructions: "System Jane jane.system@example.com",
       input: [
@@ -51,7 +51,7 @@ describe("Codex Text Extractor", () => {
     };
 
     expect(
-      codexExtractor.extractTexts(request).map((span) => ({
+      responsesExtractor.extractTexts(request).map((span) => ({
         path: span.path,
         role: span.role,
         text: span.text,

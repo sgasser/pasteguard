@@ -100,6 +100,8 @@ from openai import OpenAI
 client = OpenAI(base_url="http://localhost:3000/openai/v1")
 ```
 
+Both `client.chat.completions.create(...)` and `client.responses.create(...)` pass through PasteGuard's privacy pipeline.
+
 For custom config, persistent logs, Docker Compose, or detector settings: **[Read the docs](https://pasteguard.com/docs/installation)**.
 
 ## Privacy Modes

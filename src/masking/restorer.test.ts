@@ -4,8 +4,8 @@ import type { AnthropicResponse } from "../providers/anthropic/types";
 import type { OpenAIResponse } from "../providers/openai/types";
 import { createPlaceholderContext, type PlaceholderContext } from "./context";
 import { anthropicExtractor } from "./extractors/anthropic";
-import { type CodexResponsesResponse, codexExtractor } from "./extractors/codex";
 import { openaiExtractor } from "./extractors/openai";
+import { type ResponsesResponse, responsesExtractor } from "./extractors/responses";
 import { restoreResponse } from "./restorer";
 import type { RequestExtractor } from "./types";
 
@@ -127,11 +127,11 @@ describe("restoreResponse applies markers through each provider extractor", () =
   });
 
   test("Codex response", () => {
-    const response: CodexResponsesResponse = {
+    const response: ResponsesResponse = {
       output: [{ content: [{ type: "output_text", text: "Your key is [[API_KEY_SK_1]]" }] }],
     };
 
-    const result = restoreResponse(response, codexExtractor, markerConfig, {
+    const result = restoreResponse(response, responsesExtractor, markerConfig, {
       secretsContext: context({ "[[API_KEY_SK_1]]": "sk-secret" }),
     });
 

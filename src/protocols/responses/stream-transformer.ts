@@ -1,9 +1,9 @@
 import type { MaskingConfig } from "../../config";
 import type { PlaceholderContext } from "../../masking/context";
-import { type CodexResponsesResponse, codexExtractor } from "../../masking/extractors/codex";
+import { type ResponsesResponse, responsesExtractor } from "../../masking/extractors/responses";
 import { StreamRestorer } from "../../masking/stream-restorer";
 
-export function createCodexUnmaskingStream(
+export function createResponsesUnmaskingStream(
   stream: ReadableStream<Uint8Array>,
   piiContext: PlaceholderContext | undefined,
   maskingConfig: MaskingConfig,
@@ -19,14 +19,14 @@ export function createCodexUnmaskingStream(
   });
 
   function unmaskPayload(payload: unknown): unknown {
-    const result = payload as CodexResponsesResponse;
-    const spans = codexExtractor.extractTexts(result);
+    const result = payload as ResponsesResponse;
+    const spans = responsesExtractor.extractTexts(result);
 
     if (spans.length === 0) {
       return result;
     }
 
-    return codexExtractor.applyMasked(
+    return responsesExtractor.applyMasked(
       result,
       spans.map((span) => ({
         ...span,

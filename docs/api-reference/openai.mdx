@@ -1,19 +1,20 @@
 ---
 title: OpenAI
-description: POST /openai/v1/chat/completions
+description: POST /openai/v1/chat/completions and /responses
 ---
 
-Generate chat completions with automatic PII and secrets protection.
+Generate Chat Completions and Responses with automatic PII and secrets protection.
 
 ```
 POST /openai/v1/chat/completions
+POST /openai/v1/responses
 ```
 
 <Note>
-This is the only endpoint that receives PII detection and masking. All other OpenAI endpoints (`/models`, `/embeddings`, `/files`, etc.) are proxied directly to OpenAI without modification.
+These endpoints receive PII detection and masking. Other OpenAI endpoints (`/models`, `/embeddings`, `/files`, etc.) are proxied directly without modification.
 </Note>
 
-## Request
+## Chat Completions request
 
 ```bash
 curl http://localhost:3000/openai/v1/chat/completions \
@@ -106,6 +107,22 @@ for await (const chunk of stream) {
 ```
 
 </CodeGroup>
+
+## Responses
+
+Use the same base URL with the Responses API:
+
+```bash
+curl http://localhost:3000/openai/v1/responses \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.2",
+    "input": "Summarize this customer note"
+  }'
+```
+
+PasteGuard inspects Responses requests, restores supported JSON and streaming responses, and records masking events in the dashboard.
 
 ## Response Headers
 

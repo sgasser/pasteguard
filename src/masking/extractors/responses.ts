@@ -1,15 +1,15 @@
 import { type PlaceholderContext, restorePlaceholders } from "../../masking/context";
 import type { MaskedSpan, RequestExtractor, TextSpan } from "../types";
 
-export type CodexResponsesRequest = {
+export type ResponsesRequest = {
   model?: string;
-  instructions?: string;
+  instructions?: unknown;
   input?: unknown;
   stream?: boolean;
   [key: string]: unknown;
 };
 
-export type CodexResponsesResponse = Record<string, unknown>;
+export type ResponsesResponse = Record<string, unknown>;
 
 const TEXT_KEYS = new Set([
   "arguments",
@@ -110,8 +110,8 @@ function pathFromString(path: string): Array<string | number> {
   return result;
 }
 
-export const codexExtractor: RequestExtractor<CodexResponsesRequest, CodexResponsesResponse> = {
-  extractTexts(request: CodexResponsesRequest): TextSpan[] {
+export const responsesExtractor: RequestExtractor<ResponsesRequest, ResponsesResponse> = {
+  extractTexts(request: ResponsesRequest): TextSpan[] {
     return collectText(request).map((item, index) => ({
       text: item.value,
       path: pathToString(item.path),
@@ -121,7 +121,7 @@ export const codexExtractor: RequestExtractor<CodexResponsesRequest, CodexRespon
     }));
   },
 
-  applyMasked(request: CodexResponsesRequest, maskedSpans: MaskedSpan[]): CodexResponsesRequest {
+  applyMasked(request: ResponsesRequest, maskedSpans: MaskedSpan[]): ResponsesRequest {
     return maskedSpans.reduce(
       (current, span) => setAtPath(current, pathFromString(span.path), span.maskedText),
       request,
@@ -129,10 +129,10 @@ export const codexExtractor: RequestExtractor<CodexResponsesRequest, CodexRespon
   },
 
   unmaskResponse(
-    response: CodexResponsesResponse,
+    response: ResponsesResponse,
     context: PlaceholderContext,
     formatValue?: (original: string) => string,
-  ): CodexResponsesResponse {
+  ): ResponsesResponse {
     let result = response;
     for (const item of collectText(response)) {
       result = setAtPath(result, item.path, restorePlaceholders(item.value, context, formatValue));
