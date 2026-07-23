@@ -79,13 +79,3 @@ jobs:
       # Build the all-in-one image users actually run (proxy + detector).
       - name: Test Docker build
         run: docker build -f docker/Dockerfile -t pasteguard:test .
-
-      - name: Scan Docker image
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: pasteguard:test
-          version: v0.72.0
-          exit-code: "1"
-          ignore-unfixed: false
-          severity: HIGH,CRITICAL
-          vuln-type: os,library

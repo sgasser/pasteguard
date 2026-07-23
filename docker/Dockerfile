@@ -17,12 +17,14 @@
 #     -v ./data:/pasteguard/data \
 #     pasteguard:latest
 
-ARG AMAZON_LINUX_IMAGE=public.ecr.aws/amazonlinux/amazonlinux:2023-minimal@sha256:0caa7d3c2a199a700f488b055058b0798cff190bc0cf08bacd6003b9d03e9dfd
+ARG BUN_IMAGE=oven/bun:1-slim@sha256:d56a2534ffd262e92c12fd3249d3924d296d97086da773f821d7d0477435ea04
+ARG PYTHON_BUILD_IMAGE=cgr.dev/chainguard/python:latest-dev@sha256:967409cf4148210d7c1bb872ffdda42a8b73cfc738f95eae7413045d0d6c30ee
+ARG PYTHON_RUNTIME_IMAGE=cgr.dev/chainguard/python:latest@sha256:2c6a2e8bdeb1336cd8545d3586d1c1e5b4f7564ef00924b0447ebfbe57a549ee
 
 # =============================================================================
 # Stage: bun-builder — build the Bun application
 # =============================================================================
-FROM oven/bun:1-slim AS bun-builder
+FROM ${BUN_IMAGE} AS bun-builder
 
 WORKDIR /app
 
@@ -35,12 +37,11 @@ COPY tsconfig.json ./
 # =============================================================================
 # Stage: detector-builder — install the detector and download its model
 # =============================================================================
-FROM ${AMAZON_LINUX_IMAGE} AS detector-builder
+FROM ${PYTHON_BUILD_IMAGE} AS detector-builder
 
-RUN microdnf install -y python3.11 python3.11-pip \
-    && microdnf clean all
+USER root
 
-RUN python3.11 -m venv /opt/venv
+RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # The explicit CPU index prevents PyPI from pulling unused CUDA libraries.
@@ -68,35 +69,31 @@ RUN --mount=type=cache,target=/tmp/huggingface \
     [ -n "$ok" ] \
     && mkdir -p /opt/models \
     && cp -a /tmp/huggingface/. /opt/models/ \
+    && mkdir -p /tmp/empty-data \
     || exit 1
 
 # =============================================================================
 # Stage: detector — the standalone PII detector runtime
 # =============================================================================
-FROM ${AMAZON_LINUX_IMAGE} AS detector
-
-RUN microdnf install -y python3.11 shadow-utils \
-    && useradd --uid 1000 --create-home --home-dir /home/pasteguard pasteguard \
-    && microdnf remove -y shadow-utils \
-    && microdnf clean all \
-    && mkdir -p /pasteguard/data \
-    && chown -R 1000:1000 /pasteguard
+FROM ${PYTHON_RUNTIME_IMAGE} AS detector
 
 COPY --from=detector-builder /opt/venv /opt/venv
-COPY --from=detector-builder --chown=1000:1000 /opt/models /opt/models
+COPY --from=detector-builder --chown=65532:65532 /opt/models /opt/models
+COPY --from=detector-builder --chown=65532:65532 /tmp/empty-data /pasteguard/data
 
 ENV PATH="/opt/venv/bin:${PATH}"
 ENV DETECTOR_MODEL=urchade/gliner_multi_pii-v1
 ENV HF_HOME=/opt/models
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
-ENV HOME=/home/pasteguard
+ENV HOME=/home/nonroot
 
 EXPOSE 5002
 HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=5 \
-    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5002/health').status==200 else 1)"
+    CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5002/health').status==200 else 1)"]
 
-USER 1000
+USER 65532
+ENTRYPOINT []
 CMD ["uvicorn", "detector.app:app", "--host", "0.0.0.0", "--port", "5002"]
 
 # =============================================================================
@@ -124,6 +121,6 @@ ENV DETECTOR_URL=http://localhost:5002
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+    CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/health').status==200 else 1)"]
 
 CMD ["/opt/venv/bin/supervisord", "-c", "/etc/supervisord.conf"]
