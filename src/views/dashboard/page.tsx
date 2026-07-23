@@ -554,6 +554,15 @@ function renderEntityList(entities) {
   ).join('') + '</div>';
 }
 
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function formatSourceLabel(source) {
   return source === 'browser_extension' ? 'Browser Extension' : source.toUpperCase();
 }
@@ -602,7 +611,7 @@ async function fetchLogs() {
           '</td>' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' + sourceBadge + '</td>' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' + statusBadge + '</td>' +
-          '<td class="font-mono text-[0.7rem] text-text-secondary px-4 py-3 border-b border-border-subtle align-middle">' + log.model + '</td>' +
+          '<td class="font-mono text-[0.7rem] text-text-secondary px-4 py-3 border-b border-border-subtle align-middle">' + escapeHtml(log.model) + '</td>' +
           '<td class="text-sm px-4 py-3 border-b border-border-subtle align-middle">' +
             (entities.length > 0
               ? '<div class="flex flex-wrap gap-1">' + entities.map(e => '<span class="font-mono text-[0.55rem] px-1.5 py-0.5 bg-elevated border border-border rounded-sm text-text-secondary">' + e.trim() + '</span>').join('') + '</div>'

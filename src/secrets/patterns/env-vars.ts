@@ -18,16 +18,21 @@ export const envVarsDetector: PatternDetector = {
 
     // Environment variable password patterns: _PASSWORD or _PWD suffix with value (8+ chars)
     // Case-insensitive for variable name, supports = and : assignment, quoted/unquoted values
+    // The variable-name run is length-bounded ({0,128}) so a long, non-matching
+    // run of word characters cannot force quadratic backtracking (ReDoS); real
+    // env var names are far shorter than this bound.
     if (enabledTypes.has("ENV_PASSWORD")) {
       const passwordPattern =
-        /[A-Za-z_][A-Za-z0-9_]*(?:PASSWORD|_PWD)\s*[=:]\s*['"]?[^\s'"]{8,}['"]?/gi;
+        /[A-Za-z_][A-Za-z0-9_]{0,128}(?:PASSWORD|_PWD)\s*[=:]\s*['"]?[^\s'"]{8,}['"]?/gi;
       detectPattern(text, passwordPattern, "ENV_PASSWORD", matches, locations);
     }
 
     // Environment variable secret patterns: _SECRET suffix with value (8+ chars)
     // Case-insensitive for variable name, supports = and : assignment, quoted/unquoted values
+    // The variable-name run is length-bounded ({0,128}) to prevent quadratic
+    // backtracking (ReDoS) on long non-matching word-character runs.
     if (enabledTypes.has("ENV_SECRET")) {
-      const secretPattern = /[A-Za-z_][A-Za-z0-9_]*_SECRET\s*[=:]\s*['"]?[^\s'"]{8,}['"]?/gi;
+      const secretPattern = /[A-Za-z_][A-Za-z0-9_]{0,128}_SECRET\s*[=:]\s*['"]?[^\s'"]{8,}['"]?/gi;
       detectPattern(text, secretPattern, "ENV_SECRET", matches, locations);
     }
 

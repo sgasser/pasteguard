@@ -31,7 +31,18 @@ const requestIdMiddleware = createMiddleware<{ Variables: Variables }>(async (c,
 
 // Middleware
 app.use("*", requestIdMiddleware);
-app.use("*", cors());
+// Permissive CORS is applied to the proxy and mask APIs so browser-based clients
+// can call them, but NOT to the dashboard. The dashboard UI and its JSON APIs
+// (/dashboard, /dashboard/api/*) are served same-origin and may be
+// unauthenticated; a wildcard Access-Control-Allow-Origin there would let any
+// website the operator visits read logged request data cross-origin. Same-origin
+// dashboard use needs no CORS headers, so excluding it changes no legitimate flow.
+const corsMiddleware = cors();
+app.use("*", (c, next) =>
+  c.req.path === "/dashboard" || c.req.path.startsWith("/dashboard/")
+    ? next()
+    : corsMiddleware(c, next),
+);
 app.use("*", logger());
 
 // Favicon
