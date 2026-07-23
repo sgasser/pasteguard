@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { openaiExtractor } from "../masking/extractors/openai";
-import type { PIIDetectionResult } from "../pii/detect";
+import { filterAllowlistedEntities, type PIIDetectionResult, PIIDetector } from "../pii/detect";
 import type { OpenAIRequest } from "../providers/openai/types";
 import type { PrivacyPipelineConfig } from "./pipeline";
 
@@ -22,6 +22,8 @@ const mockAnalyzeRequest = mock<
 );
 
 mock.module("../pii/detect", () => ({
+  PIIDetector,
+  filterAllowlistedEntities,
   getPIIDetector: () => ({
     analyzeRequest: mockAnalyzeRequest,
     detectPII: mock(() => Promise.resolve([])),
