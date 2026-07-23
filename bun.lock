@@ -6,7 +6,7 @@
       "name": "pasteguard",
       "dependencies": {
         "@hono/zod-validator": "^0.7.6",
-        "hono": "^4.12.23",
+        "hono": "^4.12.25",
         "hono-tailwind": "^2.2.0",
         "kysely": "^0.29.2",
         "pg": "^8.22.0",
@@ -99,7 +99,7 @@
 
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
-    "hono": ["hono@4.12.23", "", {}, "sha512-eIaZ9qDgu7XV0pxOCrg7/WhnQ6Ivm22UcxhXx/A3dcbqbbYgBEkc6e/J/s7j2tS96zoB0S9VBdLwQNCWwUo4LA=="],
+    "hono": ["hono@4.12.31", "", {}, "sha512-zJIHFrl6bq3RDd2YusFNCDlM8qUprxKswyi/OPzPyzKDdyBXDqWx8bZlZ7R+saTdSTatUmb3O7K4SspGPaEOQg=="],
 
     "hono-tailwind": ["hono-tailwind@2.2.0", "", { "dependencies": { "@tailwindcss/postcss": "^4.1.6", "postcss": "^8.5.3" }, "peerDependencies": { "hono": "^4.0.0", "tailwindcss": "^4.1.6" } }, "sha512-orA97f08l2nsKU4tu4EAa4/F5KIIscdvsFQkFi07U0WYCpCVEy+Pw4qAY+z4jYgHf7OSnXo7IzLwFxTq4tRH9Q=="],
 

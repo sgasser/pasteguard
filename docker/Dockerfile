@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # PasteGuard — Docker image (multi-stage, single source of truth)
 #
 # Two build targets share ONE detector definition (the `detector` stage):
@@ -15,6 +17,8 @@
 #     -v ./data:/pasteguard/data \
 #     pasteguard:latest
 
+ARG AMAZON_LINUX_IMAGE=public.ecr.aws/amazonlinux/amazonlinux:2023-minimal@sha256:0caa7d3c2a199a700f488b055058b0798cff190bc0cf08bacd6003b9d03e9dfd
+
 # =============================================================================
 # Stage: bun-builder — build the Bun application
 # =============================================================================
@@ -29,39 +33,70 @@ COPY src ./src
 COPY tsconfig.json ./
 
 # =============================================================================
-# Stage: detector — the PII detector service (also a standalone build target)
+# Stage: detector-builder — install the detector and download its model
 # =============================================================================
-FROM python:3.11-slim AS detector
+FROM ${AMAZON_LINUX_IMAGE} AS detector-builder
 
-# CPU-only torch. The CPU index serves both x86_64 and aarch64 CPU wheels, so
-# pin it for every arch. (PyPI's DEFAULT index now ships CUDA builds for
-# linux/arm64 too — e.g. torch 2.x+cuXXX — which would drag ~6 GB of unused
-# CUDA libraries into the image; the explicit CPU index avoids that.)
+RUN microdnf install -y python3.11 python3.11-pip \
+    && microdnf clean all
+
+RUN python3.11 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+# The explicit CPU index prevents PyPI from pulling unused CUDA libraries.
 RUN pip install --no-cache-dir typing-extensions \
     && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
-# Install the detector package (pulls fastapi/uvicorn/gliner/stdnum/...).
+RUN pip install --no-cache-dir setuptools==83.0.0
+
+ENV PIP_DEFAULT_TIMEOUT=120
+ENV PIP_RETRIES=5
+
 COPY detector/pyproject.toml /srv/detector/
 COPY detector/detector /srv/detector/detector
-RUN pip install --no-cache-dir /srv/detector
+RUN pip install --no-cache-dir supervisor==4.3.0 /srv/detector \
+    && pip check \
+    && pip uninstall -y pip
 
-# Bake the default model into a location the all-in-one runtime user (UID 1000)
-# can also read, and force offline use at runtime (no network needed for models).
 ENV DETECTOR_MODEL=urchade/gliner_multi_pii-v1
 ENV HF_HOME=/opt/models
-# Retry the fetch: under multi-arch (QEMU) builds a transient HF rate-limit or
-# network blip should not fail the whole image build.
-RUN ok=""; for i in 1 2 3; do \
-        python -c "import os; from gliner import GLiNER; GLiNER.from_pretrained(os.environ['DETECTOR_MODEL'])" && { ok=1; break; }; \
+RUN --mount=type=cache,target=/tmp/huggingface \
+    ok=""; for i in 1 2 3; do \
+        HF_HOME=/tmp/huggingface python -c "import os; from gliner import GLiNER; GLiNER.from_pretrained(os.environ['DETECTOR_MODEL'])" && { ok=1; break; }; \
         echo "model fetch attempt $i failed; retrying in 10s"; sleep 10; \
     done; \
-    [ -n "$ok" ] && chown -R 1000:1000 /opt/models || exit 1
-ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+    [ -n "$ok" ] \
+    && mkdir -p /opt/models \
+    && cp -a /tmp/huggingface/. /opt/models/ \
+    || exit 1
+
+# =============================================================================
+# Stage: detector — the standalone PII detector runtime
+# =============================================================================
+FROM ${AMAZON_LINUX_IMAGE} AS detector
+
+RUN microdnf install -y python3.11 shadow-utils \
+    && useradd --uid 1000 --create-home --home-dir /home/pasteguard pasteguard \
+    && microdnf remove -y shadow-utils \
+    && microdnf clean all \
+    && mkdir -p /pasteguard/data \
+    && chown -R 1000:1000 /pasteguard
+
+COPY --from=detector-builder /opt/venv /opt/venv
+COPY --from=detector-builder --chown=1000:1000 /opt/models /opt/models
+
+ENV PATH="/opt/venv/bin:${PATH}"
+ENV DETECTOR_MODEL=urchade/gliner_multi_pii-v1
+ENV HF_HOME=/opt/models
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+ENV HOME=/home/pasteguard
 
 EXPOSE 5002
 HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=5 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5002/health').status==200 else 1)"
 
+USER 1000
 CMD ["uvicorn", "detector.app:app", "--host", "0.0.0.0", "--port", "5002"]
 
 # =============================================================================
@@ -69,17 +104,9 @@ CMD ["uvicorn", "detector.app:app", "--host", "0.0.0.0", "--port", "5002"]
 # =============================================================================
 FROM detector AS allinone
 
-# supervisor manages both processes; curl backs the health check.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    supervisor \
-    curl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy the Bun binary from the official image (baseline build for x86_64
 # compatibility on older CPUs, see https://github.com/sgasser/pasteguard/issues/70).
 COPY --from=bun-builder /usr/local/bin/bun /usr/local/bin/bun
-ENV PATH="/usr/local/bin:${PATH}"
 
 # Copy the Bun application.
 WORKDIR /pasteguard
@@ -89,15 +116,7 @@ COPY --from=bun-builder /app/package.json ./
 COPY --from=bun-builder /app/tsconfig.json ./
 COPY config.example.yaml ./
 
-# Create a real UID-1000 user with a home dir. torch resolves its cache dir via
-# getpwuid() at import, which fails on a bare numeric USER with no passwd entry.
-RUN useradd --uid 1000 --create-home --home-dir /home/pasteguard pasteguard \
-    && mkdir -p /pasteguard/data && chown -R 1000:1000 /pasteguard
-
-COPY docker/supervisord.conf /etc/supervisor/conf.d/pasteguard.conf
-
-USER 1000
-ENV HOME=/home/pasteguard
+COPY docker/supervisord.conf /etc/supervisord.conf
 
 # The proxy talks to the in-container detector.
 ENV DETECTOR_URL=http://localhost:5002
@@ -107,4 +126,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/pasteguard.conf"]
+CMD ["/opt/venv/bin/supervisord", "-c", "/etc/supervisord.conf"]
