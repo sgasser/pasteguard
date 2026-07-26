@@ -144,7 +144,7 @@ Every request is logged with masking details. See what was detected, what was ma
 
 The detector combines checksums and format checks for structured values with a
 semantic backend for names and places. GLiNER is currently the only backend.
-See [`detector/`](detector/) and [Semantic Backends](https://pasteguard.com/docs/configuration/semantic-backends).
+See [Semantic Backends](https://pasteguard.com/docs/configuration/semantic-backends).
 
 ## Tech Stack
 
