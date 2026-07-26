@@ -122,6 +122,25 @@ def test_missing_local_model_path_fails_before_loading(monkeypatch, tmp_path):
     load.assert_not_called()
 
 
+def test_unresolvable_tilde_model_fails_actionably(monkeypatch):
+    model = "~unknown-pasteguard-user/custom-checkpoint"
+    monkeypatch.setenv("DETECTOR_MODEL", model)
+    monkeypatch.setattr(
+        semantic_backend.Path,
+        "expanduser",
+        Mock(side_effect=RuntimeError("Could not determine home directory")),
+    )
+    load = _mock_gliner_loader(monkeypatch)
+
+    with pytest.raises(
+        ValueError,
+        match=r"DETECTOR_MODEL local path does not exist: ~unknown-pasteguard-user/",
+    ):
+        semantic_backend.load_semantic_backend()
+
+    load.assert_not_called()
+
+
 def test_local_model_path_must_be_a_directory(monkeypatch, tmp_path):
     model_file = tmp_path / "model.bin"
     model_file.touch()
@@ -282,6 +301,21 @@ def test_existing_model_path_alias_wins_over_baked_detector_model(monkeypatch, t
     semantic_backend.load_semantic_backend()
 
     load.assert_called_once_with(str(model_path.resolve()))
+
+
+def test_missing_model_path_alias_error_names_the_source(monkeypatch, tmp_path):
+    missing = tmp_path / "missing-checkpoint"
+    monkeypatch.setenv("DETECTOR_MODEL", "urchade/gliner_multi_pii-v1")
+    monkeypatch.setenv("DETECTOR_MODEL_PATH", str(missing))
+    load = _mock_gliner_loader(monkeypatch)
+
+    with pytest.raises(
+        ValueError,
+        match="DETECTOR_MODEL_PATH local path does not exist",
+    ):
+        semantic_backend.load_semantic_backend()
+
+    load.assert_not_called()
 
 
 def test_backend_info_reports_loaded_identity(monkeypatch):
