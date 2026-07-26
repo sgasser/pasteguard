@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Entity type strings returned on the /analyze response. The original
-# Presidio-compatible set and VAT_CODE remain available alongside the semantic
-# types emitted by OpenAI Privacy Filter.
+# Entity type strings returned by /analyze. Deterministic identifiers and
+# semantic model output share this canonical response taxonomy.
 PERSON = "PERSON"
 LOCATION = "LOCATION"
 EMAIL_ADDRESS = "EMAIL_ADDRESS"

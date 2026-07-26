@@ -79,8 +79,7 @@ _LABELS = list(PER_LABEL_FLOOR)
 _LABEL_TO_TYPE = {
     "person": PERSON,
     "location": LOCATION,
-    # Street addresses are a kind of location for masking purposes; emit them as
-    # LOCATION so the response entity set stays the Presidio drop-in set.
+    # Street addresses are locations for masking purposes.
     "address": LOCATION,
 }
 # Capture candidates below every floor so per-label filtering has them.

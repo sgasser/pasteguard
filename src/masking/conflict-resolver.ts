@@ -1,6 +1,3 @@
-// Conflict resolution based on Microsoft Presidio's logic
-// https://github.com/microsoft/presidio/blob/main/presidio-anonymizer/presidio_anonymizer/anonymizer_engine.py
-
 export interface Span {
   start: number;
   end: number;
