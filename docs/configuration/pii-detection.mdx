@@ -27,8 +27,19 @@ pii_detection:
 | `detector_url` | `http://localhost:5002` | Detector `/analyze` URL |
 | `detector_timeout` | `30` | Timeout in seconds for each detector `/analyze` request. Increase for very large messages; set to `0` to disable |
 | `phone_regions` | `[]` | Optional regions for national-format phone numbers |
-| `score_threshold` | `0.7` | Minimum confidence floor for the neural labels PERSON and LOCATION (0.0-1.0). Checksum-validated identifiers always score `1.0` and are unaffected |
+| `score_threshold` | `0.7` | Minimum confidence floor for the semantic labels PERSON and LOCATION (0.0-1.0). Checksum-validated identifiers always score `1.0` and are unaffected |
 | `entities` | See below | Entity types to return |
+
+## Detector Backend
+
+The detector always runs deterministic checks for structured identifiers and
+uses a semantic backend for names, locations, and street addresses. GLiNER is
+the current default and only enabled backend.
+
+- [Semantic Backends](/configuration/semantic-backends) explains selection,
+  startup validation, and backend health metadata.
+- [GLiNER](/configuration/gliner) covers custom Hugging Face models, local
+  checkpoints, confidence floors, and offline deployment.
 
 ## Phone Regions
 
@@ -65,7 +76,7 @@ Names and locations are multilingual. IBAN, credit card, email, IP, and `+` phon
 
 ## Score Threshold
 
-`score_threshold` raises the confidence floor for the **tunable** neural labels
+`score_threshold` raises the confidence floor for the **tunable** semantic labels
 **PERSON** and **LOCATION** only. Higher = fewer false positives, might miss
 some PII; lower = catches more, more false positives.
 
@@ -77,11 +88,13 @@ pii_detection:
 ```
 
 Checksum-validated identifiers are always reported (score `1.0`) and are never
-dropped by the threshold. Tune the neural labels per deployment via the
-`DETECTOR_FLOOR_PERSON`, `DETECTOR_FLOOR_LOCATION`, and `DETECTOR_FLOOR_ADDRESS`
-environment variables on the detector service — e.g. `DETECTOR_FLOOR_PERSON=0.9`
-(fewer person false positives) or `DETECTOR_FLOOR_LOCATION=0.4` (more location
-recall). Street addresses are detected by the model and reported as `LOCATION`.
+dropped by the threshold. Street addresses are detected by the semantic backend
+and reported as `LOCATION`.
+
+GLiNER deployments can tune the backend floors with
+`GLINER_FLOOR_PERSON`, `GLINER_FLOOR_LOCATION`, and
+`GLINER_FLOOR_ADDRESS`. See [GLiNER configuration](/configuration/gliner) for
+defaults, precedence, and validation rules.
 
 ## Allowlist
 

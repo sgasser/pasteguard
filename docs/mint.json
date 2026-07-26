@@ -72,6 +72,8 @@
         "configuration/overview",
         "configuration/providers",
         "configuration/pii-detection",
+        "configuration/semantic-backends",
+        "configuration/gliner",
         "configuration/secrets-detection",
         "configuration/logging"
       ]

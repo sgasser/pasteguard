@@ -68,3 +68,8 @@ pii_detection:
   detector_url: ${DETECTOR_URL:-http://localhost:5002}
   detector_timeout: ${DETECTOR_TIMEOUT:-30}
 ```
+
+`config.yaml` controls the proxy's PII policy and connection to the detector.
+Backend and model settings are environment variables on the detector service.
+See [Semantic Backends](/configuration/semantic-backends) and
+[GLiNER](/configuration/gliner).

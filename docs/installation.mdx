@@ -4,8 +4,8 @@ description: Docker image and deployment options
 ---
 
 PasteGuard ships as a single all-in-one Docker image — the Bun proxy and the PII
-detector (deterministic regex/checksum + multilingual GLiNER) run together in one
-container. No build step required.
+detector (deterministic checks plus a semantic backend) run together in one
+container. GLiNER is included as the default backend. No build step required.
 
 ## Docker Image
 
@@ -73,12 +73,27 @@ Detection is multilingual and needs no per-language configuration. Configure
 `phone_regions` only if you need national-format phone numbers without a `+`
 country prefix — see [PII Detection Config](/configuration/pii-detection).
 
+## Detector Models
+
+The image includes `urchade/gliner_multi_pii-v1` and loads it offline by
+default. No Hugging Face access is needed for the standard setup.
+
+You can select a validated Hugging Face model ID or mount a local GLiNER
+checkpoint. Custom Hub models need online access for the first download because
+the published image deliberately starts in offline mode.
+
+See [Semantic Backends](/configuration/semantic-backends) for the common
+selection behavior and [GLiNER](/configuration/gliner) for complete Docker,
+local-checkpoint, cache, and tuning examples.
+
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DETECTOR_URL` | `http://localhost:5002` | Where the proxy reaches the detector. In the all-in-one image this is in-container and rarely changed; override it to point at an external detector. |
 | `DETECTOR_TIMEOUT` | `30` | Seconds to wait for each detector `/analyze` request when using the example config. Increase for very large messages; set to `0` to disable. |
+| `DETECTOR_BACKEND` | `gliner` | Semantic detector backend. GLiNER is currently the only supported value. |
+| `DETECTOR_MODEL` | `urchade/gliner_multi_pii-v1` | Hugging Face model ID or local model directory used by the detector. |
 | `PASTEGUARD_STARTUP_TIMEOUT` | `180` | Seconds to wait for the detector to become ready at startup |
 
 ## Next Steps
@@ -89,5 +104,8 @@ country prefix — see [PII Detection Config](/configuration/pii-detection).
   </Card>
   <Card title="Configuration" icon="gear" href="/configuration/overview">
     Customize PasteGuard
+  </Card>
+  <Card title="GLiNER" icon="scan-search" href="/configuration/gliner">
+    Configure semantic models
   </Card>
 </CardGroup>

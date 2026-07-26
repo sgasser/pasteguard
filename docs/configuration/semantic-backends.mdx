@@ -1,0 +1,78 @@
+---
+title: Semantic Backends
+description: Select and verify the semantic detector backend
+---
+
+PasteGuard's detector combines two independent layers:
+
+- The **deterministic layer** validates structured values such as email addresses,
+  phone numbers, credit cards, IBANs, IP addresses, and VAT numbers.
+- The **semantic backend** detects names, locations, and street addresses.
+
+Changing the semantic backend does not disable or replace deterministic
+detection.
+
+## Available Backends
+
+| Backend | Status | Default |
+|---------|--------|---------|
+| `gliner` | Enabled | Yes |
+
+GLiNER is currently the only supported backend. Unknown backend names stop the
+detector during startup instead of silently falling back.
+
+## Select a Backend
+
+Set detector environment variables on the detector process or container:
+
+```bash
+DETECTOR_BACKEND=gliner
+DETECTOR_MODEL=urchade/gliner_multi_pii-v1
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DETECTOR_BACKEND` | `gliner` | Semantic backend to load |
+| `DETECTOR_MODEL` | Backend default | Model identifier or local model directory |
+
+The selected backend and model load before the detector becomes ready. Invalid
+configuration, inaccessible models, and incomplete local checkpoints fail
+startup with an actionable error.
+
+See [GLiNER](/configuration/gliner) for supported model formats, tuning options,
+Docker examples, and offline operation.
+
+## Verify the Loaded Backend
+
+Query the detector service directly:
+
+```bash
+curl http://localhost:5002/health
+```
+
+```json
+{
+  "status": "ok",
+  "backend": "gliner",
+  "model": "urchade/gliner_multi_pii-v1"
+}
+```
+
+For a local checkpoint, `model` contains its resolved absolute path. This
+provider-neutral response lets deployment checks and benchmark tooling verify
+what is actually loaded.
+
+<Note>
+PasteGuard's public `GET /health` endpoint on port `3000` reports whether the
+detector is available. Backend identity is exposed by the detector's own
+`GET /health` endpoint, normally on port `5002`.
+</Note>
+
+## Runtime Behavior
+
+A detector process loads one semantic model and reuses it for all requests.
+Restart the detector after changing backend or model environment variables.
+
+Each backend owns its model-specific validation and tuning. Future backends can
+be added without changing the deterministic layer or the `/analyze` response
+contract.
