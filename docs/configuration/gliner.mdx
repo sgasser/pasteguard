@@ -7,49 +7,25 @@ description: Configure GLiNER models, checkpoints, confidence floors, and offlin
 only semantic backend. It detects `PERSON` and `LOCATION`; street addresses are
 also returned as `LOCATION`.
 
-## Default Model
-
-PasteGuard uses:
-
-```text
-urchade/gliner_multi_pii-v1
-```
-
-The published Docker image includes this checkpoint and runs the Hugging Face
-and Transformers loaders offline by default. No model download is required at
-runtime.
-
-## Custom Hugging Face Model
-
-Set `DETECTOR_MODEL` to a valid Hugging Face model ID:
+The default model is `urchade/gliner_multi_pii-v1`.
 
 ```bash
-DETECTOR_BACKEND=gliner \
 DETECTOR_MODEL=urchade/gliner_small-v2.1 \
 .venv/bin/uvicorn detector.app:app --host 0.0.0.0 --port 5002
 ```
 
-Before loading the larger checkpoint, startup verifies that the repository is
-accessible and contains a readable `gliner_config.json`. Private or gated
-repositories require valid Hugging Face authentication.
+`DETECTOR_MODEL` accepts a Hugging Face model ID or local directory. Hub models
+must contain `gliner_config.json`; private models require Hugging Face
+authentication.
 
 <Warning>
-Custom models can have different accuracy and confidence calibration. Test
-person, location, and address recall against your own data before production.
-The deterministic detection of structured identifiers remains active
-regardless of the selected GLiNER model.
+Custom models have different accuracy and confidence calibration. Test them
+against your data before production.
 </Warning>
 
-## Local Model Directory
+## Local Models
 
-`DETECTOR_MODEL` can also point to a local directory:
-
-```bash
-DETECTOR_MODEL=/models/custom-gliner \
-.venv/bin/uvicorn detector.app:app --host 0.0.0.0 --port 5002
-```
-
-The directory must contain:
+Local directories need:
 
 ```text
 custom-gliner/
@@ -57,22 +33,18 @@ custom-gliner/
 └── model.safetensors
 ```
 
-`pytorch_model.bin` is accepted instead of `model.safetensors`. The config must
-be readable JSON with an object as its top-level value.
-
-Local paths are expanded and resolved during startup. Missing directories,
-invalid configs, and missing weights fail before inference starts.
+`pytorch_model.bin` is also accepted. Missing or invalid files fail during
+startup.
 
 <Note>
-A GLiNER config can reference a separate tokenizer or encoder model. Fully
-offline deployments must include those dependencies in the Hugging Face cache
-as well as the GLiNER checkpoint.
+Offline deployments must also cache any tokenizer or encoder referenced by
+`gliner_config.json`.
 </Note>
 
-## Docker: Custom Hub Model
+## Docker
 
-The published image is offline by default. To download a custom model on first
-start, enable Hub access and persist the model cache:
+The image includes the default model and runs offline. For a custom Hub model,
+enable downloads on first start and persist the cache:
 
 ```bash
 docker volume create pasteguard-models
@@ -86,12 +58,7 @@ docker run --rm -p 3000:3000 \
   ghcr.io/sgasser/pasteguard:latest
 ```
 
-After the first successful download, reuse the same volume. You can restore
-offline operation by setting both offline variables back to `1`.
-
-## Docker: Local Checkpoint
-
-Mount the model into the container and use its container path:
+For a local model, mount the directory and use its container path:
 
 ```bash
 docker run --rm -p 3000:3000 \
@@ -100,11 +67,7 @@ docker run --rm -p 3000:3000 \
   ghcr.io/sgasser/pasteguard:latest
 ```
 
-If the checkpoint references an encoder that is not already bundled, also mount
-a prepared Hugging Face cache at `/opt/models` or allow the first startup to
-download it.
-
-## GLiNER Environment Variables
+## Settings
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -113,36 +76,9 @@ download it.
 | `GLINER_FLOOR_ADDRESS` | `0.80` | Minimum confidence for street-address detections |
 | `GLINER_MAX_TOKENS` | `384` | Maximum model tokens per input window; must be at least `64` |
 
-Confidence floors must be finite numbers between `0` and `1`. Invalid values
-fail startup. Lower floors increase recall and false positives; higher floors
-increase precision and missed detections.
+Floors must be between `0` and `1`. The request `score_threshold` can raise, but
+not lower, them.
 
-The request-level `pii_detection.score_threshold` can raise the effective floor
-for person, location, and address detections. It never lowers the configured
-`GLINER_FLOOR_*` value.
-
-## Compatibility Variables
-
-Existing deployments can continue using:
-
-- `DETECTOR_MODEL_PATH`
-- `DETECTOR_FLOOR_PERSON`
-- `DETECTOR_FLOOR_LOCATION`
-- `DETECTOR_FLOOR_ADDRESS`
-- `DETECTOR_MAX_TOKENS`
-
-Prefer the canonical variables for new deployments. `DETECTOR_MODEL_PATH` takes
-precedence over `DETECTOR_MODEL`; each `GLINER_*` variable takes precedence over
-its legacy `DETECTOR_*` equivalent.
-
-## Verify the Model
-
-After startup:
-
-```bash
-curl http://localhost:5002/health
-```
-
-Confirm that `backend` is `gliner` and `model` matches the requested Hub ID or
-resolved local path. Then run representative requests through `/analyze` or
-PasteGuard's `/api/mask` endpoint before promoting the deployment.
+Legacy `DETECTOR_MODEL_PATH`, `DETECTOR_FLOOR_*`, and `DETECTOR_MAX_TOKENS`
+remain supported. `DETECTOR_MODEL_PATH` wins over `DETECTOR_MODEL`; `GLINER_*`
+wins over matching legacy variables.

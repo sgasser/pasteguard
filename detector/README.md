@@ -1,13 +1,9 @@
 # PasteGuard Detector
 
-The detector is a standalone FastAPI service used by PasteGuard. It combines:
+The FastAPI detector combines deterministic checks for structured identifiers
+with GLiNER for names, locations, and addresses.
 
-- deterministic format and checksum validation for structured identifiers;
-- a semantic backend for names, locations, and street addresses.
-
-GLiNER is the only enabled and default semantic backend.
-
-## Run Locally
+## Run
 
 ```bash
 cd detector
@@ -18,32 +14,28 @@ python -m venv .venv
 
 The default model is `urchade/gliner_multi_pii-v1`.
 
-## Select a Model
+## Models
 
-Use a Hugging Face model ID:
+Set `DETECTOR_MODEL` to a Hugging Face model ID or local checkpoint:
 
 ```bash
 DETECTOR_MODEL=urchade/gliner_small-v2.1 \
 .venv/bin/uvicorn detector.app:app --host 0.0.0.0 --port 5002
-```
 
-Or use a local GLiNER checkpoint:
-
-```bash
 DETECTOR_MODEL=/models/custom-gliner \
 .venv/bin/uvicorn detector.app:app --host 0.0.0.0 --port 5002
 ```
 
-A local checkpoint must contain `gliner_config.json` and either
-`model.safetensors` or `pytorch_model.bin`. The detector validates the model
-before starting inference.
+A local checkpoint needs `gliner_config.json` and either `model.safetensors` or
+`pytorch_model.bin`. Invalid models fail during startup.
 
-See the full documentation for [semantic backends](../docs/configuration/semantic-backends.mdx)
-and [GLiNER configuration](../docs/configuration/gliner.mdx).
+See [Semantic Backends](../docs/configuration/semantic-backends.mdx) and
+[GLiNER](../docs/configuration/gliner.mdx).
 
 ## Endpoints
 
-### Health
+- `GET /health` — readiness plus loaded backend and model
+- `POST /analyze` — detected entities with UTF-16 offsets
 
 ```bash
 curl http://localhost:5002/health
@@ -57,37 +49,7 @@ curl http://localhost:5002/health
 }
 ```
 
-### Analyze
-
-```bash
-curl http://localhost:5002/analyze \
-  -H "content-type: application/json" \
-  --data '{
-    "text": "Mario Rossi lives in Rome.",
-    "entities": ["PERSON", "LOCATION"],
-    "score_threshold": 0.7
-  }'
-```
-
-Offsets in the response use UTF-16 code units to match JavaScript string
-indexing.
-
-## Environment
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DETECTOR_BACKEND` | `gliner` | Semantic backend |
-| `DETECTOR_MODEL` | `urchade/gliner_multi_pii-v1` | Hugging Face model ID or local directory |
-| `GLINER_FLOOR_PERSON` | `0.95` | Person confidence floor |
-| `GLINER_FLOOR_LOCATION` | `0.80` | Location confidence floor |
-| `GLINER_FLOOR_ADDRESS` | `0.80` | Address confidence floor |
-| `GLINER_MAX_TOKENS` | `384` | Maximum tokens per model window |
-
-The existing `DETECTOR_MODEL_PATH`, `DETECTOR_FLOOR_*`, and
-`DETECTOR_MAX_TOKENS` names remain compatibility fallbacks. Prefer
-`DETECTOR_MODEL` and `GLINER_*` for new deployments.
-
-## Development Checks
+## Checks
 
 ```bash
 .venv/bin/python -m pytest -q

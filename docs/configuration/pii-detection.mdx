@@ -32,14 +32,9 @@ pii_detection:
 
 ## Detector Backend
 
-The detector always runs deterministic checks for structured identifiers and
-uses a semantic backend for names, locations, and street addresses. GLiNER is
-the current default and only enabled backend.
-
-- [Semantic Backends](/configuration/semantic-backends) explains selection,
-  startup validation, and backend health metadata.
-- [GLiNER](/configuration/gliner) covers custom Hugging Face models, local
-  checkpoints, confidence floors, and offline deployment.
+The detector combines deterministic checks with a semantic backend. GLiNER is
+currently the only backend. See [Semantic Backends](/configuration/semantic-backends)
+and [GLiNER](/configuration/gliner).
 
 ## Phone Regions
 
@@ -91,10 +86,9 @@ Checksum-validated identifiers are always reported (score `1.0`) and are never
 dropped by the threshold. Street addresses are detected by the semantic backend
 and reported as `LOCATION`.
 
-GLiNER deployments can tune the backend floors with
-`GLINER_FLOOR_PERSON`, `GLINER_FLOOR_LOCATION`, and
-`GLINER_FLOOR_ADDRESS`. See [GLiNER configuration](/configuration/gliner) for
-defaults, precedence, and validation rules.
+GLiNER floors are configured with `GLINER_FLOOR_PERSON`,
+`GLINER_FLOOR_LOCATION`, and `GLINER_FLOOR_ADDRESS`. See
+[GLiNER](/configuration/gliner).
 
 ## Allowlist
 

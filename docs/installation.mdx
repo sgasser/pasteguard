@@ -76,15 +76,8 @@ country prefix — see [PII Detection Config](/configuration/pii-detection).
 ## Detector Models
 
 The image includes `urchade/gliner_multi_pii-v1` and loads it offline by
-default. No Hugging Face access is needed for the standard setup.
-
-You can select a validated Hugging Face model ID or mount a local GLiNER
-checkpoint. Custom Hub models need online access for the first download because
-the published image deliberately starts in offline mode.
-
-See [Semantic Backends](/configuration/semantic-backends) for the common
-selection behavior and [GLiNER](/configuration/gliner) for complete Docker,
-local-checkpoint, cache, and tuning examples.
+default. Custom Hugging Face and local models are documented under
+[GLiNER](/configuration/gliner).
 
 ## Environment Variables
 
@@ -104,8 +97,5 @@ local-checkpoint, cache, and tuning examples.
   </Card>
   <Card title="Configuration" icon="gear" href="/configuration/overview">
     Customize PasteGuard
-  </Card>
-  <Card title="GLiNER" icon="scan-search" href="/configuration/gliner">
-    Configure semantic models
   </Card>
 </CardGroup>
