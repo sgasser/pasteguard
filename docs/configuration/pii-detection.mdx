@@ -18,6 +18,10 @@ pii_detection:
     - IBAN_CODE
     - IP_ADDRESS
     - VAT_CODE
+    - URL
+    - DATE_TIME
+    - ACCOUNT_NUMBER
+    - SECRET
 ```
 
 ## Options
@@ -27,18 +31,22 @@ pii_detection:
 | `detector_url` | `http://localhost:5002` | Detector `/analyze` URL |
 | `detector_timeout` | `30` | Timeout in seconds for each detector `/analyze` request. Increase for very large messages; set to `0` to disable |
 | `phone_regions` | `[]` | Optional regions for national-format phone numbers |
-| `score_threshold` | `0.7` | Minimum confidence floor for the semantic labels PERSON and LOCATION (0.0-1.0). Checksum-validated identifiers always score `1.0` and are unaffected |
+| `score_threshold` | `0.7` | Minimum confidence floor passed to the semantic backend (0.0-1.0). Checksum-validated identifiers always score `1.0` and are unaffected |
 | `entities` | See below | Entity types to return |
 
 ## Detector Backend
 
 The detector combines deterministic checks with a semantic backend. GLiNER is
-currently the only backend. See [Semantic Backends](/configuration/semantic-backends)
-and [GLiNER](/configuration/gliner).
+the default; OpenAI Privacy Filter is optional. See
+[Semantic Backends](/configuration/semantic-backends),
+[GLiNER](/configuration/gliner), and
+[OpenAI Privacy Filter](/configuration/openai-privacy-filter).
 
 ## Phone Regions
 
-Detection is **multilingual and language-agnostic**. Names and places use one model. Structured identifiers use format or checksum checks.
+GLiNER detects names and places across multiple languages. OpenAI Privacy
+Filter is primarily English. Structured identifiers use language-independent
+format or checksum checks.
 
 Phone numbers are `+` international-only by default. Add `phone_regions` only when you need local formats.
 
@@ -66,29 +74,40 @@ Keep the list focused. More regions can mean more false positives on IDs and tic
 | `IBAN_CODE` | DE89 3704 0044 0532 0130 00 |
 | `IP_ADDRESS` | 192.168.1.1 |
 | `VAT_CODE` | EU VAT number, e.g. `DE136695976`, `IT00743110157`, `FR40303265045` |
+| `URL` | Private or account-specific URLs |
+| `DATE_TIME` | Private dates and times |
+| `ACCOUNT_NUMBER` | Account and personal identifier numbers |
+| `SECRET` | Contextually sensitive secret text |
 
-Names and locations are multilingual. IBAN, credit card, email, IP, and `+` phone numbers work internationally. `VAT_CODE` requires a country prefix and is validated with `python-stdnum`.
+GLiNER names and locations are multilingual. OpenAI Privacy Filter is primarily
+English and adds the contextual entity types shown above. IBAN, credit card,
+email, IP, and `+` phone numbers work internationally. `VAT_CODE` requires a
+country prefix and is validated with `python-stdnum`.
+
+`SECRET` here is semantic PII-detector output and is independent of the
+regex-based [Secrets Shield](/configuration/secrets-detection).
 
 ## Score Threshold
 
-`score_threshold` raises the confidence floor for the **tunable** semantic labels
-**PERSON** and **LOCATION** only. Higher = fewer false positives, might miss
-some PII; lower = catches more, more false positives.
+`score_threshold` is applied after the selected backend reconstructs complete
+semantic spans. Higher = fewer false positives, but might miss some PII; lower
+= catches more, with more false positives.
 
 ```yaml
 pii_detection:
   score_threshold: 0.7  # Default, good balance
   # score_threshold: 0.5  # More aggressive
-  # score_threshold: 0.9  # More conservative (PERSON/LOCATION)
+  # score_threshold: 0.9  # More conservative
 ```
 
 Checksum-validated identifiers are always reported (score `1.0`) and are never
 dropped by the threshold. Street addresses are detected by the semantic backend
 and reported as `LOCATION`.
 
-GLiNER floors are configured with `GLINER_FLOOR_PERSON`,
-`GLINER_FLOOR_LOCATION`, and `GLINER_FLOOR_ADDRESS`. See
-[GLiNER](/configuration/gliner).
+GLiNER also retains its calibrated per-label minimum floors, configured with
+`GLINER_FLOOR_PERSON`, `GLINER_FLOOR_LOCATION`, and
+`GLINER_FLOOR_ADDRESS`. OpenAI Privacy Filter applies the request threshold to
+all reconstructed supported spans.
 
 ## Allowlist
 

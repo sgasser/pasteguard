@@ -323,6 +323,60 @@ pii_detection:
     }
   });
 
+  test("enables every supported PII entity type by default", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.entities).toEqual([
+        "PERSON",
+        "LOCATION",
+        "EMAIL_ADDRESS",
+        "PHONE_NUMBER",
+        "CREDIT_CARD",
+        "IBAN_CODE",
+        "IP_ADDRESS",
+        "VAT_CODE",
+        "URL",
+        "DATE_TIME",
+        "ACCOUNT_NUMBER",
+        "SECRET",
+      ]);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("preserves an explicit PII entity selection", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: http://localhost:5002
+  entities:
+    - URL
+    - SECRET
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.entities).toEqual(["URL", "SECRET"]);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
   test("accepts PII detector timeout override", () => {
     const path = writeConfig(`
 mode: mask

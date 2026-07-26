@@ -3,9 +3,9 @@ title: GLiNER
 description: Configure GLiNER models, checkpoints, confidence floors, and offline operation
 ---
 
-[GLiNER](https://github.com/urchade/GLiNER) is PasteGuard's default and currently
-only semantic backend. It detects `PERSON` and `LOCATION`; street addresses are
-also returned as `LOCATION`.
+[GLiNER](https://github.com/urchade/GLiNER) is PasteGuard's default semantic
+backend. It detects `PERSON` and `LOCATION`; street addresses are also returned
+as `LOCATION`.
 
 The default model is `urchade/gliner_multi_pii-v1`.
 
@@ -50,10 +50,11 @@ enable downloads on first start and persist the cache:
 docker volume create pasteguard-models
 
 docker run --rm -p 3000:3000 \
+  -e DETECTOR_BACKEND=gliner \
   -e DETECTOR_MODEL=urchade/gliner_small-v2.1 \
   -e HF_HUB_OFFLINE=0 \
   -e TRANSFORMERS_OFFLINE=0 \
-  -e PASTEGUARD_STARTUP_TIMEOUT=600 \
+  -e PASTEGUARD_STARTUP_TIMEOUT=1800 \
   -v pasteguard-models:/opt/models \
   ghcr.io/sgasser/pasteguard:latest
 ```
@@ -62,6 +63,7 @@ For a local model, mount the directory and use its container path:
 
 ```bash
 docker run --rm -p 3000:3000 \
+  -e DETECTOR_BACKEND=gliner \
   -e DETECTOR_MODEL=/models/custom-gliner \
   -v /absolute/path/to/custom-gliner:/models/custom-gliner:ro \
   ghcr.io/sgasser/pasteguard:latest
@@ -82,3 +84,5 @@ not lower, them.
 Legacy `DETECTOR_MODEL_PATH`, `DETECTOR_FLOOR_*`, and `DETECTOR_MAX_TOKENS`
 remain supported. `DETECTOR_MODEL_PATH` wins over `DETECTOR_MODEL`; `GLINER_*`
 wins over matching legacy variables.
+
+Restart the detector after changing its model or settings.

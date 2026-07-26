@@ -1,0 +1,96 @@
+---
+title: OpenAI Privacy Filter
+description: Configure the optional OpenAI Privacy Filter semantic backend
+---
+
+[OpenAI Privacy Filter](https://github.com/openai/privacy-filter) is an optional
+semantic backend with a broader privacy taxonomy than the default GLiNER model.
+
+## Quick Start
+
+Add these values to `.env`:
+
+```dotenv
+DETECTOR_BACKEND=openai_privacy_filter
+HF_HUB_OFFLINE=0
+TRANSFORMERS_OFFLINE=0
+```
+
+Then start or recreate PasteGuard:
+
+```bash
+docker compose up -d
+```
+
+The first start downloads `openai/privacy-filter` into the persistent
+`pasteguard-models` volume. After it succeeds, set both offline flags back to
+`1` if the deployment should run without Hugging Face access.
+
+Leave `DETECTOR_MODEL` unset to use `openai/privacy-filter`, or set it to a
+compatible Hugging Face model ID or local checkpoint.
+
+## Entity Mapping
+
+| Model category | PasteGuard entity |
+|----------------|-------------------|
+| `private_person` | `PERSON` |
+| `private_address` | `LOCATION` |
+| `private_email` | `EMAIL_ADDRESS` |
+| `private_phone` | `PHONE_NUMBER` |
+| `private_url` | `URL` |
+| `private_date` | `DATE_TIME` |
+| `account_number` | `ACCOUNT_NUMBER` |
+| `secret` | `SECRET` |
+
+The deterministic detector still handles validated credit cards, IBANs, IP
+addresses, VAT numbers, emails, and phone numbers independently.
+
+## `SECRET` vs. Secrets Shield
+
+`SECRET` is contextual model output controlled by
+`pii_detection.entities`. It is separate from the regex-based
+[Secrets Shield](/configuration/secrets-detection), which detects known
+credential formats such as API keys and private keys.
+
+Use both when you need contextual detection and deterministic credential
+matching.
+
+## Model Limitations
+
+<Warning>
+OpenAI Privacy Filter is primarily English and its predictions are
+probabilistic. Test it with your own data. GLiNER remains the multilingual
+default.
+</Warning>
+
+Compatible checkpoints must expose the eight categories above with complete
+BIO or BIOES labels. PasteGuard applies constrained Viterbi decoding and uses a
+checkpoint's optional `viterbi_calibration.json` automatically. BILOU, generic
+NER, incomplete checkpoints, and unsupported known-label boundaries fail during
+startup.
+
+## Local Checkpoint
+
+Mount a compatible Transformers checkpoint read-only:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e DETECTOR_BACKEND=openai_privacy_filter \
+  -e DETECTOR_MODEL=/models/privacy-filter \
+  -v /absolute/path/to/privacy-filter:/models/privacy-filter:ro \
+  ghcr.io/sgasser/pasteguard:latest
+```
+
+The directory must contain `config.json`, model weights, and tokenizer files.
+
+## Verify
+
+Check that PasteGuard is ready:
+
+```bash
+curl http://localhost:3000/health
+```
+
+Restart or recreate the service after changing the backend or model. See
+[Semantic Backends](/configuration/semantic-backends) for backend selection and
+[Installation](/installation) for Docker and cache details.

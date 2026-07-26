@@ -22,12 +22,19 @@ from huggingface_hub.utils import (
     validate_repo_id,  # pyright: ignore[reportPrivateImportUsage]
 )
 
-from . import gliner_layer
+from . import gliner_layer, openai_privacy_filter_layer
 from .entities import Span
 
 DEFAULT_BACKEND = "gliner"
 _GLINER_CONFIG = "gliner_config.json"
 _GLINER_WEIGHTS = ("model.safetensors", "pytorch_model.bin")
+_PRIVACY_FILTER_CONFIG = "config.json"
+_TRANSFORMER_WEIGHTS = (
+    "model.safetensors",
+    "model.safetensors.index.json",
+    "pytorch_model.bin",
+    "pytorch_model.bin.index.json",
+)
 
 
 class SemanticBackend(Protocol):
@@ -74,6 +81,15 @@ def _build_gliner(model: str) -> SemanticBackend:
     )
 
 
+def _build_openai_privacy_filter(model: str) -> SemanticBackend:
+    return _FunctionBackend(
+        name="openai_privacy_filter",
+        model=model,
+        _load_model=openai_privacy_filter_layer.load_model,
+        _detect=openai_privacy_filter_layer.detect_openai_privacy_filter,
+    )
+
+
 _backend: SemanticBackend | None = None
 _backend_lock = threading.Lock()
 
@@ -87,18 +103,45 @@ def _configured_model() -> tuple[str | None, str]:
     return model or None, "DETECTOR_MODEL"
 
 
-def _validate_gliner_config(config_path: Path, model: str, source_name: str) -> None:
+def _read_json_config(
+    config_path: Path,
+    configured_value: str,
+    source_name: str,
+    filename: str,
+) -> dict[str, object]:
     try:
         config = json.loads(config_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError(
-            f"{source_name} {model!r} has an unreadable {_GLINER_CONFIG}: {exc}"
+            f"{source_name} {configured_value!r} has an unreadable {filename}: {exc}"
         ) from exc
     if not isinstance(config, dict):
         raise ValueError(
-            f"{source_name} {model!r} has an invalid {_GLINER_CONFIG}: "
+            f"{source_name} {configured_value!r} has an invalid {filename}: "
             "the top-level value must be an object"
         )
+    return config
+
+
+def _validate_gliner_config(config_path: Path, model: str, source_name: str) -> None:
+    _read_json_config(config_path, model, source_name, _GLINER_CONFIG)
+
+
+def _validate_privacy_filter_config(
+    config_path: Path,
+    configured_value: str,
+    source_name: str,
+) -> None:
+    config = _read_json_config(
+        config_path,
+        configured_value,
+        source_name,
+        _PRIVACY_FILTER_CONFIG,
+    )
+    openai_privacy_filter_layer.validate_label_set(
+        config.get("id2label"),
+        configured_value,
+    )
 
 
 def _validate_local_gliner_model(path: Path, configured_value: str, source_name: str) -> str:
@@ -185,12 +228,99 @@ def _resolve_gliner_model(
     return value
 
 
+def _validate_local_privacy_filter_model(
+    path: Path,
+    configured_value: str,
+    source_name: str,
+) -> str:
+    if not path.is_dir():
+        raise ValueError(f"{source_name} local path is not a directory: {configured_value}")
+
+    config_path = path / _PRIVACY_FILTER_CONFIG
+    if not config_path.is_file():
+        raise ValueError(
+            f"{source_name} is not a complete OpenAI Privacy Filter checkpoint: "
+            f"missing {_PRIVACY_FILTER_CONFIG} in {configured_value}"
+        )
+    _validate_privacy_filter_config(config_path, configured_value, source_name)
+
+    if not any((path / filename).is_file() for filename in _TRANSFORMER_WEIGHTS):
+        expected = " or ".join(_TRANSFORMER_WEIGHTS)
+        raise ValueError(
+            f"{source_name} is not a complete OpenAI Privacy Filter checkpoint: "
+            f"missing {expected} in {configured_value}"
+        )
+    return str(path.resolve())
+
+
+def _validate_remote_privacy_filter_model(model: str, source_name: str) -> None:
+    try:
+        config_path = Path(hf_hub_download(model, _PRIVACY_FILTER_CONFIG))
+    except RemoteEntryNotFoundError:
+        raise ValueError(
+            f"{source_name} {model!r} is not an OpenAI Privacy Filter checkpoint: "
+            f"missing {_PRIVACY_FILTER_CONFIG}"
+        ) from None
+    except RepositoryNotFoundError:
+        raise ValueError(
+            f"{source_name} {model!r} was not found or is not accessible; "
+            "check the Hugging Face model ID and authentication"
+        ) from None
+    except LocalEntryNotFoundError:
+        raise ValueError(
+            f"{source_name} {model!r} could not be validated because "
+            f"{_PRIVACY_FILTER_CONFIG} is not cached and Hugging Face is unavailable"
+        ) from None
+    except HfHubHTTPError as exc:
+        raise ValueError(
+            f"{source_name} {model!r} could not be validated with Hugging Face: {exc}"
+        ) from exc
+
+    _validate_privacy_filter_config(config_path, model, source_name)
+
+
+def _resolve_openai_privacy_filter_model(
+    configured_value: str,
+    is_default: bool = False,
+    source_name: str = "DETECTOR_MODEL",
+) -> str:
+    value = configured_value.strip()
+    if not value:
+        raise ValueError(f"{source_name} must not be blank")
+
+    try:
+        path = Path(value).expanduser()
+    except RuntimeError:
+        path = Path(value)
+    if path.exists():
+        return _validate_local_privacy_filter_model(path, configured_value, source_name)
+    if _looks_like_local_path(value):
+        raise ValueError(f"{source_name} local path does not exist: {configured_value}")
+
+    try:
+        validate_repo_id(value)
+    except HFValidationError:
+        raise ValueError(
+            f"{source_name} {configured_value!r} is neither an existing local "
+            "directory nor a valid Hugging Face model ID"
+        ) from None
+
+    if not is_default:
+        _validate_remote_privacy_filter_model(value, source_name)
+    return value
+
+
 _BACKENDS = {
     "gliner": _BackendDefinition(
         default_model=gliner_layer.DEFAULT_MODEL,
         resolve_model=_resolve_gliner_model,
         build=_build_gliner,
-    )
+    ),
+    "openai_privacy_filter": _BackendDefinition(
+        default_model=openai_privacy_filter_layer.DEFAULT_MODEL,
+        resolve_model=_resolve_openai_privacy_filter_model,
+        build=_build_openai_privacy_filter,
+    ),
 }
 
 

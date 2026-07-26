@@ -1,5 +1,6 @@
 """Tests for semantic backend selection and model validation (no downloads)."""
 
+import json
 from unittest.mock import Mock
 
 import pytest
@@ -28,9 +29,34 @@ def _mock_gliner_loader(monkeypatch):
     return load
 
 
+def _mock_privacy_filter_loader(monkeypatch):
+    load = Mock()
+    monkeypatch.setattr(semantic_backend.openai_privacy_filter_layer, "load_model", load)
+    return load
+
+
 def _valid_local_model(path):
     path.mkdir(parents=True)
     (path / "gliner_config.json").write_text("{}")
+    (path / "model.safetensors").touch()
+    return path
+
+
+def _privacy_filter_id2label():
+    labels = [
+        "O",
+        *[
+            f"{boundary}-{label}"
+            for label in sorted(semantic_backend.openai_privacy_filter_layer._REQUIRED_LABELS)
+            for boundary in "BIES"
+        ],
+    ]
+    return dict(enumerate(labels))
+
+
+def _valid_local_privacy_filter_model(path):
+    path.mkdir(parents=True)
+    (path / "config.json").write_text(json.dumps({"id2label": _privacy_filter_id2label()}))
     (path / "model.safetensors").touch()
     return path
 
@@ -40,7 +66,7 @@ def _hub_error(error_type):
     return error_type("not found", response=response)
 
 
-def test_gliner_is_the_only_default_backend(monkeypatch):
+def test_gliner_remains_the_default_backend(monkeypatch):
     load = _mock_gliner_loader(monkeypatch)
     download_config = Mock()
     monkeypatch.setattr(semantic_backend, "hf_hub_download", download_config)
@@ -62,18 +88,35 @@ def test_explicit_gliner_selection(monkeypatch):
     load.assert_called_once_with("urchade/gliner_multi_pii-v1")
 
 
-@pytest.mark.parametrize("backend", ["unknown", "openai_privacy_filter"])
-def test_unknown_or_disabled_backend_fails_clearly(monkeypatch, backend):
+def test_unknown_backend_fails_clearly(monkeypatch):
+    backend = "unknown"
     monkeypatch.setenv("DETECTOR_BACKEND", backend)
     load = _mock_gliner_loader(monkeypatch)
 
     with pytest.raises(
         ValueError,
-        match=rf"Unknown DETECTOR_BACKEND {backend!r}. Supported backends: gliner",
+        match=(
+            rf"Unknown DETECTOR_BACKEND {backend!r}. Supported backends: "
+            "gliner, openai_privacy_filter"
+        ),
     ):
         semantic_backend.load_semantic_backend()
 
     load.assert_not_called()
+
+
+def test_openai_privacy_filter_uses_its_backend_default(monkeypatch):
+    monkeypatch.setenv("DETECTOR_BACKEND", "openai_privacy_filter")
+    load = _mock_privacy_filter_loader(monkeypatch)
+    download_config = Mock()
+    monkeypatch.setattr(semantic_backend, "hf_hub_download", download_config)
+
+    backend = semantic_backend.load_semantic_backend()
+
+    assert backend.name == "openai_privacy_filter"
+    assert backend.model == "openai/privacy-filter"
+    load.assert_called_once_with("openai/privacy-filter")
+    download_config.assert_not_called()
 
 
 def test_selected_backend_loads_once(monkeypatch):
@@ -95,6 +138,49 @@ def test_valid_local_model_is_resolved_and_loaded(monkeypatch, tmp_path):
 
     assert backend.model == str(model_path.resolve())
     load.assert_called_once_with(str(model_path.resolve()))
+
+
+def test_valid_local_privacy_filter_model_is_resolved_and_loaded(monkeypatch, tmp_path):
+    model_path = _valid_local_privacy_filter_model(tmp_path / "privacy-filter")
+    monkeypatch.setenv("DETECTOR_BACKEND", "openai_privacy_filter")
+    monkeypatch.setenv("DETECTOR_MODEL", str(model_path))
+    load = _mock_privacy_filter_loader(monkeypatch)
+
+    backend = semantic_backend.load_semantic_backend()
+
+    assert backend.model == str(model_path.resolve())
+    load.assert_called_once_with(str(model_path.resolve()))
+
+
+def test_local_privacy_filter_model_requires_weights(monkeypatch, tmp_path):
+    model_path = tmp_path / "incomplete-privacy-filter"
+    model_path.mkdir()
+    (model_path / "config.json").write_text(json.dumps({"id2label": _privacy_filter_id2label()}))
+    monkeypatch.setenv("DETECTOR_BACKEND", "openai_privacy_filter")
+    monkeypatch.setenv("DETECTOR_MODEL", str(model_path))
+    load = _mock_privacy_filter_loader(monkeypatch)
+
+    with pytest.raises(ValueError, match=r"missing model\.safetensors"):
+        semantic_backend.load_semantic_backend()
+
+    load.assert_not_called()
+
+
+def test_local_privacy_filter_model_rejects_incompatible_labels(monkeypatch, tmp_path):
+    model_path = tmp_path / "generic-ner"
+    model_path.mkdir()
+    (model_path / "config.json").write_text(
+        json.dumps({"id2label": {"0": "O", "1": "B-PER", "2": "I-PER"}})
+    )
+    (model_path / "model.safetensors").touch()
+    monkeypatch.setenv("DETECTOR_BACKEND", "openai_privacy_filter")
+    monkeypatch.setenv("DETECTOR_MODEL", str(model_path))
+    load = _mock_privacy_filter_loader(monkeypatch)
+
+    with pytest.raises(ValueError, match="not a Privacy Filter-compatible checkpoint"):
+        semantic_backend.load_semantic_backend()
+
+    load.assert_not_called()
 
 
 def test_existing_relative_model_directory_shadows_hub_id(monkeypatch, tmp_path):
@@ -205,6 +291,39 @@ def test_custom_hugging_face_model_is_validated_and_loaded(monkeypatch, tmp_path
 
     download_config.assert_called_once_with("org/custom-gliner", "gliner_config.json")
     load.assert_called_once_with("org/custom-gliner")
+
+
+def test_custom_privacy_filter_hugging_face_model_is_validated(monkeypatch, tmp_path):
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"id2label": _privacy_filter_id2label()}))
+    monkeypatch.setenv("DETECTOR_BACKEND", "openai_privacy_filter")
+    monkeypatch.setenv("DETECTOR_MODEL", "org/custom-privacy-filter")
+    load = _mock_privacy_filter_loader(monkeypatch)
+    download_config = Mock(return_value=str(config))
+    monkeypatch.setattr(semantic_backend, "hf_hub_download", download_config)
+
+    semantic_backend.load_semantic_backend()
+
+    download_config.assert_called_once_with("org/custom-privacy-filter", "config.json")
+    load.assert_called_once_with("org/custom-privacy-filter")
+
+
+def test_remote_privacy_filter_model_rejects_incompatible_labels(monkeypatch, tmp_path):
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"id2label": {"0": "O", "1": "B-PER", "2": "I-PER"}}))
+    monkeypatch.setenv("DETECTOR_BACKEND", "openai_privacy_filter")
+    monkeypatch.setenv("DETECTOR_MODEL", "org/generic-ner")
+    load = _mock_privacy_filter_loader(monkeypatch)
+    monkeypatch.setattr(
+        semantic_backend,
+        "hf_hub_download",
+        Mock(return_value=str(config)),
+    )
+
+    with pytest.raises(ValueError, match="not a Privacy Filter-compatible checkpoint"):
+        semantic_backend.load_semantic_backend()
+
+    load.assert_not_called()
 
 
 def test_non_gliner_hugging_face_model_fails_before_loading(monkeypatch):
@@ -331,6 +450,18 @@ def test_backend_info_reports_loaded_identity(monkeypatch):
     }
 
 
+def test_backend_info_reports_openai_privacy_filter_identity(monkeypatch):
+    monkeypatch.setenv("DETECTOR_BACKEND", "openai_privacy_filter")
+    _mock_privacy_filter_loader(monkeypatch)
+
+    semantic_backend.load_semantic_backend()
+
+    assert semantic_backend.backend_info() == {
+        "backend": "openai_privacy_filter",
+        "model": "openai/privacy-filter",
+    }
+
+
 def test_detect_semantic_uses_loaded_backend(monkeypatch):
     _mock_gliner_loader(monkeypatch)
     expected = [Span(PERSON, 0, 5, 0.9)]
@@ -350,6 +481,23 @@ def test_gliner_load_failure_includes_backend_and_model(monkeypatch):
         match=(
             "Failed to load semantic backend 'gliner' with model "
             "'urchade/gliner_multi_pii-v1': OSError: weights are unreadable"
+        ),
+    ):
+        semantic_backend.load_semantic_backend()
+
+    assert semantic_backend.backend_info() == {}
+
+
+def test_privacy_filter_load_failure_includes_backend_and_model(monkeypatch):
+    monkeypatch.setenv("DETECTOR_BACKEND", "openai_privacy_filter")
+    load = Mock(side_effect=ValueError("incompatible labels"))
+    monkeypatch.setattr(semantic_backend.openai_privacy_filter_layer, "load_model", load)
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "Failed to load semantic backend 'openai_privacy_filter' with model "
+            "'openai/privacy-filter': ValueError: incompatible labels"
         ),
     ):
         semantic_backend.load_semantic_backend()

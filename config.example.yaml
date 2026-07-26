@@ -91,6 +91,12 @@ pii_detection:
     - IBAN_CODE
     - IP_ADDRESS
     - VAT_CODE  # EU VAT number (any member state; requires country prefix)
+    - URL
+    - DATE_TIME
+    - ACCOUNT_NUMBER
+    # A semantic SECRET is PII output. It is independent of the regex-based
+    # Secrets Shield configured below.
+    - SECRET
 
 # Secrets Detection settings (Secrets Shield)
 # Detects private keys, API keys, tokens and other secret credentials in requests

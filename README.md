@@ -103,7 +103,7 @@ client = OpenAI(base_url="http://localhost:3000/openai/v1")
 Both `client.chat.completions.create(...)` and `client.responses.create(...)` pass through PasteGuard's privacy pipeline.
 
 For custom config, persistent logs, Docker Compose, or
-[custom GLiNER models](https://pasteguard.com/docs/configuration/gliner):
+[semantic backend configuration](https://pasteguard.com/docs/configuration/semantic-backends):
 **[Read the docs](https://pasteguard.com/docs/installation)**.
 
 ## Privacy Modes
@@ -126,7 +126,9 @@ Route Mode sends requests containing sensitive data to a local LLM such as Ollam
 
 ## What It Catches
 
-**Personal data**: Names, locations, emails, phone numbers, credit cards, IBANs, IP addresses, and EU VAT numbers. Detection is multilingual.
+**Personal data**: Names, locations, emails, phone numbers, credit cards, IBANs,
+IP addresses, and EU VAT numbers. The optional OpenAI Privacy Filter backend
+also detects private URLs, dates, account numbers, and contextual secrets.
 
 **Secrets**: API keys for providers such as OpenAI, Anthropic, Stripe, AWS, and GitHub; SSH and PEM private keys; JWT tokens; bearer tokens; passwords; and connection strings.
 
@@ -143,12 +145,13 @@ Every request is logged with masking details. See what was detected, what was ma
 ## How Detection Works
 
 The detector combines checksums and format checks for structured values with a
-semantic backend for names and places. GLiNER is currently the only backend.
+semantic backend. GLiNER is the multilingual default; OpenAI Privacy Filter is
+an optional backend with a broader, primarily English privacy taxonomy.
 See [Semantic Backends](https://pasteguard.com/docs/configuration/semantic-backends).
 
 ## Tech Stack
 
-[Bun](https://bun.sh) · [Hono](https://hono.dev) · [GLiNER](https://github.com/urchade/GLiNER) + [python-stdnum](https://arthurdejong.org/python-stdnum/) ([`detector/`](detector/)) · SQLite or Postgres
+[Bun](https://bun.sh) · [Hono](https://hono.dev) · [GLiNER](https://github.com/urchade/GLiNER) + [OpenAI Privacy Filter](https://github.com/openai/privacy-filter) + [python-stdnum](https://arthurdejong.org/python-stdnum/) ([`detector/`](detector/)) · SQLite or Postgres
 
 ## Contributing
 

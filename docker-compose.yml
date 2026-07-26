@@ -20,12 +20,19 @@ services:
       dockerfile: docker/Dockerfile
     ports:
       - "${PASTEGUARD_PORT:-3000}:3000"
+    environment:
+      DETECTOR_BACKEND: ${DETECTOR_BACKEND:-gliner}
+      DETECTOR_MODEL: ${DETECTOR_MODEL:-}
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-1}
+      PASTEGUARD_STARTUP_TIMEOUT: ${PASTEGUARD_STARTUP_TIMEOUT:-1800}
     env_file:
       - path: .env
         required: false
     volumes:
       - ./config.yaml:/pasteguard/config.yaml:ro
       - ./data:/pasteguard/data
+      - pasteguard-models:/opt/models
     restart: unless-stopped
 
   # Development only: the PII detector on its own, for `bun run dev`.
@@ -37,6 +44,19 @@ services:
       context: .
       dockerfile: docker/Dockerfile
       target: detector
+    environment:
+      DETECTOR_BACKEND: ${DETECTOR_BACKEND:-gliner}
+      DETECTOR_MODEL: ${DETECTOR_MODEL:-}
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-1}
     ports:
       - "${PASTEGUARD_DETECTOR_PORT:-5002}:5002"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - pasteguard-models:/opt/models
     restart: unless-stopped
+
+volumes:
+  pasteguard-models:

@@ -7,7 +7,7 @@ PasteGuard's detector combines two independent layers:
 
 - The **deterministic layer** validates structured values such as email addresses,
   phone numbers, credit cards, IBANs, IP addresses, and VAT numbers.
-- The **semantic backend** detects names, locations, and street addresses.
+- The **semantic backend** uses context to detect less structured private data.
 
 Changing the backend does not affect deterministic detection.
 
@@ -16,13 +16,39 @@ Changing the backend does not affect deterministic detection.
 | `DETECTOR_BACKEND` | `gliner` | Semantic backend to load |
 | `DETECTOR_MODEL` | Backend default | Model identifier or local model directory |
 
-GLiNER is currently the only supported backend. Unknown backends and invalid
-models fail during startup. See [GLiNER](/configuration/gliner) for model and
-tuning options.
+| Backend | Default model | Semantic output |
+|---------|---------------|-----------------|
+| `gliner` | `urchade/gliner_multi_pii-v1` | `PERSON`, `LOCATION` (including street addresses) |
+| `openai_privacy_filter` | `openai/privacy-filter` | `PERSON`, `LOCATION`, `DATE_TIME`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `URL`, `ACCOUNT_NUMBER`, `SECRET` |
+
+GLiNER remains the default and is baked into the Docker image. OpenAI Privacy
+Filter is optional and downloads on first use unless its checkpoint is already
+cached or mounted locally. See [GLiNER](/configuration/gliner) and
+[OpenAI Privacy Filter](/configuration/openai-privacy-filter).
+
+Unknown backends, invalid model locations, incomplete checkpoints, and
+incompatible Privacy Filter label sets fail during detector startup.
+
+## Select a Backend
+
+For a local detector process:
+
+```bash
+DETECTOR_BACKEND=openai_privacy_filter \
+.venv/bin/uvicorn detector.app:app --host 0.0.0.0 --port 5002
+```
+
+Omit `DETECTOR_MODEL` to use the selected backend's default. Set it to a Hugging
+Face model ID or a valid local checkpoint directory to override that default.
+
+<Note>
+`DETECTOR_MODEL_PATH` remains a supported legacy alias and takes precedence over
+`DETECTOR_MODEL`.
+</Note>
 
 ## Verify the Backend
 
-Query the detector directly:
+When running the standalone detector, query it directly:
 
 ```bash
 curl http://localhost:5002/health

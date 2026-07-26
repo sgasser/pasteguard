@@ -59,11 +59,10 @@ RUN pip install --no-cache-dir supervisor==4.3.0 /srv/detector \
     && pip check \
     && pip uninstall -y pip
 
-ENV DETECTOR_MODEL=urchade/gliner_multi_pii-v1
 ENV HF_HOME=/opt/models
 RUN --mount=type=cache,target=/tmp/huggingface \
     ok=""; for i in 1 2 3; do \
-        HF_HOME=/tmp/huggingface python -c "import os; from gliner import GLiNER; GLiNER.from_pretrained(os.environ['DETECTOR_MODEL'])" && { ok=1; break; }; \
+        HF_HOME=/tmp/huggingface python -c "from detector.gliner_layer import DEFAULT_MODEL; from gliner import GLiNER; GLiNER.from_pretrained(DEFAULT_MODEL)" && { ok=1; break; }; \
         echo "model fetch attempt $i failed; retrying in 10s"; sleep 10; \
     done; \
     [ -n "$ok" ] \
@@ -82,14 +81,17 @@ COPY --from=detector-builder --chown=65532:65532 /opt/models /opt/models
 COPY --from=detector-builder --chown=65532:65532 /tmp/empty-data /pasteguard/data
 
 ENV PATH="/opt/venv/bin:${PATH}"
-ENV DETECTOR_MODEL=urchade/gliner_multi_pii-v1
+ENV DETECTOR_BACKEND=gliner
 ENV HF_HOME=/opt/models
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 ENV HOME=/home/nonroot
 
 EXPOSE 5002
-HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=5 \
+# A successful check ends the startup grace period immediately. The longer
+# failure grace lets an explicitly enabled first-run Hub download finish
+# without weakening steady-state health checks.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30m --retries=5 \
     CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5002/health').status==200 else 1)"]
 
 USER 65532
@@ -117,10 +119,12 @@ COPY docker/supervisord.conf /etc/supervisord.conf
 
 # The proxy talks to the in-container detector.
 ENV DETECTOR_URL=http://localhost:5002
+# First-run model downloads can take several minutes.
+ENV PASTEGUARD_STARTUP_TIMEOUT=1800
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30m --retries=3 \
     CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/health').status==200 else 1)"]
 
 CMD ["/opt/venv/bin/supervisord", "-c", "/etc/supervisord.conf"]

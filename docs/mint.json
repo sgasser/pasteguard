@@ -74,6 +74,7 @@
         "configuration/pii-detection",
         "configuration/semantic-backends",
         "configuration/gliner",
+        "configuration/openai-privacy-filter",
         "configuration/secrets-detection",
         "configuration/logging"
       ]

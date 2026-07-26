@@ -18,9 +18,9 @@ ghcr.io/sgasser/pasteguard
 | `latest` | Latest release |
 | `vX.Y.Z` | Pinned release version |
 
-Detection is multilingual and language-agnostic — one model finds entities
-regardless of the language the text is written in, so there are no per-language
-image variants.
+The default GLiNER backend is multilingual, so there are no per-language image
+variants. OpenAI Privacy Filter is also available in the same image as an
+optional, primarily English backend.
 
 ## Quick Start
 
@@ -52,12 +52,14 @@ mkdir -p data
 docker run -d --name pasteguard --restart unless-stopped -p 3000:3000 \
   -v ./config.yaml:/pasteguard/config.yaml:ro \
   -v ./data:/pasteguard/data \
+  -v pasteguard-models:/opt/models \
   ghcr.io/sgasser/pasteguard:latest
 ```
 
 This gives you:
 - **Custom config** — edit `config.yaml` to change detection settings
 - **Persistent logs** — request history in `data/pasteguard.db` survives restarts
+- **Persistent models** — custom Hub downloads survive container replacement
 - **Auto-restart** — the container restarts automatically
 
 Or with Docker Compose:
@@ -76,8 +78,10 @@ country prefix — see [PII Detection Config](/configuration/pii-detection).
 ## Detector Models
 
 The image includes `urchade/gliner_multi_pii-v1` and loads it offline by
-default. Custom Hugging Face and local models are documented under
-[GLiNER](/configuration/gliner).
+default. It also contains the dependencies needed to download and run
+`openai/privacy-filter`. See [Semantic Backends](/configuration/semantic-backends),
+[GLiNER](/configuration/gliner), and
+[OpenAI Privacy Filter](/configuration/openai-privacy-filter).
 
 ## Environment Variables
 
@@ -85,9 +89,15 @@ default. Custom Hugging Face and local models are documented under
 |----------|---------|-------------|
 | `DETECTOR_URL` | `http://localhost:5002` | Where the proxy reaches the detector. In the all-in-one image this is in-container and rarely changed; override it to point at an external detector. |
 | `DETECTOR_TIMEOUT` | `30` | Seconds to wait for each detector `/analyze` request when using the example config. Increase for very large messages; set to `0` to disable. |
-| `DETECTOR_BACKEND` | `gliner` | Semantic detector backend. GLiNER is currently the only supported value. |
-| `DETECTOR_MODEL` | `urchade/gliner_multi_pii-v1` | Hugging Face model ID or local model directory used by the detector. |
-| `PASTEGUARD_STARTUP_TIMEOUT` | `180` | Seconds to wait for the detector to become ready at startup |
+| `DETECTOR_BACKEND` | `gliner` | Semantic detector backend: `gliner` or `openai_privacy_filter`. |
+| `DETECTOR_MODEL` | Backend default | Hugging Face model ID or local model directory used by the detector. |
+| `HF_HUB_OFFLINE` | `1` | Set to `0` when an uncached Hub checkpoint must download. |
+| `TRANSFORMERS_OFFLINE` | `1` | Set to `0` with `HF_HUB_OFFLINE` for an uncached Transformers checkpoint. |
+| `PASTEGUARD_STARTUP_TIMEOUT` | `1800` | Seconds the all-in-one proxy waits for the detector to become ready. |
+
+The Compose file passes these settings from `.env` and persists `/opt/models`
+in a named volume. Restart or recreate the service after changing a backend or
+model.
 
 ## Next Steps
 

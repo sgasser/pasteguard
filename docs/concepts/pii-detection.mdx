@@ -4,17 +4,17 @@ description: Personal data detection via deterministic checks and a semantic bac
 ---
 
 PasteGuard detects PII with a small open-source service that pairs a
-deterministic regex/checksum layer with a semantic backend. Detection is
-**language-agnostic**: the semantic model finds names and places in
-mixed-language text — for example, an Italian name and city in a German letter —
-and structured identifiers (IBAN, credit card, email, IP) are matched by format
-or checksum, not by language.
+deterministic regex/checksum layer with a semantic backend. The default GLiNER
+backend is multilingual: it can find names and places in mixed-language text.
+Structured identifiers (IBAN, credit card, email, IP) are matched by format or
+checksum, not by language.
 
 ## How it works
 
 - **Deterministic layer** — regex candidates validated by checksum/format (`python-stdnum`, `phonenumbers`). Owns the structured identifiers; every match is validated, not guessed, and scores `1.0`.
-- **Semantic layer** — a loaded backend for names, locations, and street
-  addresses. GLiNER is currently the only enabled backend.
+- **Semantic layer** — either the default multilingual GLiNER backend for names,
+  locations, and street addresses, or the optional OpenAI Privacy Filter backend
+  for a broader, primarily English privacy taxonomy.
 
 The detector speaks the `/analyze` HTTP contract, is configured through the
 `detector_url` setting, and runs as a separate service (see
@@ -33,12 +33,21 @@ Backend selection does not change the deterministic layer or response contract.
 | `CREDIT_CARD` | 4111 1111 1111 1111 |
 | `IP_ADDRESS` | 192.168.1.1 |
 | `VAT_CODE` | EU VAT number, e.g. `DE136695976`, `IT00743110157`, `FR40303265045` |
+| `URL` | Private or account-specific URLs |
+| `DATE_TIME` | Private dates and times |
+| `ACCOUNT_NUMBER` | Account and personal identifier numbers |
+| `SECRET` | Contextually sensitive secret text |
 
-Names and locations use the multilingual model. IBAN, credit card, email, and IP work internationally. Phone numbers are `+` international-only by default; set `phone_regions` for local formats. `VAT_CODE` requires a country prefix and is validated with `python-stdnum`.
+The last four contextual types require a semantic backend that emits them, such
+as OpenAI Privacy Filter. IBAN, credit card, email, and IP work internationally.
+Phone numbers are `+` international-only by default; set `phone_regions` for
+local formats. `VAT_CODE` requires a country prefix and is validated with
+`python-stdnum`.
 
 ## Languages and phone regions
 
-Detection is multilingual and **language-agnostic**. PasteGuard does not auto-detect language.
+PasteGuard does not auto-detect language. GLiNER is the multilingual default;
+OpenAI Privacy Filter is primarily English.
 
 National-format phone numbers need country rules. Configure `phone_regions` only for regions your traffic uses.
 
@@ -54,7 +63,8 @@ pii_detection:
 
 Each backend can apply its own confidence floors. See
 [Semantic Backends](/configuration/semantic-backends) and
-[GLiNER](/configuration/gliner).
+[GLiNER](/configuration/gliner), or
+[OpenAI Privacy Filter](/configuration/openai-privacy-filter).
 
 ## Response Headers
 

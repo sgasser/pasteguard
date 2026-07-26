@@ -231,6 +231,39 @@ describe("POST /api/mask", () => {
     expect(mockDetectPII).toHaveBeenCalled();
   });
 
+  test("masks a semantic SECRET as PII when only PII detection is selected", async () => {
+    const text = "The internal passphrase is blue-orchid.";
+    const secret = "blue-orchid";
+    const start = text.indexOf(secret);
+    mockDetectPII.mockResolvedValueOnce([
+      {
+        entity_type: "SECRET",
+        start,
+        end: start + secret.length,
+        score: 0.92,
+      },
+    ]);
+
+    const res = await app.request("/api/mask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        detect: ["pii"],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      masked: string;
+      context: Record<string, string>;
+      entities: { type: string; placeholder: string }[];
+    };
+    expect(body.masked).toBe("The internal passphrase is [[SECRET_1]].");
+    expect(body.context["[[SECRET_1]]"]).toBe(secret);
+    expect(body.entities).toEqual([{ type: "SECRET", placeholder: "[[SECRET_1]]" }]);
+  });
+
   test("masks secrets when detected", async () => {
     // Skip PII detection
     const res = await app.request("/api/mask", {

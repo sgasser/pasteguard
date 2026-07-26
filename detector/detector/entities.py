@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Entity type strings returned on the /analyze response. The Presidio drop-in
-# set plus VAT_CODE (EU VAT numbers, checksum-validated). Other structured types
-# (org/address/fiscal/BIC/crypto) are not currently emitted.
+# Entity type strings returned on the /analyze response. The original
+# Presidio-compatible set and VAT_CODE remain available alongside the semantic
+# types emitted by OpenAI Privacy Filter.
 PERSON = "PERSON"
 LOCATION = "LOCATION"
 EMAIL_ADDRESS = "EMAIL_ADDRESS"
@@ -19,6 +19,10 @@ CREDIT_CARD = "CREDIT_CARD"
 IBAN_CODE = "IBAN_CODE"
 IP_ADDRESS = "IP_ADDRESS"
 VAT_CODE = "VAT_CODE"
+URL = "URL"
+DATE_TIME = "DATE_TIME"
+ACCOUNT_NUMBER = "ACCOUNT_NUMBER"
+SECRET = "SECRET"
 
 
 @dataclass(frozen=True)
