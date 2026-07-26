@@ -1,21 +1,19 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { getConfig } from "../config";
 import { healthCheck as checkDetector } from "../pii/request";
 import { checkLocalHealth } from "../providers/local";
 
-export const healthRoutes = new Hono();
-
-healthRoutes.get("/", (c) => {
+function redirectToStatus(c: Context) {
   const config = getConfig();
   return c.redirect(config.dashboard.enabled ? "/dashboard" : "/health");
-});
+}
 
-healthRoutes.get("/health", async (c) => {
+async function healthHandler(c: Context, detectorHealthCheck: () => Promise<boolean>) {
   const config = getConfig();
   const piiEnabled = config.pii_detection.enabled;
 
   const [detectorHealth, localHealth] = await Promise.all([
-    piiEnabled ? checkDetector() : Promise.resolve(true),
+    piiEnabled ? detectorHealthCheck() : Promise.resolve(true),
     config.mode === "route" && config.local
       ? checkLocalHealth(config.local)
       : Promise.resolve(true),
@@ -40,4 +38,15 @@ healthRoutes.get("/health", async (c) => {
     },
     isHealthy ? 200 : 503,
   );
-});
+}
+
+export function createHealthRoutes(
+  detectorHealthCheck: () => Promise<boolean> = checkDetector,
+): Hono {
+  const routes = new Hono();
+  routes.get("/", redirectToStatus);
+  routes.get("/health", (c) => healthHandler(c, detectorHealthCheck));
+  return routes;
+}
+
+export const healthRoutes = createHealthRoutes();

@@ -1,16 +1,21 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
 import { getConfig } from "../config";
-import { healthRoutes } from "./health";
+import { createHealthRoutes } from "./health";
 
+const mockDetectorHealthCheck = mock<() => Promise<boolean>>(() => Promise.resolve(true));
 const app = new Hono();
-app.route("/", healthRoutes);
+app.route("/", createHealthRoutes(mockDetectorHealthCheck));
 
 const config = getConfig();
 const originalDashboardEnabled = config.dashboard.enabled;
+const originalPIIEnabled = config.pii_detection.enabled;
 
 afterEach(() => {
   config.dashboard.enabled = originalDashboardEnabled;
+  config.pii_detection.enabled = originalPIIEnabled;
+  mockDetectorHealthCheck.mockReset();
+  mockDetectorHealthCheck.mockResolvedValue(true);
 });
 
 describe("GET /", () => {
@@ -34,15 +39,41 @@ describe("GET /", () => {
 });
 
 describe("GET /health", () => {
-  test("returns health status", async () => {
+  test("returns the detector service as up when its health check succeeds", async () => {
+    config.pii_detection.enabled = true;
+    mockDetectorHealthCheck.mockResolvedValueOnce(true);
+
     const res = await app.request("/health");
 
-    // May be 200 (healthy) or 503 (degraded) depending on the detector
-    expect([200, 503]).toContain(res.status);
+    expect(res.status).toBe(200);
 
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.status).toMatch(/healthy|degraded/);
-    expect(body.services).toBeDefined();
+    const body = (await res.json()) as {
+      status: string;
+      services: Record<string, string>;
+      timestamp: string;
+    };
+    expect(body.status).toBe("healthy");
+    expect(body.services.detector).toBe("up");
+    expect(body.services).not.toHaveProperty(["pre", "sidio"].join(""));
+    expect(body.timestamp).toBeDefined();
+  });
+
+  test("returns the detector service as down when its health check fails", async () => {
+    config.pii_detection.enabled = true;
+    mockDetectorHealthCheck.mockResolvedValueOnce(false);
+
+    const res = await app.request("/health");
+
+    expect(res.status).toBe(503);
+
+    const body = (await res.json()) as {
+      status: string;
+      services: Record<string, string>;
+      timestamp: string;
+    };
+    expect(body.status).toBe("degraded");
+    expect(body.services.detector).toBe("down");
+    expect(body.services).not.toHaveProperty(["pre", "sidio"].join(""));
     expect(body.timestamp).toBeDefined();
   });
 });

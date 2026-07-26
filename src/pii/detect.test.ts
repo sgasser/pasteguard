@@ -407,6 +407,33 @@ describe("PIIDetector", () => {
   });
 
   describe("detectPII", () => {
+    test("reports detector HTTP errors with provider-neutral wording", async () => {
+      globalThis.fetch = mock(async () => {
+        return new Response("service unavailable", {
+          status: 503,
+          statusText: "Service Unavailable",
+        });
+      }) as unknown as typeof fetch;
+
+      const detector = new PIIDetector();
+
+      await expect(detector.detectPII("Hello world")).rejects.toThrow(
+        "Detector API error: 503 Service Unavailable - service unavailable",
+      );
+    });
+
+    test("reports detector connection failures with provider-neutral wording", async () => {
+      globalThis.fetch = mock(async () => {
+        throw new TypeError("fetch failed");
+      }) as unknown as typeof fetch;
+
+      const detector = new PIIDetector();
+
+      await expect(detector.detectPII("Hello world")).rejects.toThrow(
+        "Failed to connect to the PII detector",
+      );
+    });
+
     test("uses the configured detector timeout", async () => {
       const config = getConfig();
       const previousTimeout = config.pii_detection.detector_timeout;
@@ -513,6 +540,17 @@ describe("PIIDetector", () => {
     test("returns false when the detector is unavailable", async () => {
       globalThis.fetch = mock(async () => {
         throw new Error("Connection refused");
+      }) as unknown as typeof fetch;
+
+      const detector = new PIIDetector();
+      const healthy = await detector.healthCheck();
+
+      expect(healthy).toBe(false);
+    });
+
+    test("returns false when the detector health endpoint reports an error", async () => {
+      globalThis.fetch = mock(async () => {
+        return new Response("Unavailable", { status: 503 });
       }) as unknown as typeof fetch;
 
       const detector = new PIIDetector();

@@ -5,7 +5,7 @@
  * independently of the OpenAI/Anthropic proxy routes.
  */
 
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { getConfig, type SecretsDetectionConfig } from "../config";
 import { logRequest, normalizeRequestSource } from "../logging/logger";
@@ -20,8 +20,6 @@ import { mask as maskPII } from "../pii/mask";
 import { detectSecrets } from "../secrets/detect";
 import { maskSecrets } from "../secrets/mask";
 import { createLogData } from "./utils";
-
-export const apiRoutes = new Hono();
 
 // Request schema
 const MaskRequestSchema = z.object({
@@ -75,7 +73,9 @@ function extractEntities(
  *
  * Masks PII and secrets in text. Returns context for client-side unmasking.
  */
-apiRoutes.post("/mask", async (c) => {
+type DetectorProvider = () => Pick<ReturnType<typeof getPIIDetector>, "detectPII">;
+
+async function maskHandler(c: Context, getDetector: DetectorProvider) {
   const startTime = Date.now();
   const config = getConfig();
   const userAgent = c.req.header("user-agent") || null;
@@ -185,7 +185,7 @@ apiRoutes.post("/mask", async (c) => {
   if (detectPII) {
     try {
       const piiStartTime = Date.now();
-      const detector = getPIIDetector();
+      const detector = getDetector();
       const piiEntities = config.pii_detection.enabled ? await detector.detectPII(maskedText) : [];
       scanTimeMs = Date.now() - piiStartTime;
 
@@ -268,4 +268,12 @@ apiRoutes.post("/mask", async (c) => {
   };
 
   return c.json(response);
-});
+}
+
+export function createApiRoutes(getDetector: DetectorProvider = getPIIDetector): Hono {
+  const routes = new Hono();
+  routes.post("/mask", (c) => maskHandler(c, getDetector));
+  return routes;
+}
+
+export const apiRoutes = createApiRoutes();

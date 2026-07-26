@@ -1,23 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
-import {
-  filterAllowlistedEntities,
-  findDenylistedEntities,
-  mergeDenylistEntities,
-  type PIIEntity,
-} from "../pii/detect";
+import type { PIIEntity } from "../pii/detect";
 
-// Mock the PII detector to avoid needing the detector running
 const mockDetectPII = mock<(text: string) => Promise<PIIEntity[]>>(() => Promise.resolve([]));
-mock.module("../pii/detect", () => ({
-  getPIIDetector: () => ({
-    detectPII: mockDetectPII,
-    healthCheck: mock(() => Promise.resolve(true)),
-  }),
-  filterAllowlistedEntities,
-  findDenylistedEntities,
-  mergeDenylistEntities,
-}));
 
 // Mock the logger to avoid database operations
 mock.module("../logging/logger", () => ({
@@ -54,10 +39,13 @@ const testConfig = {
 mock.module("../config", () => ({ ...realConfig, getConfig: () => testConfig }));
 
 // Import after mocks are set up
-const { apiRoutes } = await import("./api");
+const { createApiRoutes } = await import("./api");
 
 const app = new Hono();
-app.route("/api", apiRoutes);
+app.route(
+  "/api",
+  createApiRoutes(() => ({ detectPII: mockDetectPII })),
+);
 
 describe("POST /api/mask", () => {
   test("returns 400 for missing text", async () => {

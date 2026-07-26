@@ -16,6 +16,85 @@ function cleanupConfig(path: string): void {
 }
 
 describe("config", () => {
+  test("accepts a valid detector HTTP URL", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: https://detector.example.com
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.detector_url).toBe("https://detector.example.com");
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("requires a detector URL", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  enabled: true
+`);
+
+    try {
+      expect(() => loadConfig(path)).toThrow("Invalid configuration");
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("substitutes DETECTOR_URL from the environment", () => {
+    const previousDetectorUrl = process.env.DETECTOR_URL;
+    process.env.DETECTOR_URL = "http://detector.internal:7000";
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: \${DETECTOR_URL:-http://localhost:5002}
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.pii_detection.detector_url).toBe("http://detector.internal:7000");
+    } finally {
+      if (previousDetectorUrl === undefined) {
+        delete process.env.DETECTOR_URL;
+      } else {
+        process.env.DETECTOR_URL = previousDetectorUrl;
+      }
+      cleanupConfig(path);
+    }
+  });
+
+  test("rejects an invalid detector URL", () => {
+    const path = writeConfig(`
+mode: mask
+providers:
+  openai: {}
+  anthropic: {}
+pii_detection:
+  detector_url: not-a-url
+`);
+
+    try {
+      expect(() => loadConfig(path)).toThrow("Invalid configuration");
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
   test("uses the default Codex provider base URL", () => {
     const path = writeConfig(`
 mode: mask
