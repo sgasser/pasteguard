@@ -19,7 +19,14 @@ mv "$tmp" config.yaml
 
 mkdir -p data
 """
-run = """
+archive = """
+PORT="${CONDUCTOR_PORT:-3000}"
+docker compose -p "pasteguard-${PORT}" --profile dev down --remove-orphans || true
+"""
+run_mode = "concurrent"
+
+[scripts.run.dev]
+command = """
 set -e
 
 PORT="${CONDUCTOR_PORT:-3000}"
@@ -30,8 +37,5 @@ export DETECTOR_URL="http://localhost:${PASTEGUARD_DETECTOR_PORT}"
 docker compose -p "pasteguard-${PORT}" --profile dev up detector -d
 bun run dev
 """
-archive = """
-PORT="${CONDUCTOR_PORT:-3000}"
-docker compose -p "pasteguard-${PORT}" --profile dev down --remove-orphans || true
-"""
-run_mode = "concurrent"
+default = true
+icon = "play"
