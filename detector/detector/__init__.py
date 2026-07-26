@@ -1,4 +1,3 @@
-"""PasteGuard PII detector: an /analyze service over a deterministic
-regex/checksum layer plus multilingual GLiNER NER."""
+"""PasteGuard PII detector: deterministic checks plus a semantic backend."""
 
 __version__ = "0.1.0"

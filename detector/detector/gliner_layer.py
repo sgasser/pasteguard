@@ -12,6 +12,7 @@ import os
 import re
 import threading
 from functools import lru_cache
+from math import isfinite
 from typing import Any
 
 from .entities import LOCATION, PERSON, Span
@@ -22,12 +23,43 @@ MODEL_INFERENCE_CACHE_SIZE = 4096
 DEFAULT_MODEL = "urchade/gliner_multi_pii-v1"
 
 
+def _env(name: str, legacy_name: str | None = None) -> str | None:
+    value = os.environ.get(name)
+    if value is not None:
+        return value
+    return os.environ.get(legacy_name) if legacy_name is not None else None
+
+
 def _floor(label: str, default: float) -> float:
-    return float(os.environ.get(f"DETECTOR_FLOOR_{label.upper()}", default))
+    name = f"GLINER_FLOOR_{label.upper()}"
+    value = _env(name, f"DETECTOR_FLOOR_{label.upper()}")
+    if value is None:
+        return default
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise ValueError(f"{name} must be a number between 0 and 1; got {value!r}") from None
+    if not isfinite(parsed) or not 0.0 <= parsed <= 1.0:
+        raise ValueError(f"{name} must be a number between 0 and 1; got {value!r}")
+    return parsed
+
+
+def _max_tokens(default: int = 384) -> int:
+    name = "GLINER_MAX_TOKENS"
+    value = _env(name, "DETECTOR_MAX_TOKENS")
+    if value is None:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise ValueError(f"{name} must be an integer of at least 64; got {value!r}") from None
+    if parsed < 64:
+        raise ValueError(f"{name} must be an integer of at least 64; got {value!r}")
+    return parsed
 
 
 # Per-label confidence floors (calibrated against the accuracy benchmark;
-# overridable via env, e.g. DETECTOR_FLOOR_LOCATION=0.6). Role nouns are demoted
+# overridable via env, e.g. GLINER_FLOOR_LOCATION=0.6). Role nouns are demoted
 # by the suppressor labels (below), not by this floor.
 PER_LABEL_FLOOR = {
     "person": _floor("person", 0.95),
@@ -59,7 +91,7 @@ _PREDICT_FLOOR = min(PER_LABEL_FLOOR.values()) - 0.1
 # drop PII past the cut. Split into overlapping windows; the splitter mirrors
 # GLiNER's WhitespaceTokenSplitter so window sizes match.
 _TOKEN_RE = re.compile(r"\w+(?:[-_]\w+)*|\S")
-_MAX_TOKENS = int(os.environ.get("DETECTOR_MAX_TOKENS", "384"))
+_MAX_TOKENS = _max_tokens()
 _WINDOW = max(64, _MAX_TOKENS - 64)  # headroom under the hard limit
 _OVERLAP = 64  # >= longest expected entity, so boundary-straddling spans survive
 
@@ -84,28 +116,34 @@ def _windows(text: str):
 
 # GLiNER ships no type stubs, so the loaded model is untyped (Any).
 _model: Any = None
+_loaded_model_name: str | None = None
 _lock = threading.Lock()
 # Torch inference is not guaranteed thread-safe; serialize concurrent /analyze calls.
 _infer_lock = threading.Lock()
 
 
-def _model_name() -> str:
-    return (
-        os.environ.get("DETECTOR_MODEL_PATH") or os.environ.get("DETECTOR_MODEL") or DEFAULT_MODEL
-    )
-
-
-def load_model() -> None:
-    """Load the model once. Safe to call at startup or lazily."""
-    global _model
+def load_model(model_name: str = DEFAULT_MODEL) -> None:
+    """Load the selected GLiNER model once."""
+    global _loaded_model_name, _model
     if _model is not None:
+        if _loaded_model_name != model_name:
+            loaded = _loaded_model_name or "an unknown checkpoint"
+            raise RuntimeError(
+                f"GLiNER is already loaded with {loaded!r}; cannot load {model_name!r}"
+            )
         return
     with _lock:
         if _model is not None:
+            if _loaded_model_name != model_name:
+                loaded = _loaded_model_name or "an unknown checkpoint"
+                raise RuntimeError(
+                    f"GLiNER is already loaded with {loaded!r}; cannot load {model_name!r}"
+                )
             return
         from gliner import GLiNER
 
-        _model = GLiNER.from_pretrained(_model_name())
+        _model = GLiNER.from_pretrained(model_name)
+        _loaded_model_name = model_name
 
 
 @lru_cache(maxsize=MODEL_INFERENCE_CACHE_SIZE)
@@ -116,7 +154,8 @@ def _predict_window(text: str):
 def detect_gliner(text: str, score_threshold: float = 0.0) -> list[Span]:
     if not text:
         return []
-    load_model()
+    if _model is None:
+        raise RuntimeError("GLiNER model not loaded; load_semantic_backend() selects and loads it")
     n = len(text)
     # Run each window, shift spans back to absolute offsets, dedupe overlaps
     # (same span+label) keeping the max score.

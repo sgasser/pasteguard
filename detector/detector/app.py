@@ -7,8 +7,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from .deterministic import detect_deterministic
-from .gliner_layer import detect_gliner, load_model
 from .merge import merge
+from .semantic_backend import backend_info, detect_semantic, load_semantic_backend
 
 
 def _utf16_mapper(text: str):
@@ -39,8 +39,9 @@ class Entity(BaseModel):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Load the model before serving so /health == ready (PasteGuard polls it).
-    load_model()
+    # Load the selected backend before serving so /health == ready
+    # (PasteGuard polls it).
+    load_semantic_backend()
     yield
 
 
@@ -49,14 +50,14 @@ app = FastAPI(title="PasteGuard Detector", version="0.1.0", lifespan=lifespan)
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", **backend_info()}
 
 
 @app.post("/analyze", response_model=list[Entity])
 def analyze(req: AnalyzeRequest) -> list[Entity]:
     deterministic = detect_deterministic(req.text, req.phone_regions)
-    fuzzy = detect_gliner(req.text, req.score_threshold)
-    spans = merge(deterministic, fuzzy, req.entities, 0.0)
+    semantic = detect_semantic(req.text, req.score_threshold)
+    spans = merge(deterministic, semantic, req.entities, 0.0)
     to_u16 = _utf16_mapper(req.text)
     return [
         Entity(

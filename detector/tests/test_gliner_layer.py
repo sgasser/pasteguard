@@ -8,14 +8,18 @@ from unittest.mock import Mock
 
 import pytest
 
+import detector.gliner_layer as layer
 from detector.gliner_layer import (
     _MAX_TOKENS,
     _SUPPRESS_LABELS,
     _TOKEN_RE,
     PER_LABEL_FLOOR,
     Span,
+    _floor,
+    _max_tokens,
     _windows,
     detect_gliner,
+    load_model,
 )
 
 
@@ -59,6 +63,98 @@ def test_per_label_floors_present_and_ordered():
     # Person carries a stricter floor than location: higher volume and no
     # structural validator, so a higher floor curbs false positives.
     assert PER_LABEL_FLOOR["location"] <= PER_LABEL_FLOOR["person"]
+
+
+def test_gliner_loads_selected_model_once(monkeypatch):
+    from gliner import GLiNER
+
+    loaded_model = object()
+    from_pretrained = Mock(return_value=loaded_model)
+    monkeypatch.setattr(layer, "_model", None)
+    monkeypatch.setattr(layer, "_loaded_model_name", None)
+    monkeypatch.setattr(GLiNER, "from_pretrained", from_pretrained)
+
+    load_model("org/custom-gliner")
+    load_model("org/custom-gliner")
+
+    from_pretrained.assert_called_once_with("org/custom-gliner")
+    assert layer._model is loaded_model
+
+
+def test_gliner_rejects_different_model_after_loading(monkeypatch):
+    monkeypatch.setattr(layer, "_model", object())
+    monkeypatch.setattr(layer, "_loaded_model_name", "org/already-loaded")
+
+    with pytest.raises(
+        RuntimeError,
+        match=("GLiNER is already loaded with 'org/already-loaded'; cannot load 'org/different'"),
+    ):
+        load_model("org/different")
+
+
+def test_detect_requires_loaded_model(monkeypatch):
+    monkeypatch.setattr(layer, "_model", None)
+
+    with pytest.raises(RuntimeError, match="GLiNER model not loaded"):
+        detect_gliner("Alice", 0.0)
+
+
+def test_floor_env_defaults(monkeypatch):
+    monkeypatch.delenv("GLINER_FLOOR_PERSON", raising=False)
+    monkeypatch.delenv("DETECTOR_FLOOR_PERSON", raising=False)
+
+    assert _floor("person", 0.95) == 0.95
+
+
+def test_gliner_floor_env_wins_over_existing_legacy_name(monkeypatch):
+    monkeypatch.setenv("GLINER_FLOOR_PERSON", "0.91")
+    monkeypatch.setenv("DETECTOR_FLOOR_PERSON", "0.50")
+
+    assert _floor("person", 0.95) == 0.91
+
+
+def test_existing_floor_env_remains_supported(monkeypatch):
+    monkeypatch.delenv("GLINER_FLOOR_PERSON", raising=False)
+    monkeypatch.setenv("DETECTOR_FLOOR_PERSON", "0.90")
+
+    assert _floor("person", 0.95) == 0.90
+
+
+@pytest.mark.parametrize("value", ["bad", "-0.1", "1.1", "nan", "inf"])
+def test_invalid_gliner_floor_fails_clearly(monkeypatch, value):
+    monkeypatch.setenv("GLINER_FLOOR_PERSON", value)
+
+    with pytest.raises(ValueError, match="GLINER_FLOOR_PERSON must be a number between 0 and 1"):
+        _floor("person", 0.95)
+
+
+def test_max_tokens_env_defaults(monkeypatch):
+    monkeypatch.delenv("GLINER_MAX_TOKENS", raising=False)
+    monkeypatch.delenv("DETECTOR_MAX_TOKENS", raising=False)
+
+    assert _max_tokens() == 384
+
+
+def test_gliner_max_tokens_env_wins_over_existing_legacy_name(monkeypatch):
+    monkeypatch.setenv("GLINER_MAX_TOKENS", "512")
+    monkeypatch.setenv("DETECTOR_MAX_TOKENS", "256")
+
+    assert _max_tokens() == 512
+
+
+def test_existing_max_tokens_env_remains_supported(monkeypatch):
+    monkeypatch.delenv("GLINER_MAX_TOKENS", raising=False)
+    monkeypatch.setenv("DETECTOR_MAX_TOKENS", "256")
+
+    assert _max_tokens() == 256
+
+
+@pytest.mark.parametrize("value", ["63", "384.5", "many"])
+def test_invalid_gliner_max_tokens_fails_clearly(monkeypatch, value):
+    monkeypatch.setenv("GLINER_MAX_TOKENS", value)
+
+    with pytest.raises(ValueError, match="GLINER_MAX_TOKENS must be an integer of at least 64"):
+        _max_tokens()
 
 
 def test_window_inference_cache(monkeypatch):

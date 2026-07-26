@@ -13,9 +13,14 @@ from detector.entities import LOCATION, PERSON, PHONE_NUMBER, Span
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setattr(appmod, "load_model", lambda: None)
+    monkeypatch.setattr(appmod, "load_semantic_backend", lambda: None)
+    monkeypatch.setattr(
+        appmod,
+        "backend_info",
+        lambda: {"backend": "gliner", "model": "urchade/gliner_multi_pii-v1"},
+    )
 
-    def fake_gliner(text, score_threshold=0.0):
+    def fake_semantic(text, score_threshold=0.0):
         spans = []
         for needle, etype in (("Mario Rossi", PERSON), ("München", LOCATION)):
             i = text.find(needle)
@@ -25,7 +30,7 @@ def client(monkeypatch):
                 spans.append(Span(etype, i, i + len(needle), 0.95))
         return spans
 
-    monkeypatch.setattr(appmod, "detect_gliner", fake_gliner)
+    monkeypatch.setattr(appmod, "detect_semantic", fake_semantic)
     with TestClient(appmod.app) as c:
         yield c
 
@@ -33,7 +38,24 @@ def client(monkeypatch):
 def test_health(client):
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+    assert r.json() == {
+        "status": "ok",
+        "backend": "gliner",
+        "model": "urchade/gliner_multi_pii-v1",
+    }
+
+
+def test_unknown_backend_failure_aborts_startup(monkeypatch):
+    def fail_startup():
+        raise ValueError("Unknown DETECTOR_BACKEND 'unknown'")
+
+    monkeypatch.setattr(appmod, "load_semantic_backend", fail_startup)
+
+    with (
+        pytest.raises(ValueError, match="Unknown DETECTOR_BACKEND 'unknown'"),
+        TestClient(appmod.app),
+    ):
+        pass
 
 
 def test_response_shape_and_offsets(client):
