@@ -120,6 +120,17 @@ def test_existing_floor_env_remains_supported(monkeypatch):
     assert _floor("person", 0.95) == 0.90
 
 
+def test_invalid_existing_floor_env_names_the_source(monkeypatch):
+    monkeypatch.delenv("GLINER_FLOOR_PERSON", raising=False)
+    monkeypatch.setenv("DETECTOR_FLOOR_PERSON", "bad")
+
+    with pytest.raises(
+        ValueError,
+        match="DETECTOR_FLOOR_PERSON must be a number between 0 and 1",
+    ):
+        _floor("person", 0.95)
+
+
 @pytest.mark.parametrize("value", ["bad", "-0.1", "1.1", "nan", "inf"])
 def test_invalid_gliner_floor_fails_clearly(monkeypatch, value):
     monkeypatch.setenv("GLINER_FLOOR_PERSON", value)
@@ -147,6 +158,17 @@ def test_existing_max_tokens_env_remains_supported(monkeypatch):
     monkeypatch.setenv("DETECTOR_MAX_TOKENS", "256")
 
     assert _max_tokens() == 256
+
+
+def test_invalid_existing_max_tokens_env_names_the_source(monkeypatch):
+    monkeypatch.delenv("GLINER_MAX_TOKENS", raising=False)
+    monkeypatch.setenv("DETECTOR_MAX_TOKENS", "many")
+
+    with pytest.raises(
+        ValueError,
+        match="DETECTOR_MAX_TOKENS must be an integer of at least 64",
+    ):
+        _max_tokens()
 
 
 @pytest.mark.parametrize("value", ["63", "384.5", "many"])

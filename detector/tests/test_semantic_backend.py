@@ -273,17 +273,15 @@ def test_existing_model_path_alias_remains_supported(monkeypatch, tmp_path):
     load.assert_called_once_with(str(model_path.resolve()))
 
 
-def test_detector_model_wins_over_existing_path_alias(monkeypatch, tmp_path):
-    config = tmp_path / "gliner_config.json"
-    config.write_text("{}")
-    monkeypatch.setenv("DETECTOR_MODEL", "org/custom-gliner")
-    monkeypatch.setenv("DETECTOR_MODEL_PATH", "/ignored/legacy-path")
+def test_existing_model_path_alias_wins_over_baked_detector_model(monkeypatch, tmp_path):
+    model_path = _valid_local_model(tmp_path / "mounted-checkpoint")
+    monkeypatch.setenv("DETECTOR_MODEL", "urchade/gliner_multi_pii-v1")
+    monkeypatch.setenv("DETECTOR_MODEL_PATH", str(model_path))
     load = _mock_gliner_loader(monkeypatch)
-    monkeypatch.setattr(semantic_backend, "hf_hub_download", Mock(return_value=str(config)))
 
     semantic_backend.load_semantic_backend()
 
-    load.assert_called_once_with("org/custom-gliner")
+    load.assert_called_once_with(str(model_path.resolve()))
 
 
 def test_backend_info_reports_loaded_identity(monkeypatch):

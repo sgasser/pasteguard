@@ -23,38 +23,44 @@ MODEL_INFERENCE_CACHE_SIZE = 4096
 DEFAULT_MODEL = "urchade/gliner_multi_pii-v1"
 
 
-def _env(name: str, legacy_name: str | None = None) -> str | None:
+def _env(name: str, legacy_name: str | None = None) -> tuple[str | None, str]:
     value = os.environ.get(name)
     if value is not None:
-        return value
-    return os.environ.get(legacy_name) if legacy_name is not None else None
+        return value, name
+    if legacy_name is not None:
+        legacy_value = os.environ.get(legacy_name)
+        if legacy_value is not None:
+            return legacy_value, legacy_name
+    return None, name
 
 
 def _floor(label: str, default: float) -> float:
     name = f"GLINER_FLOOR_{label.upper()}"
-    value = _env(name, f"DETECTOR_FLOOR_{label.upper()}")
+    value, source_name = _env(name, f"DETECTOR_FLOOR_{label.upper()}")
     if value is None:
         return default
     try:
         parsed = float(value)
     except ValueError:
-        raise ValueError(f"{name} must be a number between 0 and 1; got {value!r}") from None
+        raise ValueError(f"{source_name} must be a number between 0 and 1; got {value!r}") from None
     if not isfinite(parsed) or not 0.0 <= parsed <= 1.0:
-        raise ValueError(f"{name} must be a number between 0 and 1; got {value!r}")
+        raise ValueError(f"{source_name} must be a number between 0 and 1; got {value!r}")
     return parsed
 
 
 def _max_tokens(default: int = 384) -> int:
     name = "GLINER_MAX_TOKENS"
-    value = _env(name, "DETECTOR_MAX_TOKENS")
+    value, source_name = _env(name, "DETECTOR_MAX_TOKENS")
     if value is None:
         return default
     try:
         parsed = int(value)
     except ValueError:
-        raise ValueError(f"{name} must be an integer of at least 64; got {value!r}") from None
+        raise ValueError(
+            f"{source_name} must be an integer of at least 64; got {value!r}"
+        ) from None
     if parsed < 64:
-        raise ValueError(f"{name} must be an integer of at least 64; got {value!r}")
+        raise ValueError(f"{source_name} must be an integer of at least 64; got {value!r}")
     return parsed
 
 

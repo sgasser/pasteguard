@@ -79,12 +79,12 @@ _backend_lock = threading.Lock()
 
 
 def _configured_model() -> str | None:
-    """Return the configured model, retaining only main's existing path alias."""
-    model = os.environ.get("DETECTOR_MODEL")
-    if model:
-        return model
+    """Return the configured model with main's path-first precedence."""
     legacy_path = os.environ.get("DETECTOR_MODEL_PATH")
-    return legacy_path or None
+    if legacy_path:
+        return legacy_path
+    model = os.environ.get("DETECTOR_MODEL")
+    return model or None
 
 
 def _validate_gliner_config(config_path: Path, model: str) -> None:
