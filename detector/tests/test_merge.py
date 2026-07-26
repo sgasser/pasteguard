@@ -4,11 +4,36 @@ from detector.entities import IBAN_CODE, LOCATION, PERSON, Span
 from detector.merge import merge
 
 
-def test_deterministic_precedence_over_overlapping_fuzzy():
-    det = [Span(IBAN_CODE, 0, 27, 1.0)]
-    fuzzy = [Span(LOCATION, 0, 4, 0.9)]  # e.g. "DE89" mis-tagged
+def test_deterministic_full_overlap_removes_fuzzy():
+    det = [Span(IBAN_CODE, 10, 20, 1.0)]
+    fuzzy = [Span(PERSON, 12, 18, 0.9)]
     out = merge(det, fuzzy, None, 0.7)
-    assert out == [Span(IBAN_CODE, 0, 27, 1.0)]
+    assert out == [Span(IBAN_CODE, 10, 20, 1.0)]
+
+
+def test_deterministic_left_overlap_preserves_fuzzy_left_fragment():
+    det = [Span(IBAN_CODE, 10, 20, 1.0)]
+    fuzzy = [Span(PERSON, 0, 15, 0.9)]
+    out = merge(det, fuzzy, None, 0.7)
+    assert out == [Span(PERSON, 0, 10, 0.9), Span(IBAN_CODE, 10, 20, 1.0)]
+
+
+def test_deterministic_right_overlap_preserves_fuzzy_right_fragment():
+    det = [Span(IBAN_CODE, 10, 20, 1.0)]
+    fuzzy = [Span(PERSON, 15, 30, 0.9)]
+    out = merge(det, fuzzy, None, 0.7)
+    assert out == [Span(IBAN_CODE, 10, 20, 1.0), Span(PERSON, 20, 30, 0.9)]
+
+
+def test_deterministic_split_overlap_preserves_both_fuzzy_fragments():
+    det = [Span(IBAN_CODE, 10, 20, 1.0)]
+    fuzzy = [Span(PERSON, 0, 30, 0.9)]
+    out = merge(det, fuzzy, None, 0.7)
+    assert out == [
+        Span(PERSON, 0, 10, 0.9),
+        Span(IBAN_CODE, 10, 20, 1.0),
+        Span(PERSON, 20, 30, 0.9),
+    ]
 
 
 def test_fuzzy_below_threshold_dropped():

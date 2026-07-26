@@ -8,6 +8,7 @@ import {
   findDenylistedEntities,
   mergeDenylistEntities,
   PIIDetector,
+  subtractPlaceholderOverlaps,
 } from "./detect";
 
 const originalFetch = globalThis.fetch;
@@ -557,6 +558,62 @@ describe("PIIDetector", () => {
       const healthy = await detector.healthCheck();
 
       expect(healthy).toBe(false);
+    });
+  });
+
+  describe("subtractPlaceholderOverlaps", () => {
+    const text = "left [[TOKEN_1]] right";
+    const placeholders = ["[[TOKEN_1]]"];
+
+    test("removes an entity fully inside a placeholder", () => {
+      const entities = [{ entity_type: "PERSON", start: 7, end: 14, score: 0.91 }];
+
+      expect(subtractPlaceholderOverlaps(text, entities, placeholders)).toEqual([]);
+    });
+
+    test("leaves non-overlapping entities unchanged", () => {
+      const entities = [
+        { entity_type: "PERSON", start: 0, end: 4, score: 0.91 },
+        { entity_type: "LOCATION", start: 17, end: 22, score: 0.82 },
+      ];
+
+      expect(subtractPlaceholderOverlaps(text, entities, placeholders)).toEqual(entities);
+    });
+
+    test("keeps the uncovered left fragment of a partial overlap", () => {
+      const entities = [{ entity_type: "PERSON", start: 0, end: 10, score: 0.91 }];
+
+      expect(subtractPlaceholderOverlaps(text, entities, placeholders)).toEqual([
+        { entity_type: "PERSON", start: 0, end: 5, score: 0.91 },
+      ]);
+    });
+
+    test("keeps the uncovered right fragment of a partial overlap", () => {
+      const entities = [{ entity_type: "PERSON", start: 10, end: 22, score: 0.91 }];
+
+      expect(subtractPlaceholderOverlaps(text, entities, placeholders)).toEqual([
+        { entity_type: "PERSON", start: 16, end: 22, score: 0.91 },
+      ]);
+    });
+
+    test("splits an entity around a placeholder", () => {
+      const entities = [{ entity_type: "PERSON", start: 0, end: 22, score: 0.91 }];
+
+      expect(subtractPlaceholderOverlaps(text, entities, placeholders)).toEqual([
+        { entity_type: "PERSON", start: 0, end: 5, score: 0.91 },
+        { entity_type: "PERSON", start: 16, end: 22, score: 0.91 },
+      ]);
+    });
+
+    test("subtracts multiple placeholders from one spanning entity", () => {
+      const multiText = "aa [[ONE_1]] bb [[TWO_2]] cc";
+      const entities = [{ entity_type: "LOCATION", start: 1, end: 27, score: 0.83 }];
+
+      expect(subtractPlaceholderOverlaps(multiText, entities, ["[[ONE_1]]", "[[TWO_2]]"])).toEqual([
+        { entity_type: "LOCATION", start: 1, end: 3, score: 0.83 },
+        { entity_type: "LOCATION", start: 12, end: 16, score: 0.83 },
+        { entity_type: "LOCATION", start: 25, end: 27, score: 0.83 },
+      ]);
     });
   });
 

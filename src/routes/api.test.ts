@@ -371,6 +371,42 @@ describe("POST /api/mask", () => {
     }
   });
 
+  test("masks a detector fragment beside a secret placeholder without corrupting it", async () => {
+    const connectionString = "postgres://admin:S3cretPass@db.example.com:5432/appdb";
+    mockDetectPII.mockImplementationOnce((text: string) => {
+      expect(text).toBe("hunter2 [[CONNECTION_STRING_1]]");
+      return Promise.resolve([
+        {
+          entity_type: "PERSON",
+          start: 0,
+          end: text.length,
+          score: 0.93,
+        },
+      ]);
+    });
+
+    const res = await app.request("/api/mask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: `hunter2 ${connectionString}` }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      masked: string;
+      context: Record<string, string>;
+      entities: { type: string; placeholder: string }[];
+    };
+    expect(body.masked).toBe("[[PERSON_1]][[CONNECTION_STRING_1]]");
+    expect(body.context["[[PERSON_1]]"]).toBe("hunter2 ");
+    expect(body.context["[[CONNECTION_STRING_1]]"]).toBe(connectionString);
+    expect(body.entities).toContainEqual({
+      type: "CONNECTION_STRING",
+      placeholder: "[[CONNECTION_STRING_1]]",
+    });
+    expect(body.entities).toContainEqual({ type: "PERSON", placeholder: "[[PERSON_1]]" });
+  });
+
   test("returns 400 for malformed JSON", async () => {
     const res = await app.request("/api/mask", {
       method: "POST",

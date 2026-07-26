@@ -15,6 +15,7 @@ import {
   findDenylistedEntities,
   getPIIDetector,
   mergeDenylistEntities,
+  subtractPlaceholderOverlaps,
 } from "../pii/detect";
 import { mask as maskPII } from "../pii/mask";
 import { detectSecrets } from "../secrets/detect";
@@ -189,9 +190,14 @@ async function maskHandler(c: Context, getDetector: DetectorProvider) {
       const piiEntities = config.pii_detection.enabled ? await detector.detectPII(maskedText) : [];
       scanTimeMs = Date.now() - piiStartTime;
 
-      const filteredEntities = filterAllowlistedEntities(
+      const uncoveredEntities = subtractPlaceholderOverlaps(
         maskedText,
         piiEntities,
+        Object.keys(context.mapping),
+      );
+      const filteredEntities = filterAllowlistedEntities(
+        maskedText,
+        uncoveredEntities,
         config.masking.allowlist,
       );
       const entitiesToMask = mergeDenylistEntities(

@@ -77,6 +77,44 @@ describe("processPrivacyPipeline", () => {
     expect(knownPlaceholders).toEqual(["[[API_KEY_SK_1]]"]);
   });
 
+  test("masks sensitive text beside a secret placeholder without remasking the placeholder", async () => {
+    const connectionString = "postgres://admin:S3cretPass@db.example.com:5432/appdb";
+    const detector = new PIIDetector();
+    detector.detectPII = mock(async (text: string) => {
+      expect(text).toBe("hunter2 [[CONNECTION_STRING_1]]");
+      return [{ entity_type: "PERSON", start: 0, end: text.length, score: 0.93 }];
+    });
+    mockAnalyzeRequest.mockImplementationOnce((maskedRequest, extractor, knownPlaceholders) =>
+      detector.analyzeRequest(
+        maskedRequest as OpenAIRequest,
+        extractor as typeof openaiExtractor,
+        knownPlaceholders,
+      ),
+    );
+
+    const result = await processPrivacyPipeline(
+      request(`hunter2 ${connectionString}`),
+      {
+        ...baseConfig,
+        secrets_detection: {
+          ...baseConfig.secrets_detection,
+          entities: ["CONNECTION_STRING"],
+        },
+      },
+      openaiExtractor,
+    );
+
+    expect(result.requestAfterSecrets.messages[0].content).toBe("hunter2 [[CONNECTION_STRING_1]]");
+    expect(result.piiResult?.detection.spanEntities[0]).toEqual([
+      { entity_type: "PERSON", start: 0, end: 8, score: 0.93 },
+    ]);
+    expect(result.request.messages[0].content).toBe("[[PERSON_1]][[CONNECTION_STRING_1]]");
+    expect(result.piiMaskingContext?.mapping["[[PERSON_1]]"]).toBe("hunter2 ");
+    expect(result.secretsResult.maskingContext?.mapping["[[CONNECTION_STRING_1]]"]).toBe(
+      connectionString,
+    );
+  });
+
   test("returns privacy facts without route decisions", async () => {
     const result = await processPrivacyPipeline(request("Hello"), baseConfig, openaiExtractor);
 

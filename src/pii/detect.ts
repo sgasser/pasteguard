@@ -59,7 +59,48 @@ function placeholderSpans(
       index = text.indexOf(placeholder, index + placeholder.length);
     }
   }
-  return spans;
+  return spans.sort((a, b) => a.start - b.start || a.end - b.end);
+}
+
+/**
+ * Remove placeholder-covered intervals from detector entities.
+ *
+ * Entity offsets stay relative to the original text. A partial overlap can
+ * therefore produce both a left and a right fragment with the original type
+ * and score.
+ */
+export function subtractPlaceholderOverlaps(
+  text: string,
+  entities: PIIEntity[],
+  knownPlaceholders: readonly string[],
+): PIIEntity[] {
+  if (entities.length === 0 || knownPlaceholders.length === 0) return entities;
+
+  const placeholders = placeholderSpans(text, knownPlaceholders);
+  if (placeholders.length === 0) return entities;
+
+  return entities.flatMap((entity) => {
+    let fragments = [entity];
+
+    for (const placeholder of placeholders) {
+      fragments = fragments.flatMap((fragment) => {
+        if (!overlaps(fragment, placeholder)) return [fragment];
+
+        const uncovered: PIIEntity[] = [];
+        if (fragment.start < placeholder.start) {
+          uncovered.push({ ...fragment, end: placeholder.start });
+        }
+        if (placeholder.end < fragment.end) {
+          uncovered.push({ ...fragment, start: placeholder.end });
+        }
+        return uncovered;
+      });
+
+      if (fragments.length === 0) break;
+    }
+
+    return fragments;
+  });
 }
 
 export function findDenylistedEntities(
@@ -72,12 +113,7 @@ export function findDenylistedEntities(
   const matches = denylist.flatMap(({ pattern, type, regex }) =>
     regex ? findRegexMatches(text, pattern, type) : findLiteralMatches(text, pattern, type),
   );
-  if (matches.length === 0 || knownPlaceholders.length === 0) return matches;
-
-  // Drop matches inside an already-masked placeholder; re-masking its internals would corrupt the earlier mask.
-  const masked = placeholderSpans(text, knownPlaceholders);
-  if (masked.length === 0) return matches;
-  return matches.filter((m) => !masked.some((p) => overlaps(m, p)));
+  return subtractPlaceholderOverlaps(text, matches, knownPlaceholders);
 }
 
 // Additive merge: a denylist match extends coverage but never shrinks an overlapping detector span; overlaps become their union and the detector type wins.
@@ -242,7 +278,12 @@ export class PIIDetector {
 
       const denylistedEntities = findDenylistedEntities(span.text, denylist, knownPlaceholders);
       const detectedEntities = config.pii_detection.enabled ? await this.detectPII(span.text) : [];
-      const filteredEntities = filterAllowlistedEntities(span.text, detectedEntities, allowlist);
+      const uncoveredEntities = subtractPlaceholderOverlaps(
+        span.text,
+        detectedEntities,
+        knownPlaceholders,
+      );
+      const filteredEntities = filterAllowlistedEntities(span.text, uncoveredEntities, allowlist);
       spanEntities.push(mergeDenylistEntities(filteredEntities, denylistedEntities));
     }
 
