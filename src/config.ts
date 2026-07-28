@@ -251,13 +251,11 @@ const ConfigSchema = z
 export type Config = z.infer<typeof ConfigSchema>;
 export type OpenAIProviderConfig = z.infer<typeof OpenAIProviderSchema>;
 export type AnthropicProviderConfig = z.infer<typeof AnthropicProviderSchema>;
-export type CodexProviderConfig = z.infer<typeof CodexProviderSchema>;
 export type LocalProviderConfig = z.infer<typeof LocalProviderSchema>;
 export type MaskingConfig = z.infer<typeof MaskingSchema>;
 export type AllowlistPattern = z.infer<typeof AllowlistPatternSchema>;
 export type DenylistPattern = z.infer<typeof DenylistPatternSchema>;
 export type SecretsDetectionConfig = z.infer<typeof SecretsDetectionSchema>;
-export type ServerConfig = z.infer<typeof ServerSchema>;
 
 /**
  * Replaces ${VAR} and ${VAR:-default} patterns with environment variable values

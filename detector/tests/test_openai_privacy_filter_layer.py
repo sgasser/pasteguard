@@ -21,6 +21,13 @@ from detector.entities import (
     URL,
     Span,
 )
+from detector.openai_privacy_filter_decoder import (
+    VITERBI_BIAS_KEYS,
+    TokenPrediction,
+    default_viterbi_biases,
+    viterbi_decode,
+)
+from detector.openai_privacy_filter_labels import REQUIRED_LABELS, validate_label_set
 
 
 @pytest.fixture(autouse=True)
@@ -32,18 +39,14 @@ def reset_backend(monkeypatch):
     monkeypatch.setattr(
         layer,
         "_viterbi_biases",
-        dict.fromkeys(layer._VITERBI_BIAS_KEYS, 0.0),
+        default_viterbi_biases(),
     )
 
 
 def _checkpoint_labels(boundaries: str = "BIES", extras: tuple[str, ...] = ()) -> list[str]:
     return [
         "O",
-        *[
-            f"{boundary}-{label}"
-            for label in sorted(layer._REQUIRED_LABELS)
-            for boundary in boundaries
-        ],
+        *[f"{boundary}-{label}" for label in sorted(REQUIRED_LABELS) for boundary in boundaries],
         *extras,
     ]
 
@@ -56,7 +59,7 @@ def _model_with_labels(labels: list[str]):
 
 
 def _token(label: str, start: int, end: int, score: float = 0.9):
-    return layer._TokenPrediction(label, start, end, score)
+    return TokenPrediction(label, start, end, score)
 
 
 def _loaded_stub(monkeypatch, windows):
@@ -68,7 +71,7 @@ def _loaded_stub(monkeypatch, windows):
 def test_loads_and_validates_checkpoint_once(monkeypatch):
     tokenizer = Mock(is_fast=True)
     model = _model_with_labels(_checkpoint_labels())
-    biases = dict.fromkeys(layer._VITERBI_BIAS_KEYS, 0.0)
+    biases = default_viterbi_biases()
     create = Mock(return_value=(tokenizer, model, biases))
     monkeypatch.setattr(layer, "_create_components", create)
 
@@ -84,7 +87,7 @@ def test_loads_and_validates_checkpoint_once(monkeypatch):
 def test_loaded_checkpoint_cannot_be_replaced(monkeypatch):
     tokenizer = Mock(is_fast=True)
     model = _model_with_labels(_checkpoint_labels())
-    biases = dict.fromkeys(layer._VITERBI_BIAS_KEYS, 0.0)
+    biases = default_viterbi_biases()
     monkeypatch.setattr(
         layer,
         "_create_components",
@@ -101,7 +104,7 @@ def test_loaded_checkpoint_cannot_be_replaced(monkeypatch):
 def test_complete_bio_and_bioes_label_sets_are_accepted(boundaries):
     labels = _checkpoint_labels(boundaries)
 
-    normalized = layer.validate_label_set(dict(enumerate(labels)), "compatible/model")
+    normalized = validate_label_set(dict(enumerate(labels)), "compatible/model")
 
     assert normalized[0] == "O"
     assert set(normalized.values()) == set(labels)
@@ -111,21 +114,21 @@ def test_bilou_required_labels_fail_at_startup():
     labels = _checkpoint_labels("BILU")
 
     with pytest.raises(ValueError, match=r"unsupported boundary prefixes.*L,U"):
-        layer.validate_label_set(dict(enumerate(labels)), "org/bilou")
+        validate_label_set(dict(enumerate(labels)), "org/bilou")
 
 
 def test_bilou_recognized_aliases_fail_at_startup():
     labels = _checkpoint_labels(extras=("B-person", "I-person", "L-person", "U-person"))
 
     with pytest.raises(ValueError, match=r"unsupported boundary prefixes.*person=L,U"):
-        layer.validate_label_set(dict(enumerate(labels)), "org/bilou-alias")
+        validate_label_set(dict(enumerate(labels)), "org/bilou-alias")
 
 
 def test_incompatible_generic_ner_checkpoint_fails_clearly():
     labels = ["O", "B-PER", "I-PER", "B-LOC", "I-LOC"]
 
     with pytest.raises(ValueError, match="not a Privacy Filter-compatible checkpoint"):
-        layer.validate_label_set(dict(enumerate(labels)), "dslim/bert-base-NER")
+        validate_label_set(dict(enumerate(labels)), "dslim/bert-base-NER")
 
 
 def test_incomplete_boundary_scheme_fails_clearly():
@@ -133,7 +136,7 @@ def test_incomplete_boundary_scheme_fails_clearly():
     labels.remove("S-secret")
 
     with pytest.raises(ValueError, match=r"incomplete BIO/BIOES boundaries.*secret=B,E,I"):
-        layer.validate_label_set(dict(enumerate(labels)), "org/incomplete")
+        validate_label_set(dict(enumerate(labels)), "org/incomplete")
 
 
 def test_extra_unsupported_labels_are_allowed():
@@ -141,25 +144,21 @@ def test_extra_unsupported_labels_are_allowed():
         extras=("B-organization", "I-organization", "L-organization", "U-organization")
     )
 
-    normalized = layer.validate_label_set(dict(enumerate(labels)), "org/extended")
+    normalized = validate_label_set(dict(enumerate(labels)), "org/extended")
 
     assert "B-organization" in normalized.values()
     assert "U-organization" in normalized.values()
 
 
-def test_viterbi_replaces_an_invalid_independent_argmax_path(monkeypatch):
+def test_viterbi_replaces_an_invalid_independent_argmax_path():
     torch = pytest.importorskip("torch")
-    monkeypatch.setattr(
-        layer,
-        "_id2label",
-        {
-            0: "O",
-            1: "B-private_person",
-            2: "I-private_person",
-            3: "E-private_person",
-            4: "S-private_person",
-        },
-    )
+    id2label = {
+        0: "O",
+        1: "B-private_person",
+        2: "I-private_person",
+        3: "E-private_person",
+        4: "S-private_person",
+    }
     log_probabilities = torch.tensor(
         [
             [0.0, 9.0, 10.0, 0.0, 0.0],
@@ -168,20 +167,16 @@ def test_viterbi_replaces_an_invalid_independent_argmax_path(monkeypatch):
     )
 
     assert log_probabilities.argmax(dim=-1).tolist() == [2, 0]
-    assert layer._viterbi_decode(log_probabilities) == [1, 3]
+    assert viterbi_decode(log_probabilities, id2label, default_viterbi_biases()) == [1, 3]
 
 
-def test_viterbi_supports_complete_bio_checkpoints(monkeypatch):
+def test_viterbi_supports_complete_bio_checkpoints():
     torch = pytest.importorskip("torch")
-    monkeypatch.setattr(
-        layer,
-        "_id2label",
-        {
-            0: "O",
-            1: "B-private_person",
-            2: "I-private_person",
-        },
-    )
+    id2label = {
+        0: "O",
+        1: "B-private_person",
+        2: "I-private_person",
+    }
     log_probabilities = torch.tensor(
         [
             [0.0, 9.0, 10.0],
@@ -189,11 +184,11 @@ def test_viterbi_supports_complete_bio_checkpoints(monkeypatch):
         ]
     )
 
-    assert layer._viterbi_decode(log_probabilities) == [1, 0]
+    assert viterbi_decode(log_probabilities, id2label, default_viterbi_biases()) == [1, 0]
 
 
 def test_local_viterbi_calibration_is_loaded(tmp_path):
-    biases = {key: index / 10 for index, key in enumerate(layer._VITERBI_BIAS_KEYS, start=1)}
+    biases = {key: index / 10 for index, key in enumerate(VITERBI_BIAS_KEYS, start=1)}
     (tmp_path / "viterbi_calibration.json").write_text(
         json.dumps({"operating_points": {"default": {"biases": biases}}})
     )

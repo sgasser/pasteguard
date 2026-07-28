@@ -59,10 +59,6 @@ export function maskPII<TRequest, TResponse>(
   };
 }
 
-export type { PlaceholderContext } from "../masking/context";
-export type { PIIDetectionResult, PIIEntity } from "./detect";
-export { createMaskingContext } from "./mask";
-
 /**
  * Check if the detector is healthy
  */

@@ -1,3 +1,3 @@
-import type { OpenAIContentPart, OpenAIMessageContent } from "../providers/openai/types";
+import type { OpenAIContentPart } from "../providers/openai/types";
 
-export type { OpenAIContentPart, OpenAIMessageContent };
+export type { OpenAIContentPart };

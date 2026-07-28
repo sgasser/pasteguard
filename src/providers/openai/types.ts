@@ -70,7 +70,6 @@ export const OpenAIResponseSchema = z.object({
 
 // Inferred types
 export type OpenAIContentPart = z.infer<typeof OpenAIContentPartSchema>;
-export type OpenAIMessageContent = z.infer<typeof OpenAIMessageContentSchema>;
 export type OpenAIMessage = z.infer<typeof OpenAIMessageSchema>;
 export type OpenAIRequest = z.infer<typeof OpenAIRequestSchema>;
 export type OpenAIResponse = z.infer<typeof OpenAIResponseSchema>;

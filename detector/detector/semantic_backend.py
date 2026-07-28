@@ -22,7 +22,7 @@ from huggingface_hub.utils import (
     validate_repo_id,  # pyright: ignore[reportPrivateImportUsage]
 )
 
-from . import gliner_layer, openai_privacy_filter_layer
+from . import gliner_layer, openai_privacy_filter_labels, openai_privacy_filter_layer
 from .entities import Span
 
 DEFAULT_BACKEND = "gliner"
@@ -138,7 +138,7 @@ def _validate_privacy_filter_config(
         source_name,
         _PRIVACY_FILTER_CONFIG,
     )
-    openai_privacy_filter_layer.validate_label_set(
+    openai_privacy_filter_labels.validate_label_set(
         config.get("id2label"),
         configured_value,
     )

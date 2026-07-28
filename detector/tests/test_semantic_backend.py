@@ -13,6 +13,7 @@ from huggingface_hub.errors import (
 
 import detector.semantic_backend as semantic_backend
 from detector.entities import PERSON, Span
+from detector.openai_privacy_filter_labels import REQUIRED_LABELS
 
 
 @pytest.fixture(autouse=True)
@@ -45,11 +46,7 @@ def _valid_local_model(path):
 def _privacy_filter_id2label():
     labels = [
         "O",
-        *[
-            f"{boundary}-{label}"
-            for label in sorted(semantic_backend.openai_privacy_filter_layer._REQUIRED_LABELS)
-            for boundary in "BIES"
-        ],
+        *[f"{boundary}-{label}" for label in sorted(REQUIRED_LABELS) for boundary in "BIES"],
     ]
     return dict(enumerate(labels))
 
