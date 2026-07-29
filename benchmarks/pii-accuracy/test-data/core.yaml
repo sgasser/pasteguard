@@ -367,6 +367,7 @@ cases:
     category: core
     split: test
     language: de
+    gating_backends: [gliner]
     text: "Bitte trage Mehmet Yıldız in die Zugriffsliste ein."
     expected:
       - entity: PERSON
@@ -415,4 +416,52 @@ cases:
     expected:
       - entity: VAT_CODE
         text: FR40303265045
+        match: exact
+
+  - id: core_private_url_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    backends: [openai_privacy_filter]
+    text: "The customer's private recovery link is https://portal.example.test/recover/A7v9Q2."
+    expected:
+      - entity: URL
+        text: https://portal.example.test/recover/A7v9Q2
+        match: exact
+
+  - id: core_private_date_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    backends: [openai_privacy_filter]
+    text: "The patient's follow-up appointment is on 2026-05-17."
+    expected:
+      - entity: DATE_TIME
+        text: 2026-05-17
+        match: exact
+
+  - id: core_account_number_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    backends: [openai_privacy_filter]
+    text: "Transfer the refund to customer account number 0091847265."
+    expected:
+      - entity: ACCOUNT_NUMBER
+        text: "0091847265"
+        match: exact
+
+  - id: core_contextual_secret_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    backends: [openai_privacy_filter]
+    text: "The temporary vault passphrase is cobalt-river-seven."
+    expected:
+      - entity: SECRET
+        text: cobalt-river-seven
         match: exact

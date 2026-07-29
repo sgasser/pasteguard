@@ -58,3 +58,13 @@ cases:
     entities: [EMAIL_ADDRESS, PHONE_NUMBER, IP_ADDRESS, LOCATION, PERSON]
     text: "Log sample: user=anonymous, host=local-dev, route=/api/v1/orders, status=204, latency=123ms, trace=abc123def456, region=staging-west, retry=0. The sample intentionally avoids direct personal data."
     expected: []
+
+  - id: precision_paragraph_public_reference_data
+    suite: precision-paragraphs
+    category: precision
+    split: test
+    language: en
+    entities: [URL, DATE_TIME, ACCOUNT_NUMBER, SECRET]
+    backends: [openai_privacy_filter]
+    text: "The public changelog at https://docs.example.com/releases lists version 4.2 on 2026-05-17. Ticket 0091847265 discusses the general topic of secret rotation and contains no private customer data."
+    expected: []

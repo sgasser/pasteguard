@@ -1,11 +1,21 @@
 import { z } from "zod";
-import { CONFIGURED_PII_ENTITIES, SUPPORTED_LANGUAGES } from "./taxonomy";
+import { CONFIGURED_PII_ENTITIES, SEMANTIC_BACKENDS, SUPPORTED_LANGUAGES } from "./taxonomy";
 
 export const ConfiguredPiiEntitySchema = z.enum(CONFIGURED_PII_ENTITIES);
 export type ConfiguredPiiEntity = z.infer<typeof ConfiguredPiiEntitySchema>;
 
 export const SupportedLanguageSchema = z.enum(SUPPORTED_LANGUAGES);
 export type SupportedLanguage = z.infer<typeof SupportedLanguageSchema>;
+
+export const SemanticBackendSchema = z.enum(SEMANTIC_BACKENDS);
+export type SemanticBackend = z.infer<typeof SemanticBackendSchema>;
+
+const BackendListSchema = z
+  .array(SemanticBackendSchema)
+  .min(1)
+  .refine((backends) => new Set(backends).size === backends.length, {
+    message: "Backend lists must not contain duplicates",
+  });
 
 export const MatchModeSchema = z.enum(["exact", "contains", "overlap"]);
 export type MatchMode = z.infer<typeof MatchModeSchema>;
@@ -22,6 +32,7 @@ export const ExpectedSpanSchema = z
     text: z.string().min(1),
     match: MatchModeSchema.default("contains"),
     aliases: z.array(z.string().min(1)).default([]),
+    backends: BackendListSchema.optional(),
   })
   .strict();
 export type ExpectedSpan = z.infer<typeof ExpectedSpanSchema>;
@@ -35,6 +46,8 @@ export const BenchmarkCaseSchema = z
     language: SupportedLanguageSchema,
     text: z.string().min(1),
     entities: z.array(ConfiguredPiiEntitySchema).optional(),
+    backends: BackendListSchema.optional(),
+    gating_backends: BackendListSchema.optional(),
     gate: z.boolean().optional(),
     note: z.string().optional(),
     expected: z.array(ExpectedSpanSchema).default([]),
@@ -58,6 +71,7 @@ export type Detection = {
 
 export type TestResult = {
   case: BenchmarkCase;
+  expected: ExpectedSpan[];
   passed: boolean;
   gating: boolean;
   detections: Detection[];

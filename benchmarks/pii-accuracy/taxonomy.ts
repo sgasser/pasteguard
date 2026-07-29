@@ -12,7 +12,13 @@ export const CONFIGURED_PII_ENTITIES = [
   "PERSON",
   "PHONE_NUMBER",
   "VAT_CODE",
+  "URL",
+  "DATE_TIME",
+  "ACCOUNT_NUMBER",
+  "SECRET",
 ] as const;
+
+export const SEMANTIC_BACKENDS = ["gliner", "openai_privacy_filter"] as const;
 
 export const SUPPORTED_LANGUAGES = ["en", "de", "es", "fr", "it", "nl", "pl", "pt", "ro"] as const;
 

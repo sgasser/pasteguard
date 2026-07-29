@@ -3,16 +3,19 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { parse as parseYaml } from "yaml";
-import { isKnownSuite, SUITES, suiteNames } from "./taxonomy";
+import { isKnownSuite, SEMANTIC_BACKENDS, SUITES, suiteNames } from "./taxonomy";
 import {
   type BenchmarkCase,
   BenchmarkFileSchema,
   type Detection,
   type ExpectedSpan,
+  type SemanticBackend,
+  SemanticBackendSchema,
   type TestResult,
 } from "./types";
 
 const DEFAULT_ANALYZE_URL = "http://localhost:3000/analyze";
+const DEFAULT_BACKEND: SemanticBackend = "gliner";
 const DEFAULT_THRESHOLD = 0.7;
 const MAX_FAILURES_TO_PRINT = 40;
 const MAX_CONTAINS_EDGE_CHARS = 2;
@@ -41,6 +44,8 @@ const argv = parseArgs({
     category: { type: "string" },
     languages: { type: "string" },
     split: { type: "string" },
+    backend: { type: "string" },
+    validate: { type: "boolean", default: false },
     verbose: { type: "boolean", default: false },
     "list-suites": { type: "boolean", default: false },
     help: { type: "boolean", default: false },
@@ -61,6 +66,9 @@ if (argv.values["list-suites"]) {
 }
 
 const analyzeUrl = argv.values.url ?? process.env.PII_BENCHMARK_ANALYZE_URL ?? DEFAULT_ANALYZE_URL;
+const backend = parseBackend(
+  argv.values.backend ?? process.env.PII_BENCHMARK_BACKEND ?? DEFAULT_BACKEND,
+);
 const threshold = parseThreshold(argv.values.threshold ?? String(DEFAULT_THRESHOLD));
 const filters = buildFilters(argv.values);
 const verbose = Boolean(argv.values.verbose);
@@ -71,20 +79,32 @@ const testDataDir = join(benchmarkDir, "test-data");
 const allCases = await loadCases(testDataDir);
 validateCorpus(allCases);
 
-const cases = applyFilters(allCases, filters);
+const cases = applyFilters(allCases, filters, backend);
 
 if (cases.length === 0) {
   console.error("No benchmark cases matched the selected filters.");
   process.exit(1);
 }
 
+if (argv.values.validate) {
+  const expectations = cases.reduce(
+    (count, testCase) => count + expectedForBackend(testCase, backend).length,
+    0,
+  );
+  console.log(
+    `Valid benchmark corpus for ${backend}: ${cases.length} cases, ${expectations} expected spans.`,
+  );
+  process.exit(0);
+}
+
+const backendInfo = await verifyBackend(analyzeUrl, backend);
 const results: TestResult[] = [];
 
 for (const testCase of cases) {
-  results.push(await runCase(testCase, analyzeUrl, threshold));
+  results.push(await runCase(testCase, analyzeUrl, threshold, backend));
 }
 
-printReport(results, analyzeUrl, threshold, verbose);
+printReport(results, analyzeUrl, threshold, backendInfo, verbose);
 
 const gatingFailures = results.filter((result) => result.gating && !result.passed);
 const errors = results.filter((result) => result.error);
@@ -128,11 +148,52 @@ function validateCorpus(casesToValidate: BenchmarkCase[]) {
       errors.push(`Unknown suite in ${testCase.id}: ${testCase.suite}`);
     }
 
+    if (testCase.gate !== undefined && testCase.gating_backends !== undefined) {
+      errors.push(`${testCase.id} cannot set both gate and gating_backends`);
+    }
+
+    if (testCase.backends) {
+      for (const gatingBackend of testCase.gating_backends ?? []) {
+        if (!testCase.backends.includes(gatingBackend)) {
+          errors.push(
+            `${testCase.id} gates ${gatingBackend}, but that backend does not run the case`,
+          );
+        }
+      }
+    }
+
+    if (testCase.expected.length > 0) {
+      for (const backend of SEMANTIC_BACKENDS) {
+        if (testCase.backends && !testCase.backends.includes(backend)) {
+          continue;
+        }
+        if (expectedForBackend(testCase, backend).length === 0) {
+          errors.push(
+            `${testCase.id} runs for ${backend}, but has no expected spans for that backend`,
+          );
+        }
+      }
+    }
+
     for (const expected of testCase.expected) {
       if (!testCase.text.includes(expected.text)) {
         errors.push(
           `Expected text is not present in ${testCase.id}: ${expected.entity}(${expected.text})`,
         );
+      }
+      if (testCase.entities && !testCase.entities.includes(expected.entity)) {
+        errors.push(
+          `${testCase.id} expects ${expected.entity}, but entities does not request that type`,
+        );
+      }
+      if (testCase.backends && expected.backends) {
+        for (const expectedBackend of expected.backends) {
+          if (!testCase.backends.includes(expectedBackend)) {
+            errors.push(
+              `${testCase.id} expects ${expected.entity} for ${expectedBackend}, but that backend does not run the case`,
+            );
+          }
+        }
       }
     }
   }
@@ -143,8 +204,15 @@ function validateCorpus(casesToValidate: BenchmarkCase[]) {
   }
 }
 
-function applyFilters(casesToFilter: BenchmarkCase[], activeFilters: Filters): BenchmarkCase[] {
+function applyFilters(
+  casesToFilter: BenchmarkCase[],
+  activeFilters: Filters,
+  backend: SemanticBackend,
+): BenchmarkCase[] {
   return casesToFilter.filter((testCase) => {
+    if (testCase.backends && !testCase.backends.includes(backend)) {
+      return false;
+    }
     if (activeFilters.suites && !activeFilters.suites.has(testCase.suite)) {
       return false;
     }
@@ -165,15 +233,18 @@ async function runCase(
   testCase: BenchmarkCase,
   endpoint: string,
   globalThreshold: number,
+  backend: SemanticBackend,
 ): Promise<TestResult> {
-  const gating = isGatingCase(testCase);
+  const expected = expectedForBackend(testCase, backend);
+  const gating = isGatingCase(testCase, backend);
 
   try {
-    const detections = await analyze(testCase, endpoint, globalThreshold);
-    const { matched, missing, unexpected } = scoreDetections(testCase, detections);
+    const detections = await analyze(testCase, endpoint, globalThreshold, backend);
+    const { matched, missing, unexpected } = scoreDetections(testCase, expected, detections);
 
     return {
       case: testCase,
+      expected,
       passed: missing.length === 0 && unexpected.length === 0,
       gating,
       detections,
@@ -184,11 +255,12 @@ async function runCase(
   } catch (error) {
     return {
       case: testCase,
+      expected,
       passed: false,
       gating,
       detections: [],
       matched: [],
-      missing: testCase.expected,
+      missing: expected,
       unexpected: [],
       error: error instanceof Error ? error.message : String(error),
     };
@@ -199,6 +271,7 @@ async function analyze(
   testCase: BenchmarkCase,
   endpoint: string,
   globalThreshold: number,
+  backend: SemanticBackend,
 ): Promise<Detection[]> {
   const response = await fetch(endpoint, {
     method: "POST",
@@ -206,7 +279,7 @@ async function analyze(
     body: JSON.stringify({
       text: testCase.text,
       language: testCase.language,
-      entities: entitiesForCase(testCase),
+      entities: entitiesForCase(testCase, backend),
       score_threshold: globalThreshold,
     }),
   });
@@ -252,12 +325,16 @@ function normalizeDetection(testCase: BenchmarkCase, item: unknown): Detection {
   };
 }
 
-function scoreDetections(testCase: BenchmarkCase, detections: Detection[]) {
+function scoreDetections(
+  testCase: BenchmarkCase,
+  expectedSpans: ExpectedSpan[],
+  detections: Detection[],
+) {
   const unmatched = [...detections];
   const matched: Array<{ expected: ExpectedSpan; detection: Detection }> = [];
   const missing: ExpectedSpan[] = [];
 
-  for (const expected of testCase.expected) {
+  for (const expected of expectedSpans) {
     const matchIndex = unmatched.findIndex((detection) =>
       detectionMatchesExpected(testCase, detection, expected),
     );
@@ -356,26 +433,82 @@ function normalized(value: string): string {
     .trim();
 }
 
-function entitiesForCase(testCase: BenchmarkCase): string[] {
+function expectedForBackend(testCase: BenchmarkCase, backend: SemanticBackend): ExpectedSpan[] {
+  return testCase.expected.filter(
+    (expected) => !expected.backends || expected.backends.includes(backend),
+  );
+}
+
+function entitiesForCase(testCase: BenchmarkCase, backend: SemanticBackend): string[] {
   if (testCase.entities) {
     return testCase.entities;
   }
 
-  if (testCase.expected.length > 0) {
-    return [...new Set(testCase.expected.map((expected) => expected.entity))];
+  const expected = expectedForBackend(testCase, backend);
+  if (expected.length > 0) {
+    return [...new Set(expected.map((span) => span.entity))];
   }
 
   return [...(SUITES[testCase.suite]?.defaultEntities ?? [])];
 }
 
-function isGatingCase(testCase: BenchmarkCase): boolean {
+function isGatingCase(testCase: BenchmarkCase, backend: SemanticBackend): boolean {
+  if (testCase.gating_backends) {
+    return testCase.gating_backends.includes(backend);
+  }
   return testCase.gate ?? (testCase.category === "core" || testCase.category === "precision");
+}
+
+type BackendInfo = {
+  backend: SemanticBackend;
+  model: string;
+};
+
+async function verifyBackend(
+  endpoint: string,
+  expectedBackend: SemanticBackend,
+): Promise<BackendInfo> {
+  const healthUrl = healthUrlFor(endpoint);
+  const response = await fetch(healthUrl);
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Health check HTTP ${response.status}: ${body || response.statusText}`);
+  }
+
+  const payload = await response.json();
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Analyzer health response is missing a valid backend and model");
+  }
+  const record = payload as Record<string, unknown>;
+  const parsedBackend = SemanticBackendSchema.safeParse(record.backend);
+  if (!parsedBackend.success || typeof record.model !== "string" || record.model === "") {
+    throw new Error("Analyzer health response is missing a valid backend and model");
+  }
+  if (parsedBackend.data !== expectedBackend) {
+    throw new Error(
+      `Requested benchmark backend ${expectedBackend}, but ${healthUrl} reports ${parsedBackend.data}`,
+    );
+  }
+  return { backend: parsedBackend.data, model: record.model };
+}
+
+function healthUrlFor(endpoint: string): string {
+  const url = new URL(endpoint);
+  const pathname = url.pathname.replace(/\/+$/, "");
+  if (!pathname.endsWith("/analyze")) {
+    throw new Error(`Analyze URL must end with /analyze to verify its backend: ${endpoint}`);
+  }
+  url.pathname = `${pathname.slice(0, -"/analyze".length)}/health`;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
 }
 
 function printReport(
   results: TestResult[],
   endpoint: string,
   activeThreshold: number,
+  backendInfo: BackendInfo,
   printVerbose: boolean,
 ) {
   const gatingResults = results.filter((result) => result.gating);
@@ -385,6 +518,8 @@ function printReport(
   const errors = results.filter((result) => result.error);
 
   console.log("PII accuracy benchmark");
+  console.log(`Backend: ${backendInfo.backend}`);
+  console.log(`Model: ${backendInfo.model}`);
   console.log(`Endpoint: ${endpoint}`);
   console.log(`Default threshold: ${activeThreshold}`);
   console.log(
@@ -405,7 +540,7 @@ function printReport(
     "By language",
     groupMetrics(results, (result) => result.case.language),
   );
-  printMetrics("By entity", entityMetrics(results));
+  printMetrics("By entity", entityMetrics(results, backendInfo.backend));
 
   if (failed.length > 0) {
     console.log("");
@@ -473,12 +608,12 @@ function groupMetrics(
     .sort(([left], [right]) => left.localeCompare(right));
 }
 
-function entityMetrics(results: TestResult[]): Array<[string, Metrics]> {
+function entityMetrics(results: TestResult[], backend: SemanticBackend): Array<[string, Metrics]> {
   const entities = new Map<string, Metrics>();
 
   for (const result of results) {
-    const seenEntities = new Set(entitiesForCase(result.case));
-    for (const expected of result.case.expected) {
+    const seenEntities = new Set(entitiesForCase(result.case, backend));
+    for (const expected of result.expected) {
       seenEntities.add(expected.entity);
     }
     for (const detection of result.unexpected) {
@@ -523,7 +658,7 @@ function aggregate(results: TestResult[]): Metrics {
     metrics.errors += result.error ? 1 : 0;
     metrics.tp += result.matched.length;
     metrics.fp += result.unexpected.length;
-    metrics.fn += result.error ? result.case.expected.length : result.missing.length;
+    metrics.fn += result.error ? result.expected.length : result.missing.length;
   }
 
   return metrics;
@@ -617,6 +752,14 @@ function parseThreshold(value: string): number {
   return parsed;
 }
 
+function parseBackend(value: string): SemanticBackend {
+  const parsed = SemanticBackendSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error(`Invalid backend ${value}; expected one of ${SEMANTIC_BACKENDS.join(", ")}`);
+  }
+  return parsed.data;
+}
+
 function printHelp() {
   console.log(`Usage: bun run benchmarks/pii-accuracy/run.ts [options]
 
@@ -627,6 +770,8 @@ Options:
   --category <csv>         Filter categories: core,precision,eval,hard
   --languages <csv>        Filter languages, e.g. en,de,it
   --split <csv>            Filter split: dev,test
+  --backend <name>         gliner or openai_privacy_filter. Default: ${DEFAULT_BACKEND}
+  --validate               Validate and count the corpus without HTTP requests
   --list-suites            Print suites and exit
   --verbose                Print all failure details
   --help                   Print this help

@@ -86,3 +86,51 @@ cases:
       - entity: EMAIL_ADDRESS
         text: customer.owner@example.com
         match: exact
+
+  - id: boundary_private_url_parentheses
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    backends: [openai_privacy_filter]
+    text: "Use the customer's recovery link (https://portal.example.test/recover/A7v9Q2), then close the ticket."
+    expected:
+      - entity: URL
+        text: https://portal.example.test/recover/A7v9Q2
+        match: exact
+
+  - id: boundary_private_date_quotes
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    backends: [openai_privacy_filter]
+    text: "The patient's appointment date is \"2026-05-17\"."
+    expected:
+      - entity: DATE_TIME
+        text: 2026-05-17
+        match: exact
+
+  - id: boundary_account_number_brackets
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    backends: [openai_privacy_filter]
+    text: "The refund account [0091847265] belongs to the customer."
+    expected:
+      - entity: ACCOUNT_NUMBER
+        text: "0091847265"
+        match: exact
+
+  - id: boundary_contextual_secret_quotes
+    suite: boundaries
+    category: hard
+    split: test
+    language: en
+    backends: [openai_privacy_filter]
+    text: "The temporary vault passphrase is 'cobalt-river-seven'."
+    expected:
+      - entity: SECRET
+        text: cobalt-river-seven
+        match: exact

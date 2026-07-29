@@ -134,3 +134,51 @@ cases:
       - entity: LOCATION
         text: 25 Rue du Faubourg Saint-Honoré, Paris
         match: contains
+
+  - id: hard_private_url_without_scheme
+    suite: hard
+    category: hard
+    split: dev
+    language: en
+    backends: [openai_privacy_filter]
+    text: "The private patient record is at portal.example.test/patients/Morgan-Lee."
+    expected:
+      - entity: URL
+        text: portal.example.test/patients/Morgan-Lee
+        match: exact
+
+  - id: hard_private_date_natural_language
+    suite: hard
+    category: hard
+    split: dev
+    language: en
+    backends: [openai_privacy_filter]
+    text: "The patient's confidential appointment is next Thursday at 09:30."
+    expected:
+      - entity: DATE_TIME
+        text: next Thursday at 09:30
+        match: contains
+
+  - id: hard_account_number_alphanumeric
+    suite: hard
+    category: hard
+    split: dev
+    language: en
+    backends: [openai_privacy_filter]
+    text: "The customer's internal billing account is ACCT-0042-8891."
+    expected:
+      - entity: ACCOUNT_NUMBER
+        text: ACCT-0042-8891
+        match: exact
+
+  - id: hard_contextual_secret_phrase
+    suite: hard
+    category: hard
+    split: dev
+    language: en
+    backends: [openai_privacy_filter]
+    text: "For emergency access, the confidential phrase is blue door at dawn."
+    expected:
+      - entity: SECRET
+        text: blue door at dawn
+        match: contains

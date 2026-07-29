@@ -255,3 +255,30 @@ cases:
       - entity: IBAN_CODE
         text: FR1420041010050500013M02606
         match: exact
+
+  - id: eval_en_private_intake_record
+    suite: eval
+    category: eval
+    split: dev
+    language: en
+    text: "Morgan Lee's private intake record uses https://portal.example.test/patients/Morgan-Lee, lists the appointment date 2026-05-17, billing account 0091847265, and temporary passphrase cobalt-river-seven."
+    expected:
+      - entity: PERSON
+        text: Morgan Lee
+        match: contains
+      - entity: URL
+        text: https://portal.example.test/patients/Morgan-Lee
+        match: exact
+        backends: [openai_privacy_filter]
+      - entity: DATE_TIME
+        text: 2026-05-17
+        match: exact
+        backends: [openai_privacy_filter]
+      - entity: ACCOUNT_NUMBER
+        text: "0091847265"
+        match: exact
+        backends: [openai_privacy_filter]
+      - entity: SECRET
+        text: cobalt-river-seven
+        match: exact
+        backends: [openai_privacy_filter]

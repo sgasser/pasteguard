@@ -95,6 +95,7 @@ cases:
     split: test
     language: fr
     entities: [PERSON, LOCATION]
+    gating_backends: [gliner]
     text: "Le client souhaite un rendez-vous la semaine prochaine."
     expected: []
 
@@ -104,6 +105,7 @@ cases:
     split: test
     language: es
     entities: [PERSON, LOCATION]
+    gating_backends: [gliner]
     text: "El cliente solicita la factura del mes corriente."
     expected: []
 
@@ -113,6 +115,7 @@ cases:
     split: test
     language: it
     entities: [PERSON, LOCATION]
+    gating_backends: [gliner]
     text: "Il cliente ha richiesto la fattura entro venerdi."
     expected: []
 
@@ -122,6 +125,7 @@ cases:
     split: test
     language: nl
     entities: [PERSON, LOCATION]
+    gating_backends: [gliner]
     text: "De klant vraagt om een snelle levering deze week."
     expected: []
 
@@ -131,6 +135,7 @@ cases:
     split: test
     language: pt
     entities: [PERSON, LOCATION]
+    gating_backends: [gliner]
     text: "O cliente pediu a fatura ate sexta-feira."
     expected: []
 
@@ -151,6 +156,7 @@ cases:
     split: test
     language: pl
     entities: [PERSON, LOCATION]
+    gating_backends: [gliner]
     text: "Klient prosi o fakturę przed końcem tygodnia."
     expected: []
 
@@ -283,4 +289,44 @@ cases:
     language: de
     entities: [VAT_CODE]
     text: "Die Referenz DE136695977 hat keine gueltige Pruefsumme."
+    expected: []
+
+  - id: precision_public_url_not_private
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [URL]
+    backends: [openai_privacy_filter]
+    text: "The public documentation is available at https://docs.example.com/privacy."
+    expected: []
+
+  - id: precision_public_release_date_not_private
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [DATE_TIME]
+    backends: [openai_privacy_filter]
+    text: "Version 4.2 was publicly released on 2026-05-17."
+    expected: []
+
+  - id: precision_incident_number_not_account
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [ACCOUNT_NUMBER]
+    backends: [openai_privacy_filter]
+    text: "Incident 0091847265 was closed after the deployment."
+    expected: []
+
+  - id: precision_secret_word_without_value
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [SECRET]
+    backends: [openai_privacy_filter]
+    text: "The handbook explains how secret rotation works."
     expected: []
