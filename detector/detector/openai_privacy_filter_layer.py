@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -20,16 +23,19 @@ from huggingface_hub.errors import (
 from .entities import Span
 from .openai_privacy_filter_decoder import (
     VITERBI_BIAS_KEYS,
+    Candidate,
     TokenPrediction,
-    consolidate_candidates,
     default_viterbi_biases,
-    reconstruct_window,
+    reconstruct_spans,
     viterbi_decode,
 )
 from .openai_privacy_filter_labels import validate_label_set
 
 DEFAULT_MODEL = "openai/privacy-filter"
-_MAX_STRIDE_TOKENS = 128
+_DEFAULT_MAX_TOKENS = 2048
+_MIN_MAX_TOKENS = 256
+_WINDOW_OVERLAP_TOKENS = 128
+_CANDIDATE_CACHE_SIZE = 1024
 _UNBOUNDED_MODEL_LENGTH = 1_000_000_000
 _VITERBI_CALIBRATION = "viterbi_calibration.json"
 
@@ -38,6 +44,8 @@ _model: Any = None
 _id2label: dict[int, str] = {}
 _loaded_model_name: str | None = None
 _viterbi_biases = default_viterbi_biases()
+_inference_max_tokens = _DEFAULT_MAX_TOKENS
+_candidate_cache: OrderedDict[tuple[int, bytes], tuple[Candidate, ...]] = OrderedDict()
 _load_lock = threading.Lock()
 # Torch inference is not guaranteed thread-safe.
 _infer_lock = threading.Lock()
@@ -111,10 +119,30 @@ def _create_components(model_name: str) -> tuple[Any, Any, dict[str, float]]:
     return tokenizer, model, _load_viterbi_biases(model_name)
 
 
+def _configured_max_tokens() -> int:
+    value = os.environ.get("OPENAI_PRIVACY_FILTER_MAX_TOKENS")
+    if value is None:
+        return _DEFAULT_MAX_TOKENS
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise ValueError(
+            "OPENAI_PRIVACY_FILTER_MAX_TOKENS must be an integer of at least "
+            f"{_MIN_MAX_TOKENS}; got {value!r}"
+        ) from None
+    if parsed < _MIN_MAX_TOKENS:
+        raise ValueError(
+            "OPENAI_PRIVACY_FILTER_MAX_TOKENS must be an integer of at least "
+            f"{_MIN_MAX_TOKENS}; got {value!r}"
+        )
+    return parsed
+
+
 def load_model(model_name: str = DEFAULT_MODEL) -> None:
     """Load and validate one Privacy Filter checkpoint exactly once."""
 
-    global _id2label, _loaded_model_name, _model, _tokenizer, _viterbi_biases
+    global _id2label, _inference_max_tokens, _loaded_model_name, _model, _tokenizer
+    global _viterbi_biases
     if _model is not None:
         if _loaded_model_name != model_name:
             loaded = _loaded_model_name or "an unknown checkpoint"
@@ -134,6 +162,7 @@ def load_model(model_name: str = DEFAULT_MODEL) -> None:
                 )
             return
 
+        inference_max_tokens = _configured_max_tokens()
         tokenizer, model, viterbi_biases = _create_components(model_name)
         labels = validate_label_set(
             getattr(getattr(model, "config", None), "id2label", None),
@@ -143,7 +172,9 @@ def load_model(model_name: str = DEFAULT_MODEL) -> None:
         _model = model
         _id2label = labels
         _viterbi_biases = viterbi_biases
+        _inference_max_tokens = inference_max_tokens
         _loaded_model_name = model_name
+        _candidate_cache.clear()
 
 
 def _model_max_tokens() -> int:
@@ -161,7 +192,7 @@ def _model_max_tokens() -> int:
             limits.append(limit)
     if not limits:
         raise ValueError("OpenAI Privacy Filter tokenizer has no finite model_max_length")
-    return min(limits)
+    return min(_inference_max_tokens, *limits)
 
 
 def _inference_stride(max_tokens: int) -> int:
@@ -174,7 +205,7 @@ def _inference_stride(max_tokens: int) -> int:
         raise ValueError(
             "OpenAI Privacy Filter tokenizer model_max_length is too small for inference"
         )
-    return min(_MAX_STRIDE_TOKENS, max(1, content_tokens // 4))
+    return min(_WINDOW_OVERLAP_TOKENS, max(1, content_tokens // 4))
 
 
 def _as_windows(value: object) -> list[list[Any]]:
@@ -215,7 +246,7 @@ def _offset_pair(value: object) -> tuple[int, int] | None:
     return start, end
 
 
-def _predict_windows(text: str) -> list[list[TokenPrediction]]:
+def _predict_tokens(text: str) -> list[TokenPrediction]:
     import torch
 
     max_tokens = _model_max_tokens()
@@ -243,8 +274,20 @@ def _predict_windows(text: str) -> list[list[TokenPrediction]]:
     except (AttributeError, StopIteration, TypeError):
         device = None
 
-    predictions: list[list[TokenPrediction]] = []
+    token_metadata: dict[int, tuple[int, int, int]] = {}
+    score_sums: dict[int, Any] = {}
+    score_counts: dict[int, int] = {}
+    window_start = 0
+    previous_content_tokens = 0
     for window_index, input_ids in enumerate(input_windows):
+        if window_index:
+            step = previous_content_tokens - stride
+            if step <= 0:
+                raise RuntimeError(
+                    "OpenAI Privacy Filter tokenizer returned invalid overlap windows"
+                )
+            window_start += step
+
         attention = (
             attention_windows[window_index]
             if window_index < len(attention_windows)
@@ -272,37 +315,84 @@ def _predict_windows(text: str) -> list[list[TokenPrediction]]:
             len(special),
             len(logits[0]),
         )
-        active_tokens: list[tuple[int, int, int]] = []
+        active_tokens: list[tuple[int, int, int, int, int]] = []
+        content_position = 0
         for token_index in range(token_count):
             if not bool(attention[token_index]) or bool(special[token_index]):
                 continue
+            absolute_position = window_start + content_position
+            content_position += 1
             offset = _offset_pair(offsets[token_index])
             if offset is None:
                 continue
             start, end = offset
             if 0 <= start < end <= len(text):
-                active_tokens.append((token_index, start, end))
-
-        if not active_tokens:
-            predictions.append([])
-            continue
+                active_tokens.append(
+                    (
+                        absolute_position,
+                        int(input_ids[token_index]),
+                        token_index,
+                        start,
+                        end,
+                    )
+                )
+        previous_content_tokens = content_position
 
         log_probabilities = logits[0].float().log_softmax(dim=-1)
-        active_log_probabilities = log_probabilities[
-            [token_index for token_index, _, _ in active_tokens]
-        ]
-        label_ids = viterbi_decode(active_log_probabilities, _id2label, _viterbi_biases)
-        probabilities = active_log_probabilities.exp()
-        window_predictions: list[TokenPrediction] = []
-        for prediction_index, ((_, start, end), label_id) in enumerate(
-            zip(active_tokens, label_ids, strict=True)
-        ):
-            label = _id2label.get(label_id)
-            score = _finite_score(probabilities[prediction_index, label_id])
-            if label is not None and score is not None:
-                window_predictions.append(TokenPrediction(label, start, end, score))
-        predictions.append(window_predictions)
+        for absolute_position, token_id, token_index, start, end in active_tokens:
+            scores = log_probabilities[token_index]
+            metadata = (token_id, start, end)
+            previous_metadata = token_metadata.get(absolute_position)
+            if previous_metadata is None:
+                token_metadata[absolute_position] = metadata
+                score_sums[absolute_position] = scores
+                score_counts[absolute_position] = 1
+            elif previous_metadata != metadata:
+                raise RuntimeError(
+                    "OpenAI Privacy Filter tokenizer returned inconsistent overlap offsets"
+                )
+            else:
+                score_sums[absolute_position] = torch.logaddexp(
+                    score_sums[absolute_position], scores
+                )
+                score_counts[absolute_position] += 1
+
+    if not score_sums:
+        return []
+
+    positions = sorted(score_sums)
+    averaged_log_probabilities = torch.stack(
+        [score_sums[position] - math.log(float(score_counts[position])) for position in positions]
+    )
+    label_ids = viterbi_decode(averaged_log_probabilities, _id2label, _viterbi_biases)
+    probabilities = averaged_log_probabilities.exp()
+
+    predictions: list[TokenPrediction] = []
+    for prediction_index, (position, label_id) in enumerate(zip(positions, label_ids, strict=True)):
+        label = _id2label.get(label_id)
+        score = _finite_score(probabilities[prediction_index, label_id])
+        if label is not None and score is not None:
+            _, start, end = token_metadata[position]
+            predictions.append(TokenPrediction(label, start, end, score))
     return predictions
+
+
+def _candidate_cache_key(text: str) -> tuple[int, bytes]:
+    return len(text), sha256(text.encode("utf-8")).digest()
+
+
+def _candidates_for_text(text: str) -> tuple[Candidate, ...]:
+    key = _candidate_cache_key(text)
+    cached = _candidate_cache.get(key)
+    if cached is not None:
+        _candidate_cache.move_to_end(key)
+        return cached
+
+    candidates = tuple(reconstruct_spans(_predict_tokens(text), len(text)))
+    _candidate_cache[key] = candidates
+    if len(_candidate_cache) > _CANDIDATE_CACHE_SIZE:
+        _candidate_cache.popitem(last=False)
+    return candidates
 
 
 def detect_openai_privacy_filter(text: str, score_threshold: float = 0.0) -> list[Span]:
@@ -314,15 +404,7 @@ def detect_openai_privacy_filter(text: str, score_threshold: float = 0.0) -> lis
         )
 
     with _infer_lock:
-        windows = _predict_windows(text)
-
-    candidates = consolidate_candidates(
-        [
-            candidate
-            for predictions in windows
-            for candidate in reconstruct_window(predictions, len(text))
-        ]
-    )
+        candidates = _candidates_for_text(text)
 
     spans: list[Span] = []
     for candidate in candidates:

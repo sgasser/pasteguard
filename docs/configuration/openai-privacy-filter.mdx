@@ -69,6 +69,17 @@ checkpoint's optional `viterbi_calibration.json` automatically. BILOU, generic
 NER, incomplete checkpoints, and unsupported known-label boundaries fail during
 startup.
 
+## Inference Windows
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_PRIVACY_FILTER_MAX_TOKENS` | `2048` | Maximum model tokens per inference window; must be at least `256` |
+
+Windows overlap by up to 128 tokens. PasteGuard averages duplicate token scores
+before one global Viterbi decode, so entities at window boundaries keep a
+coherent label path. Increase the limit only when the available memory and
+detector timeout can accommodate longer model passes.
+
 ## Local Checkpoint
 
 Mount a compatible Transformers checkpoint read-only:

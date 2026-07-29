@@ -36,11 +36,13 @@ def reset_backend(monkeypatch):
     monkeypatch.setattr(layer, "_model", None)
     monkeypatch.setattr(layer, "_id2label", {})
     monkeypatch.setattr(layer, "_loaded_model_name", None)
+    monkeypatch.setattr(layer, "_inference_max_tokens", layer._DEFAULT_MAX_TOKENS)
     monkeypatch.setattr(
         layer,
         "_viterbi_biases",
         default_viterbi_biases(),
     )
+    layer._candidate_cache.clear()
 
 
 def _checkpoint_labels(boundaries: str = "BIES", extras: tuple[str, ...] = ()) -> list[str]:
@@ -63,9 +65,12 @@ def _token(label: str, start: int, end: int, score: float = 0.9):
 
 
 def _loaded_stub(monkeypatch, windows):
+    assert len(windows) == 1
     monkeypatch.setattr(layer, "_tokenizer", Mock())
     monkeypatch.setattr(layer, "_model", Mock())
-    monkeypatch.setattr(layer, "_predict_windows", Mock(return_value=windows))
+    predict = Mock(return_value=windows[0])
+    monkeypatch.setattr(layer, "_predict_tokens", predict)
+    return predict
 
 
 def test_loads_and_validates_checkpoint_once(monkeypatch):
@@ -98,6 +103,20 @@ def test_loaded_checkpoint_cannot_be_replaced(monkeypatch):
 
     with pytest.raises(RuntimeError, match="already loaded"):
         layer.load_model("org/another-privacy-filter")
+
+
+def test_configured_max_tokens_can_be_overridden(monkeypatch):
+    monkeypatch.setenv("OPENAI_PRIVACY_FILTER_MAX_TOKENS", "1024")
+
+    assert layer._configured_max_tokens() == 1024
+
+
+@pytest.mark.parametrize("value", ["invalid", "255"])
+def test_invalid_configured_max_tokens_fail_clearly(monkeypatch, value):
+    monkeypatch.setenv("OPENAI_PRIVACY_FILTER_MAX_TOKENS", value)
+
+    with pytest.raises(ValueError, match="must be an integer of at least 256"):
+        layer._configured_max_tokens()
 
 
 @pytest.mark.parametrize("boundaries", ["BI", "BIES"])
@@ -304,67 +323,26 @@ def test_bioes_reconstruction_handles_single_and_complete_spans(monkeypatch):
     ]
 
 
-def test_touching_bioes_fragments_coalesce_before_thresholding(monkeypatch):
-    text = "AliceBob"
+def test_adjacent_complete_person_spans_remain_separate(monkeypatch):
+    text = "Alice Smith Bob Jones"
     _loaded_stub(
         monkeypatch,
         [
             [
-                _token("S-private_person", 0, 5, 0.8),
-                _token("S-private_person", 5, 8, 0.6),
-            ]
-        ],
-    )
-
-    spans = layer.detect_openai_privacy_filter(text, 0.7)
-
-    assert spans == [Span(PERSON, 0, 8, 0.8)]
-
-
-def test_reference_person_fragments_coalesce_before_whitespace_trimming(monkeypatch):
-    text = (
-        "Quindle Testwick can be reached at quindle.testwick@openai.com "
-        "or (415) 555-0102 before 2026-05-17."
-    )
-    _loaded_stub(
-        monkeypatch,
-        [
-            [
-                _token("B-private_person", 0, 2),
-                _token("E-private_person", 2, 7),
-                _token("B-private_person", 7, 12),
-                _token("E-private_person", 12, 16),
+                _token("B-private_person", 0, 5, 0.95),
+                _token("E-private_person", 5, 11, 0.95),
+                _token("B-private_person", 11, 15, 0.96),
+                _token("E-private_person", 15, 21, 0.96),
             ]
         ],
     )
 
     spans = layer.detect_openai_privacy_filter(text)
 
-    assert spans == [Span(PERSON, 0, 16, 0.9)]
-    assert text[spans[0].start : spans[0].end] == "Quindle Testwick"
-
-
-def test_reference_address_fragments_coalesce_before_whitespace_trimming(monkeypatch):
-    text = (
-        "Support ticket notes: phone +1 999 555-1234, address 404 Nowhere Lane, "
-        "and passphrase Priv4cy-Filt3r-2026."
-    )
-    _loaded_stub(
-        monkeypatch,
-        [
-            [
-                _token("S-private_address", 53, 56),
-                _token("B-private_address", 56, 60),
-                _token("I-private_address", 60, 64),
-                _token("E-private_address", 64, 69),
-            ]
-        ],
-    )
-
-    spans = layer.detect_openai_privacy_filter(text)
-
-    assert spans == [Span(LOCATION, 53, 69, 0.9)]
-    assert text[spans[0].start : spans[0].end] == "404 Nowhere Lane"
+    assert spans == [
+        Span(PERSON, 0, 11, 0.95),
+        Span(PERSON, 12, 21, 0.96),
+    ]
 
 
 def test_unsupported_labels_are_deliberately_ignored(monkeypatch):
@@ -420,26 +398,57 @@ def test_character_offsets_remain_exact_after_astral_unicode(monkeypatch):
     assert text[spans[0].start : spans[0].end] == "Alice"
 
 
-def test_overlapping_windows_deduplicate_and_prefer_complete_span(monkeypatch):
-    text = "Alice Smith"
-    _loaded_stub(
-        monkeypatch,
-        [
-            [_token("B-private_person", 0, 5), _token("I-private_person", 6, 11)],
-            [_token("S-private_person", 6, 11, 0.95)],
-        ],
-    )
-
-    spans = layer.detect_openai_privacy_filter(text)
-
-    assert spans == [Span(PERSON, 0, 11, 0.9)]
-
-
-def test_inference_uses_safe_overlapping_tokenizer_windows(monkeypatch):
+def test_tokens_with_the_same_unicode_offset_remain_distinct(monkeypatch):
     torch = pytest.importorskip("torch")
 
     class FakeTokenizer:
-        model_max_length = 16
+        model_max_length = 2048
+
+        def num_special_tokens_to_add(self, pair=False):
+            assert pair is False
+            return 0
+
+        def __call__(self, _text, **_kwargs):
+            return {
+                "input_ids": [[10, 11]],
+                "attention_mask": [[1, 1]],
+                "offset_mapping": [[(0, 1), (0, 1)]],
+                "special_tokens_mask": [[0, 0]],
+            }
+
+    class FakeModel:
+        config = SimpleNamespace(max_position_embeddings=2048)
+
+        def parameters(self):
+            yield torch.nn.Parameter(torch.empty(0))
+
+        def __call__(self, **_kwargs):
+            return SimpleNamespace(
+                logits=torch.tensor([[[8.0, 0.0], [0.0, 8.0]]]),
+            )
+
+    monkeypatch.setattr(layer, "_tokenizer", FakeTokenizer())
+    monkeypatch.setattr(layer, "_model", FakeModel())
+    monkeypatch.setattr(layer, "_id2label", {0: "O", 1: "S-private_person"})
+
+    predictions = layer._predict_tokens("𐍈")
+
+    assert [(prediction.label, prediction.start, prediction.end) for prediction in predictions] == [
+        ("O", 0, 1),
+        ("S-private_person", 0, 1),
+    ]
+
+
+def test_inference_stitches_overlapping_token_scores_before_global_viterbi(monkeypatch):
+    torch = pytest.importorskip("torch")
+    text = "x" * 132
+    first_ids = list(range(1000, 1130))
+    second_ids = [*first_ids[2:], 2000, 2001]
+    first_offsets = [(index, index + 1) for index in range(130)]
+    second_offsets = [(index, index + 1) for index in range(2, 132)]
+
+    class FakeTokenizer:
+        model_max_length = 128000
         is_fast = True
 
         def __init__(self):
@@ -452,38 +461,66 @@ def test_inference_uses_safe_overlapping_tokenizer_windows(monkeypatch):
         def __call__(self, text, **kwargs):
             self.call(text, **kwargs)
             return {
-                "input_ids": [[10, 11]],
-                "attention_mask": [[1, 1]],
-                "offset_mapping": [[(0, 5), (6, 9)]],
-                "special_tokens_mask": [[0, 0]],
+                "input_ids": [first_ids, second_ids],
+                "attention_mask": [[1] * 130, [1] * 130],
+                "offset_mapping": [first_offsets, second_offsets],
+                "special_tokens_mask": [[0] * 130, [0] * 130],
             }
 
     class FakeModel:
-        config = SimpleNamespace(max_position_embeddings=16)
+        config = SimpleNamespace(max_position_embeddings=131072)
+
+        def __init__(self):
+            self.calls = 0
 
         def parameters(self):
             yield torch.nn.Parameter(torch.empty(0))
 
         def __call__(self, **_kwargs):
-            return SimpleNamespace(
-                logits=torch.tensor([[[0.0, 4.0], [4.0, 0.0]]]),
-            )
+            self.calls += 1
+            logits = torch.zeros((1, 130, 3))
+            logits[:, :, 0] = 8.0
+            entity_start = 128 if self.calls == 1 else 126
+            logits[0, entity_start] = torch.tensor([0.0, 10.0, 0.0])
+            logits[0, entity_start + 1] = torch.tensor([0.0, 0.0, 10.0])
+            return SimpleNamespace(logits=logits)
 
     tokenizer = FakeTokenizer()
+    model = FakeModel()
     monkeypatch.setattr(layer, "_tokenizer", tokenizer)
-    monkeypatch.setattr(layer, "_model", FakeModel())
-    monkeypatch.setattr(layer, "_id2label", {0: "O", 1: "S-private_person"})
+    monkeypatch.setattr(layer, "_model", model)
+    monkeypatch.setattr(
+        layer,
+        "_id2label",
+        {0: "O", 1: "B-private_person", 2: "E-private_person"},
+    )
 
-    spans = layer.detect_openai_privacy_filter("Alice met")
+    spans = layer.detect_openai_privacy_filter(text)
 
+    assert len(spans) == 1
     assert spans[0].entity_type == PERSON
+    assert (spans[0].start, spans[0].end) == (128, 130)
+    assert model.calls == 2
     tokenizer.call.assert_called_once_with(
-        "Alice met",
+        text,
         truncation=True,
-        max_length=16,
-        stride=4,
+        max_length=2048,
+        stride=128,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
         return_special_tokens_mask=True,
         padding=False,
     )
+
+
+def test_repeated_text_reuses_compact_candidate_cache(monkeypatch):
+    predict = _loaded_stub(
+        monkeypatch,
+        [[_token("S-private_person", 0, 5, 0.95)]],
+    )
+
+    first = layer.detect_openai_privacy_filter("Alice")
+    second = layer.detect_openai_privacy_filter("Alice")
+
+    assert first == second == [Span(PERSON, 0, 5, 0.95)]
+    predict.assert_called_once_with("Alice")

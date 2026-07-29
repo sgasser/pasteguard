@@ -33,7 +33,6 @@ class TokenPrediction:
 
 @dataclass(frozen=True)
 class Candidate:
-    native_label: str
     entity_type: str
     start: int
     end: int
@@ -151,7 +150,7 @@ def viterbi_decode(
     return path
 
 
-def reconstruct_window(
+def reconstruct_spans(
     predictions: Sequence[TokenPrediction],
     text_length: int,
 ) -> list[Candidate]:
@@ -172,7 +171,6 @@ def reconstruct_window(
         ):
             spans.append(
                 Candidate(
-                    current_label,
                     current_type,
                     start,
                     end,
@@ -229,39 +227,3 @@ def reconstruct_window(
 
     close_current()
     return spans
-
-
-def consolidate_candidates(candidates: Sequence[Candidate]) -> list[Candidate]:
-    # Exact duplicates occur in overlapping tokenizer windows. Keep the
-    # strongest instance, then join overlapping or touching fragments of the
-    # same model category before whitespace trimming and thresholding.
-    best: dict[tuple[str, int, int], Candidate] = {}
-    for candidate in candidates:
-        key = (candidate.native_label, candidate.start, candidate.end)
-        if key not in best or candidate.score > best[key].score:
-            best[key] = candidate
-
-    consolidated: list[Candidate] = []
-    for candidate in sorted(
-        best.values(),
-        key=lambda item: (item.native_label, item.start, -item.end, -item.score),
-    ):
-        previous = consolidated[-1] if consolidated else None
-        if (
-            previous is not None
-            and previous.native_label == candidate.native_label
-            and candidate.start <= previous.end
-        ):
-            extends_span = candidate.end > previous.end
-            consolidated[-1] = Candidate(
-                previous.native_label,
-                previous.entity_type,
-                previous.start,
-                max(previous.end, candidate.end),
-                max(previous.score, candidate.score) if extends_span else previous.score,
-            )
-        else:
-            consolidated.append(candidate)
-
-    consolidated.sort(key=lambda item: (item.start, item.end, item.entity_type))
-    return consolidated
