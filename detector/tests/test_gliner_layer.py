@@ -1,7 +1,6 @@
 """Unit tests for the GLiNER layer's precision calibration (no model load).
 
-The role-noun suppressor labels and per-label floors are the precision layer; the
-full model integration is covered by benchmarks/pii-accuracy.
+Full model integration is covered by benchmarks/pii-accuracy.
 """
 
 from unittest.mock import Mock
@@ -11,7 +10,6 @@ import pytest
 import detector.gliner_layer as layer
 from detector.gliner_layer import (
     _MAX_TOKENS,
-    _SUPPRESS_LABELS,
     _TOKEN_RE,
     PER_LABEL_FLOOR,
     Span,
@@ -34,12 +32,6 @@ def test_token_re_matches_gliner_splitter():
     assert _TOKEN_RE.pattern == WhitespaceTokenSplitter().whitespace_pattern.pattern
 
 
-def test_role_nouns_handled_by_suppressor_labels():
-    # Generic role nouns are disambiguated language-agnostically by competing
-    # suppressor labels rather than any hard-coded denylist.
-    assert "customer" in _SUPPRESS_LABELS
-
-
 def test_windows_single_for_short_text():
     text = "Mario Rossi lives in Rome."
     assert list(_windows(text)) == [(0, text)]
@@ -60,6 +52,7 @@ def test_windows_overlapping_and_cover_long_text():
 def test_per_label_floors_present_and_ordered():
     assert set(PER_LABEL_FLOOR) == {"person", "location", "address"}
     assert all(0.0 <= v <= 1.0 for v in PER_LABEL_FLOOR.values())
+    assert PER_LABEL_FLOOR["person"] == 0.99
     # Person carries a stricter floor than location: higher volume and no
     # structural validator, so a higher floor curbs false positives.
     assert PER_LABEL_FLOOR["location"] <= PER_LABEL_FLOOR["person"]
@@ -103,21 +96,21 @@ def test_floor_env_defaults(monkeypatch):
     monkeypatch.delenv("GLINER_FLOOR_PERSON", raising=False)
     monkeypatch.delenv("DETECTOR_FLOOR_PERSON", raising=False)
 
-    assert _floor("person", 0.95) == 0.95
+    assert _floor("person", 0.99) == 0.99
 
 
 def test_gliner_floor_env_wins_over_existing_legacy_name(monkeypatch):
     monkeypatch.setenv("GLINER_FLOOR_PERSON", "0.91")
     monkeypatch.setenv("DETECTOR_FLOOR_PERSON", "0.50")
 
-    assert _floor("person", 0.95) == 0.91
+    assert _floor("person", 0.99) == 0.91
 
 
 def test_existing_floor_env_remains_supported(monkeypatch):
     monkeypatch.delenv("GLINER_FLOOR_PERSON", raising=False)
     monkeypatch.setenv("DETECTOR_FLOOR_PERSON", "0.90")
 
-    assert _floor("person", 0.95) == 0.90
+    assert _floor("person", 0.99) == 0.90
 
 
 def test_invalid_existing_floor_env_names_the_source(monkeypatch):
@@ -128,7 +121,7 @@ def test_invalid_existing_floor_env_names_the_source(monkeypatch):
         ValueError,
         match="DETECTOR_FLOOR_PERSON must be a number between 0 and 1",
     ):
-        _floor("person", 0.95)
+        _floor("person", 0.99)
 
 
 @pytest.mark.parametrize("value", ["bad", "-0.1", "1.1", "nan", "inf"])
@@ -136,7 +129,37 @@ def test_invalid_gliner_floor_fails_clearly(monkeypatch, value):
     monkeypatch.setenv("GLINER_FLOOR_PERSON", value)
 
     with pytest.raises(ValueError, match="GLINER_FLOOR_PERSON must be a number between 0 and 1"):
-        _floor("person", 0.95)
+        _floor("person", 0.99)
+
+
+def test_gliner_calls_model_with_only_emitted_semantic_labels(monkeypatch):
+    text = "No personal data is present."
+    mock_gliner = Mock()
+    mock_gliner.predict_entities.return_value = []
+    monkeypatch.setattr(layer, "_model", mock_gliner)
+    layer._predict_window.cache_clear()
+
+    assert detect_gliner(text, 0.0) == []
+
+    labels = mock_gliner.predict_entities.call_args.args[1]
+    assert labels == ["person", "location", "address"]
+
+
+def test_detect_does_not_suppress_emitted_semantic_labels(monkeypatch):
+    monkeypatch.setattr(layer, "_model", Mock())
+    monkeypatch.setattr(
+        layer,
+        "_predict_window",
+        lambda _text: [
+            {"start": 0, "end": 5, "label": "person", "score": 0.995},
+            {"start": 0, "end": 5, "label": "location", "score": 1.0},
+        ],
+    )
+
+    assert detect_gliner("Alice", 0.0) == [
+        Span(entity_type="PERSON", start=0, end=5, score=0.995),
+        Span(entity_type="LOCATION", start=0, end=5, score=1.0),
+    ]
 
 
 def test_max_tokens_env_defaults(monkeypatch):

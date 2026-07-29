@@ -285,6 +285,50 @@ cases:
         text: John Smith
         match: contains
 
+  - id: core_person_customer_copula_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "The customer is Marco Rossi."
+    expected:
+      - entity: PERSON
+        text: Marco Rossi
+        match: contains
+
+  - id: core_person_customer_direct_object_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "Please reply to the customer Marco Rossi."
+    expected:
+      - entity: PERSON
+        text: Marco Rossi
+        match: contains
+
+  - id: core_person_kunde_de
+    suite: core
+    category: core
+    split: test
+    language: de
+    text: "Unser Kunde Thomas Müller hat angerufen."
+    expected:
+      - entity: PERSON
+        text: Thomas Müller
+        match: contains
+
+  - id: core_person_customer_turkish_name_en
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "The customer is Mehmet Yılmaz."
+    expected:
+      - entity: PERSON
+        text: Mehmet Yılmaz
+        match: contains
+
   - id: core_person_non_western_arabic
     suite: core
     category: core

@@ -1,6 +1,5 @@
 """Fuzzy layer: multilingual GLiNER NER for person, location, and address
-(addresses are emitted as LOCATION). Generic role nouns are demoted via
-competing suppressor labels rather than a per-language denylist.
+(addresses are emitted as LOCATION).
 
 Each label has its own confidence floor (PER_LABEL_FLOOR). The request
 `score_threshold` only raises the tunable labels (person, location, address).
@@ -65,10 +64,9 @@ def _max_tokens(default: int = 384) -> int:
 
 
 # Per-label confidence floors (calibrated against the accuracy benchmark;
-# overridable via env, e.g. GLINER_FLOOR_LOCATION=0.6). Role nouns are demoted
-# by the suppressor labels (below), not by this floor.
+# overridable via env, e.g. GLINER_FLOOR_LOCATION=0.6).
 PER_LABEL_FLOOR = {
-    "person": _floor("person", 0.95),
+    "person": _floor("person", 0.99),
     "location": _floor("location", 0.80),
     # A dedicated "address" label recovers full street addresses that a bare
     # "location" reading misses; emitted as LOCATION (see _LABEL_TO_TYPE).
@@ -85,11 +83,6 @@ _LABEL_TO_TYPE = {
     # LOCATION so the response entity set stays the Presidio drop-in set.
     "address": LOCATION,
 }
-# Suppressor labels: predicted but never emitted. They give GLiNER a competing
-# reading for generic role nouns (client/customer/...) in any language, so it
-# tags those instead of "person" — no per-language denylist needed.
-_SUPPRESS_LABELS = ["customer", "role"]
-_PREDICT_LABELS = _LABELS + _SUPPRESS_LABELS
 # Capture candidates below every floor so per-label filtering has them.
 _PREDICT_FLOOR = min(PER_LABEL_FLOOR.values()) - 0.1
 
@@ -154,7 +147,7 @@ def load_model(model_name: str = DEFAULT_MODEL) -> None:
 
 @lru_cache(maxsize=MODEL_INFERENCE_CACHE_SIZE)
 def _predict_window(text: str):
-    return _model.predict_entities(text, _PREDICT_LABELS, threshold=max(0.0, _PREDICT_FLOOR))
+    return _model.predict_entities(text, _LABELS, threshold=max(0.0, _PREDICT_FLOOR))
 
 
 def detect_gliner(text: str, score_threshold: float = 0.0) -> list[Span]:
@@ -174,17 +167,8 @@ def detect_gliner(text: str, score_threshold: float = 0.0) -> list[Span]:
                 if score > best.get(key, -1.0):
                     best[key] = score
 
-    # Highest suppressor score per span: if a "customer"/"role" reading of the
-    # exact same span outscores its entity reading, it is a role noun, not PII.
-    suppressor: dict[tuple[int, int], float] = {}
-    for (start, end, label), score in best.items():
-        if label in _SUPPRESS_LABELS and score > suppressor.get((start, end), -1.0):
-            suppressor[start, end] = score
-
     out: list[Span] = []
     for (start, end, label), score in best.items():
-        if label in _SUPPRESS_LABELS:
-            continue
         # label is always one of _LABELS (== _LABEL_TO_TYPE keys), so a direct
         # lookup is safe.
         etype = _LABEL_TO_TYPE[label]
@@ -192,9 +176,6 @@ def detect_gliner(text: str, score_threshold: float = 0.0) -> list[Span]:
         if label in _TUNABLE:
             floor = max(floor, score_threshold)
         if score < floor:
-            continue
-        # A stronger role-noun reading of the same span wins (drops the entity).
-        if score < suppressor.get((start, end), -1.0):
             continue
         # Drop out-of-bounds spans from tokenization bugs (would mask wrong text).
         if not 0 <= start < end <= n:

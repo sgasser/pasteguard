@@ -199,7 +199,7 @@ cases:
     language: ro
     entities: [PERSON, LOCATION]
     gate: false
-    note: "GLiNER tags the Romanian role noun 'Clientul' as PERSON (~0.85); the suppressor labels don't demote it here. Report-only."
+    note: "GLiNER can tag the Romanian role noun 'Clientul' as PERSON (~0.85); this report-only case guards PERSON-floor calibration."
     text: "Clientul cere factura până la sfârșitul săptămânii."
     expected: []
 
@@ -241,10 +241,8 @@ cases:
     text: "Sarcina a fost mutată din eu-west-1 în us-east-1 în timpul testului."
     expected: []
 
-  # --- Known over-masking after removing the stoplist (report-only) ---
-  # These document false positives GLiNER produces with high confidence and that
-  # no competing suppressor label separates. Tracked here so the benchmark stops
-  # hiding them; not gating.
+  # --- Known semantic-model over-masking (report-only) ---
+  # These document model false positives near the calibrated per-label floors.
   - id: precision_de_pronoun_not_person
     suite: precision
     category: precision
@@ -252,7 +250,7 @@ cases:
     language: de
     entities: [PERSON, LOCATION]
     gate: false
-    note: "GLiNER tags the German pronoun 'Ich' as PERSON (~0.97), above the floor and not separable by a competing label. Report-only."
+    note: "GLiNER can tag the German pronoun 'Ich' as PERSON (~0.97); this report-only case guards PERSON-floor calibration."
     text: "Ich habe die Rechnung bereits bezahlt."
     expected: []
 
@@ -274,7 +272,7 @@ cases:
     language: de
     entities: [PERSON, LOCATION]
     gate: false
-    note: "GLiNER tags the German term 'Mandant' (client) as PERSON (~0.9) even against suppressor labels; it is not suppressed. Report-only."
+    note: "GLiNER can tag the German term 'Mandant' (client) as PERSON (~0.9); this report-only case guards PERSON-floor calibration."
     text: "Der Mandant hat die Unterlagen eingereicht."
     expected: []
 
