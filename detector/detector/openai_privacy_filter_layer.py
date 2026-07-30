@@ -45,6 +45,7 @@ _id2label: dict[int, str] = {}
 _loaded_model_name: str | None = None
 _viterbi_biases = default_viterbi_biases()
 _inference_max_tokens = _DEFAULT_MAX_TOKENS
+_inference_stride_tokens = _WINDOW_OVERLAP_TOKENS
 _candidate_cache: OrderedDict[tuple[int, bytes], tuple[Candidate, ...]] = OrderedDict()
 _load_lock = threading.Lock()
 # Torch inference is not guaranteed thread-safe.
@@ -141,8 +142,8 @@ def _configured_max_tokens() -> int:
 def load_model(model_name: str = DEFAULT_MODEL) -> None:
     """Load and validate one Privacy Filter checkpoint exactly once."""
 
-    global _id2label, _inference_max_tokens, _loaded_model_name, _model, _tokenizer
-    global _viterbi_biases
+    global _id2label, _inference_max_tokens, _inference_stride_tokens
+    global _loaded_model_name, _model, _tokenizer, _viterbi_biases
     if _model is not None:
         if _loaded_model_name != model_name:
             loaded = _loaded_model_name or "an unknown checkpoint"
@@ -162,24 +163,31 @@ def load_model(model_name: str = DEFAULT_MODEL) -> None:
                 )
             return
 
-        inference_max_tokens = _configured_max_tokens()
+        configured_max_tokens = _configured_max_tokens()
         tokenizer, model, viterbi_biases = _create_components(model_name)
         labels = validate_label_set(
             getattr(getattr(model, "config", None), "id2label", None),
             model_name,
         )
+        inference_max_tokens = _model_max_tokens(
+            tokenizer,
+            model,
+            configured_max_tokens,
+        )
+        inference_stride_tokens = _inference_stride(tokenizer, inference_max_tokens)
         _tokenizer = tokenizer
         _model = model
         _id2label = labels
         _viterbi_biases = viterbi_biases
         _inference_max_tokens = inference_max_tokens
+        _inference_stride_tokens = inference_stride_tokens
         _loaded_model_name = model_name
         _candidate_cache.clear()
 
 
-def _model_max_tokens() -> int:
-    tokenizer_limit = getattr(_tokenizer, "model_max_length", None)
-    model_limit = getattr(getattr(_model, "config", None), "max_position_embeddings", None)
+def _model_max_tokens(tokenizer: Any, model: Any, configured_max_tokens: int) -> int:
+    tokenizer_limit = getattr(tokenizer, "model_max_length", None)
+    model_limit = getattr(getattr(model, "config", None), "max_position_embeddings", None)
     limits: list[int] = []
     for raw_limit in (tokenizer_limit, model_limit):
         if raw_limit is None or isinstance(raw_limit, bool):
@@ -192,12 +200,12 @@ def _model_max_tokens() -> int:
             limits.append(limit)
     if not limits:
         raise ValueError("OpenAI Privacy Filter tokenizer has no finite model_max_length")
-    return min(_inference_max_tokens, *limits)
+    return min(configured_max_tokens, *limits)
 
 
-def _inference_stride(max_tokens: int) -> int:
+def _inference_stride(tokenizer: Any, max_tokens: int) -> int:
     try:
-        special_tokens = int(_tokenizer.num_special_tokens_to_add(pair=False))
+        special_tokens = int(tokenizer.num_special_tokens_to_add(pair=False))
     except (AttributeError, TypeError, ValueError, OverflowError):
         special_tokens = 0
     content_tokens = max_tokens - max(0, special_tokens)
@@ -249,13 +257,11 @@ def _offset_pair(value: object) -> tuple[int, int] | None:
 def _predict_tokens(text: str) -> list[TokenPrediction]:
     import torch
 
-    max_tokens = _model_max_tokens()
-    stride = _inference_stride(max_tokens)
     encoded = _tokenizer(
         text,
         truncation=True,
-        max_length=max_tokens,
-        stride=stride,
+        max_length=_inference_max_tokens,
+        stride=_inference_stride_tokens,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
         return_special_tokens_mask=True,
@@ -281,7 +287,7 @@ def _predict_tokens(text: str) -> list[TokenPrediction]:
     previous_content_tokens = 0
     for window_index, input_ids in enumerate(input_windows):
         if window_index:
-            step = previous_content_tokens - stride
+            step = previous_content_tokens - _inference_stride_tokens
             if step <= 0:
                 raise RuntimeError(
                     "OpenAI Privacy Filter tokenizer returned invalid overlap windows"

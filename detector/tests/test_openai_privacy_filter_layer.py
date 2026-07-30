@@ -39,6 +39,11 @@ def reset_backend(monkeypatch):
     monkeypatch.setattr(layer, "_inference_max_tokens", layer._DEFAULT_MAX_TOKENS)
     monkeypatch.setattr(
         layer,
+        "_inference_stride_tokens",
+        layer._WINDOW_OVERLAP_TOKENS,
+    )
+    monkeypatch.setattr(
+        layer,
         "_viterbi_biases",
         default_viterbi_biases(),
     )
@@ -55,7 +60,10 @@ def _checkpoint_labels(boundaries: str = "BIES", extras: tuple[str, ...] = ()) -
 
 def _model_with_labels(labels: list[str]):
     model = Mock()
-    model.config.id2label = dict(enumerate(labels))
+    model.config = SimpleNamespace(
+        id2label=dict(enumerate(labels)),
+        max_position_embeddings=131072,
+    )
     model.eval = Mock()
     return model
 
@@ -74,7 +82,8 @@ def _loaded_stub(monkeypatch, windows):
 
 
 def test_loads_and_validates_checkpoint_once(monkeypatch):
-    tokenizer = Mock(is_fast=True)
+    tokenizer = Mock(is_fast=True, model_max_length=128000)
+    tokenizer.num_special_tokens_to_add.return_value = 2
     model = _model_with_labels(_checkpoint_labels())
     biases = default_viterbi_biases()
     create = Mock(return_value=(tokenizer, model, biases))
@@ -90,7 +99,8 @@ def test_loads_and_validates_checkpoint_once(monkeypatch):
 
 
 def test_loaded_checkpoint_cannot_be_replaced(monkeypatch):
-    tokenizer = Mock(is_fast=True)
+    tokenizer = Mock(is_fast=True, model_max_length=128000)
+    tokenizer.num_special_tokens_to_add.return_value = 2
     model = _model_with_labels(_checkpoint_labels())
     biases = default_viterbi_biases()
     monkeypatch.setattr(
@@ -103,6 +113,42 @@ def test_loaded_checkpoint_cannot_be_replaced(monkeypatch):
 
     with pytest.raises(RuntimeError, match="already loaded"):
         layer.load_model("org/another-privacy-filter")
+
+
+def test_checkpoint_without_finite_token_limit_fails_at_startup(monkeypatch):
+    tokenizer = Mock(is_fast=True, model_max_length=layer._UNBOUNDED_MODEL_LENGTH)
+    tokenizer.num_special_tokens_to_add.return_value = 2
+    model = _model_with_labels(_checkpoint_labels())
+    del model.config.max_position_embeddings
+    monkeypatch.setattr(
+        layer,
+        "_create_components",
+        Mock(return_value=(tokenizer, model, default_viterbi_biases())),
+    )
+
+    with pytest.raises(ValueError, match="has no finite model_max_length"):
+        layer.load_model("org/unbounded-privacy-filter")
+
+    assert layer._model is None
+    assert layer._tokenizer is None
+
+
+def test_checkpoint_with_too_few_content_tokens_fails_at_startup(monkeypatch):
+    tokenizer = Mock(is_fast=True, model_max_length=2)
+    tokenizer.num_special_tokens_to_add.return_value = 2
+    model = _model_with_labels(_checkpoint_labels())
+    model.config.max_position_embeddings = 2
+    monkeypatch.setattr(
+        layer,
+        "_create_components",
+        Mock(return_value=(tokenizer, model, default_viterbi_biases())),
+    )
+
+    with pytest.raises(ValueError, match="model_max_length is too small for inference"):
+        layer.load_model("org/tiny-privacy-filter")
+
+    assert layer._model is None
+    assert layer._tokenizer is None
 
 
 def test_configured_max_tokens_can_be_overridden(monkeypatch):
