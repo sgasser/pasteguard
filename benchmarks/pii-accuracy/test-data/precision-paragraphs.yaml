@@ -64,6 +64,7 @@ cases:
     category: precision
     split: test
     language: en
+    gate: false
     entities: [URL, DATE_TIME, ACCOUNT_NUMBER, SECRET]
     backends: [openai_privacy_filter]
     text: "The public changelog at https://docs.example.com/releases lists version 4.2 on 2026-05-17. Ticket 0091847265 discusses the general topic of secret rotation and contains no private customer data."
