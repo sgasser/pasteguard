@@ -41,6 +41,49 @@ Offline deployments must also cache any tokenizer or encoder referenced by
 `gliner_config.json`.
 </Note>
 
+## Fine-Tuning
+
+GLiNER can be fine-tuned on your own labeled data, for example on names and
+places that the default model misses in your domain. See the
+[GLiNER training guide](https://github.com/urchade/GLiNER#training). The
+resulting checkpoint is a normal local model: point `DETECTOR_MODEL` at its
+directory, no PasteGuard changes required.
+
+<Note>
+Training happens outside PasteGuard, with whichever GLiNER release you prefer.
+The detector ships GLiNER 0.2.x, and the checkpoint has to load there. Confirm
+that before deploying, especially after training on a newer release. The
+training API differs by version: the 0.2.x line the detector ships trains
+through `gliner.training.Trainer`, while the `train_model()` helper shown in
+the current upstream README belongs to a newer release. Training also needs
+`accelerate`, which the detector environment does not carry.
+</Note>
+
+Two things decide whether the result is useful.
+
+**Keep the label names.** PasteGuard asks the model for exactly three labels:
+
+| Label | Reported as |
+|-------|-------------|
+| `person` | `PERSON` |
+| `location` | `LOCATION` |
+| `address` | `LOCATION` |
+
+<Warning>
+These names are requested verbatim at inference. Training under different label
+names does not break detection: GLiNER treats the label as a text query, so a
+checkpoint trained on `customer` still answers a `person` query from its base
+capability. What it does mean is that the tuning is never requested, while the
+training can still shift the model's generic behaviour. Train under `person`,
+`location`, and `address` so the result applies to what PasteGuard asks for.
+</Warning>
+
+**Recalibrate the floors.** `GLINER_FLOOR_PERSON`, `GLINER_FLOOR_LOCATION`, and
+`GLINER_FLOOR_ADDRESS` are calibrated against the default checkpoint and are
+unlikely to fit a fine-tuned one. The `benchmarks/pii-accuracy` harness in the
+repository runs a labeled corpus against a running detector and is the quickest
+way to find the values that suit yours.
+
 ## Docker
 
 The image includes the default model and runs offline. For a custom Hub model,
