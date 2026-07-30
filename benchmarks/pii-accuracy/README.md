@@ -79,6 +79,13 @@ bun run benchmark:accuracy --backend openai_privacy_filter
 The runner checks `/health` before sending cases and fails if the active backend differs from
 `--backend`. `gliner` is the default.
 
+Do not report the two backends' scores as a head-to-head comparison yet. `--threshold` reaches them
+differently: GLiNER applies `max(per-label floor, threshold)` with floors of 0.99 for person and
+0.80 for location, so any threshold at or below 0.80 changes nothing, while OpenAI Privacy Filter
+applies the value as a flat cutoff on every label. At the shared default of 0.7 the two runs sit at
+different operating points, so the numbers are comparable within a backend over time, but not
+against each other.
+
 Validate the full corpus without loading or calling a model:
 
 ```bash
