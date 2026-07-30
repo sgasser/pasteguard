@@ -59,8 +59,9 @@ matching.
 
 <Warning>
 OpenAI Privacy Filter is primarily English and its predictions are
-probabilistic. Test it with your own data. GLiNER remains the multilingual
-default.
+probabilistic. It can also extend a span onto neighbouring words — in testing
+an email span reached into the word that followed it, which masks that word
+too. Test it with your own data. GLiNER remains the multilingual default.
 </Warning>
 
 Compatible checkpoints must expose the eight categories above with complete
@@ -68,6 +69,34 @@ BIO or BIOES labels. PasteGuard applies constrained Viterbi decoding and uses a
 checkpoint's optional `viterbi_calibration.json` automatically. BILOU, generic
 NER, incomplete checkpoints, and unsupported known-label boundaries fail during
 startup.
+
+## Performance and Resources
+
+The checkpoint has 1.4B parameters and loads as bfloat16, so the weights alone
+need about 3 GB of RAM — roughly seven times the default GLiNER model. On CPU,
+inference is limited by memory bandwidth rather than compute: raising Torch from
+four to eight threads changed total time by under 5% in testing. Adding CPU
+cores does not meaningfully help.
+
+Indicative cold-cache timings on CPU (Apple Silicon, bfloat16, four Torch
+threads). Treat these as an order of magnitude, not a guarantee:
+
+| Input | Tokens | Windows | Time |
+|-------|--------|---------|------|
+| 9,000 chars | ~1,900 | 1 | ~18 s |
+| 22,500 chars | ~4,800 | 3 | ~39 s |
+| 45,000 chars | ~9,600 | 5 | ~92 s |
+| 90,000 chars | ~19,200 | 10 | ~200 s |
+
+<Warning>
+The default `pii_detection.detector_timeout` is 30 seconds. On CPU, inputs past
+roughly 15,000–20,000 characters exceed it, and PasteGuard rejects the request
+rather than forwarding it unmasked. Raise `detector_timeout` for this backend,
+keep inputs short, or stay on GLiNER.
+</Warning>
+
+Repeated text is cached, so resent conversation history costs milliseconds.
+Only the first pass over new content pays the full price.
 
 ## Inference Windows
 
@@ -77,8 +106,13 @@ startup.
 
 Windows overlap by up to 128 tokens. PasteGuard averages duplicate token scores
 before one global Viterbi decode, so entities at window boundaries keep a
-coherent label path. Increase the limit only when the available memory and
-detector timeout can accommodate longer model passes.
+coherent label path.
+
+Lowering the limit reduces latency, because attention cost grows quadratically
+within a window — but it also shortens the context the model sees and drops
+detections. In one 11,000-character sample, moving from 2048 to 512 tokens cut
+inference time by about 60% and lost several spans, including a phone number and
+an account number. Treat it as a recall-versus-latency trade-off, not free speed.
 
 ## Local Checkpoint
 
