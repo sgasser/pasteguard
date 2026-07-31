@@ -39,6 +39,11 @@ server:
 | `host` | `0.0.0.0` | Bind address |
 | `request_timeout` | `600` | Request timeout in seconds (0 = no timeout) |
 
+The OpenAI, Anthropic, and Codex proxy routes reject browser requests. SDKs,
+CLIs, and other non-browser clients are unaffected. The standalone `/api/mask`
+endpoint keeps permissive CORS for the browser extension. Restrict network
+access when using a configured provider-key fallback.
+
 ## Dashboard
 
 ```yaml
