@@ -651,6 +651,75 @@ describe("Anthropic Text Extractor", () => {
       expect((result.content[0] as { text: string }).text).toBe("Hello [protected]John");
     });
 
+    test("recursively unmasks string leaves in tool_use input", () => {
+      const response: AnthropicResponse = {
+        id: "msg_tool",
+        type: "message",
+        role: "assistant",
+        content: [
+          { type: "text", text: "Calling for [[PERSON_1]]" },
+          {
+            type: "tool_use",
+            id: "tool_1",
+            name: "create_record",
+            input: {
+              contact: "[[PERSON_1]] <[[EMAIL_ADDRESS_1]]>",
+              nested: {
+                values: [
+                  "token [[SECRET_API_KEY_1]]",
+                  42,
+                  true,
+                  null,
+                  { note: "Email: [[EMAIL_ADDRESS_1]]" },
+                ],
+              },
+              "[[PERSON_1]]": "keys stay masked",
+            },
+            caller: { source: "fixture" },
+          },
+        ],
+        model: "claude-3-sonnet-20240229",
+        stop_reason: "tool_use",
+        stop_sequence: null,
+        usage: { input_tokens: 10, output_tokens: 5 },
+      };
+      const context: PlaceholderContext = {
+        mapping: {
+          "[[PERSON_1]]": "Alice",
+          "[[EMAIL_ADDRESS_1]]": "alice@example.com",
+          "[[SECRET_API_KEY_1]]": "sk-test-value",
+        },
+        reverseMapping: {},
+        counters: {},
+      };
+
+      const result = anthropicExtractor.unmaskResponse(
+        response,
+        context,
+        (value) => `[protected]${value}`,
+      );
+      const toolUse = result.content[1];
+
+      expect(result.content[0]).toEqual({ type: "text", text: "Calling for [protected]Alice" });
+      expect(toolUse).toEqual({
+        ...response.content[1],
+        input: {
+          contact: "[protected]Alice <[protected]alice@example.com>",
+          nested: {
+            values: [
+              "token [protected]sk-test-value",
+              42,
+              true,
+              null,
+              { note: "Email: [protected]alice@example.com" },
+            ],
+          },
+          "[[PERSON_1]]": "keys stay masked",
+        },
+      });
+      expect(response.content[1]).not.toBe(toolUse);
+    });
+
     test("handles multiple text blocks", () => {
       const response: AnthropicResponse = {
         id: "msg_123",
