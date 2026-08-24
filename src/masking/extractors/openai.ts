@@ -39,6 +39,38 @@ function unmaskContent(
   return content;
 }
 
+function unmaskToolCalls(
+  toolCalls: unknown[],
+  context: PlaceholderContext,
+  formatValue?: (original: string) => string,
+): unknown[] {
+  return toolCalls.map((toolCall) => {
+    if (typeof toolCall !== "object" || toolCall === null || !("function" in toolCall)) {
+      return toolCall;
+    }
+
+    const functionCall = toolCall.function;
+    if (
+      typeof functionCall !== "object" ||
+      functionCall === null ||
+      !("arguments" in functionCall) ||
+      typeof functionCall.arguments !== "string"
+    ) {
+      return toolCall;
+    }
+
+    return {
+      ...toolCall,
+      function: {
+        ...functionCall,
+        arguments: restorePlaceholders(functionCall.arguments, context, (original) =>
+          JSON.stringify(formatValue ? formatValue(original) : original).slice(1, -1),
+        ),
+      },
+    };
+  });
+}
+
 /**
  * OpenAI request extractor
  *
@@ -123,13 +155,20 @@ export const openaiExtractor: RequestExtractor<OpenAIRequest, OpenAIResponse> = 
   ): OpenAIResponse {
     return {
       ...response,
-      choices: response.choices.map((choice) => ({
-        ...choice,
-        message: {
-          ...choice.message,
-          content: unmaskContent(choice.message.content, context, formatValue),
-        },
-      })),
+      choices: response.choices.map((choice) => {
+        const toolCalls = choice.message.tool_calls;
+
+        return {
+          ...choice,
+          message: {
+            ...choice.message,
+            content: unmaskContent(choice.message.content, context, formatValue),
+            ...(Array.isArray(toolCalls)
+              ? { tool_calls: unmaskToolCalls(toolCalls, context, formatValue) }
+              : {}),
+          },
+        };
+      }),
     };
   },
 };

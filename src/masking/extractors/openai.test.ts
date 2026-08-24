@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { PlaceholderContext } from "../../masking/context";
-import type { OpenAIMessage, OpenAIRequest, OpenAIResponse } from "../../providers/openai/types";
+import {
+  type OpenAIMessage,
+  type OpenAIRequest,
+  type OpenAIResponse,
+  OpenAIResponseSchema,
+} from "../../providers/openai/types";
 import { openaiExtractor } from "./openai";
 
 /** Helper to create a minimal request from messages */
@@ -209,6 +214,80 @@ describe("OpenAI Text Extractor", () => {
       const result = openaiExtractor.unmaskResponse(response, context);
 
       expect(result.choices[0].message.content).toBe("Hello John, your email is john@example.com");
+    });
+
+    test("unmasks placeholders in tool call function arguments as valid JSON", () => {
+      const originalValue = 'Quote " slash \\ controls \b\f\n\r\t \u0001 Unicode 雪 😀';
+      const response: OpenAIResponse = {
+        id: "test-id",
+        object: "chat.completion",
+        created: 123456,
+        model: "gpt-4",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "Hello [[PERSON_1]]",
+              tool_calls: [
+                {
+                  id: "call_123",
+                  type: "function",
+                  function: {
+                    name: "lookup_person",
+                    arguments: JSON.stringify({ person: "[[PERSON_1]]" }),
+                  },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+      };
+      const context: PlaceholderContext = {
+        mapping: { "[[PERSON_1]]": originalValue },
+        reverseMapping: { [originalValue]: "[[PERSON_1]]" },
+        counters: { PERSON: 1 },
+      };
+
+      const result = openaiExtractor.unmaskResponse(response, context);
+      const toolCalls = result.choices[0].message.tool_calls as Array<{
+        id: string;
+        type: string;
+        function: { name: string; arguments: string };
+      }>;
+
+      expect(result.choices[0].message.content).toBe(`Hello ${originalValue}`);
+      expect(toolCalls[0]).toEqual({
+        id: "call_123",
+        type: "function",
+        function: {
+          name: "lookup_person",
+          arguments: expect.any(String),
+        },
+      });
+      expect(JSON.parse(toolCalls[0].function.arguments)).toEqual({ person: originalValue });
+    });
+
+    test.each([
+      "tool_calls",
+      "function_call",
+    ] as const)("accepts the OpenAI %s finish reason", (finishReason) => {
+      expect(
+        OpenAIResponseSchema.safeParse({
+          id: "test-id",
+          object: "chat.completion",
+          created: 123456,
+          model: "gpt-4",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: null },
+              finish_reason: finishReason,
+            },
+          ],
+        }).success,
+      ).toBeTrue();
     });
 
     test("applies formatValue function when provided", () => {
