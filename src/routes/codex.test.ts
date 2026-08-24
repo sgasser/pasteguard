@@ -316,6 +316,65 @@ describe("Codex proxy", () => {
     expect(parsed.delta).toBe(`Key ${secret}`);
   });
 
+  test("unmasks streamed function-call arguments without breaking inner JSON", async () => {
+    const person = 'Jane "JJ" \\vault\nline\t\u0001 café 😀';
+    const input = `Person ${person}`;
+    const entity = {
+      entity_type: "PERSON",
+      start: input.indexOf(person),
+      end: input.indexOf(person) + person.length,
+      score: 0.99,
+    };
+    mockAnalyzeRequest.mockResolvedValueOnce({
+      hasPII: true,
+      spanEntities: [[entity]],
+      allEntities: [entity],
+      scanTimeMs: 3,
+    });
+    const deltas = [
+      { delta: '{"person":"[[PER', sequence_number: 1 },
+      { delta: 'SON_1]]"}', sequence_number: 2 },
+    ];
+    const sse = `${deltas
+      .map(
+        (delta) =>
+          `data: ${JSON.stringify({
+            type: "response.function_call_arguments.delta",
+            item_id: "fc_1",
+            output_index: 0,
+            ...delta,
+          })}\n\n`,
+      )
+      .join("")}data: [DONE]\n\n`;
+    globalThis.fetch = (async (_input: string | URL | Request, _init?: RequestInit) =>
+      Promise.resolve(
+        new Response(sse, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        }),
+      )) as typeof fetch;
+
+    const res = await app.request("/codex/responses", {
+      method: "POST",
+      body: JSON.stringify({ model: "gpt-5.5", input, stream: true }),
+      headers: {
+        Authorization: "Bearer chatgpt-token",
+        "Content-Type": "application/json",
+      },
+    });
+    const text = await res.text();
+    const restoredDeltas = text
+      .split("\n")
+      .filter((line) => line.startsWith("data: ") && line !== "data: [DONE]")
+      .map((line) => JSON.parse(line.slice(6)) as { delta: string })
+      .map((event) => event.delta)
+      .join("");
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(restoredDeltas)).toEqual({ person });
+    expect(text.trimEnd().endsWith("data: [DONE]")).toBe(true);
+  });
+
   test("adds markers to streamed Codex secrets when show_markers is true", async () => {
     config.masking.show_markers = true;
     config.masking.marker_text = "[protected]";

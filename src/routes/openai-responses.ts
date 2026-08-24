@@ -7,6 +7,7 @@ import { formatMaskedRequestForLog } from "../logging/log-content";
 import { logRequest } from "../logging/logger";
 import type { PlaceholderContext } from "../masking/context";
 import {
+  isResponsesFunctionCallArguments,
   type ResponsesRequest,
   type ResponsesResponse,
   responsesExtractor,
@@ -301,10 +302,72 @@ function remaskKnownValues(
   if (replacements.size === 0) return request;
 
   const ordered = [...replacements].sort(([a], [b]) => b.length - a.length);
+  const escapePattern = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const rawPattern = new RegExp(ordered.map(([value]) => escapePattern(value)).join("|"), "g");
+  const serializedReplacements = new Map<string, string>();
+  for (const [original, placeholder] of ordered) {
+    for (const variant of [JSON.stringify(original).slice(1, -1), original]) {
+      if (!serializedReplacements.has(variant)) serializedReplacements.set(variant, placeholder);
+    }
+  }
+  const serializedOrdered = [...serializedReplacements].sort(([a], [b]) => b.length - a.length);
+  const serializedPattern = new RegExp(
+    serializedOrdered.map(([value]) => escapePattern(value)).join("|"),
+    "g",
+  );
+  const jsonTokenPattern =
+    /"(?:\\[\s\S]|[^"\\])*"|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null/g;
+  const remaskJsonString = (token: string): string => {
+    const decoded = JSON.parse(token) as string;
+    rawPattern.lastIndex = 0;
+    const matches = [...decoded.matchAll(rawPattern)];
+    if (matches.length === 0) return token;
+
+    const sourceBoundaries = [1];
+    for (let index = 1; index < token.length - 1; ) {
+      index += token[index] === "\\" ? (token[index + 1] === "u" ? 6 : 2) : 1;
+      sourceBoundaries.push(index);
+    }
+
+    let remasked = '"';
+    let sourceIndex = 1;
+    for (const match of matches) {
+      const start = sourceBoundaries[match.index!];
+      const end = sourceBoundaries[match.index! + match[0].length];
+      remasked += token.slice(sourceIndex, start);
+      remasked += JSON.stringify(replacements.get(match[0])!).slice(1, -1);
+      sourceIndex = end;
+    }
+    return remasked + token.slice(sourceIndex);
+  };
   const changed = responsesExtractor.extractTexts(request).flatMap((span) => {
     let maskedText = span.text;
-    for (const [original, placeholder] of ordered) {
-      maskedText = maskedText.split(original).join(placeholder);
+    if (isResponsesFunctionCallArguments(request, span.path)) {
+      try {
+        JSON.parse(span.text);
+        let jsonChanged = false;
+        maskedText = span.text.replace(jsonTokenPattern, (token) => {
+          if (token.startsWith('"')) {
+            const remasked = remaskJsonString(token);
+            if (remasked !== token) jsonChanged = true;
+            return remasked;
+          }
+          const placeholder = replacements.get(token);
+          if (!placeholder) return token;
+          jsonChanged = true;
+          return JSON.stringify(placeholder);
+        });
+        if (!jsonChanged) maskedText = span.text;
+      } catch {
+        maskedText = maskedText.replace(
+          serializedPattern,
+          (value) => serializedReplacements.get(value)!,
+        );
+      }
+    } else {
+      for (const [original, placeholder] of ordered) {
+        maskedText = maskedText.split(original).join(placeholder);
+      }
     }
     return maskedText === span.text ? [] : [{ ...span, maskedText }];
   });

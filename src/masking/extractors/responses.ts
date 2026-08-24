@@ -110,6 +110,51 @@ function pathFromString(path: string): Array<string | number> {
   return result;
 }
 
+function getAtPath(value: unknown, path: readonly (string | number)[]): unknown {
+  let current = value;
+  for (const part of path) {
+    if (Array.isArray(current) && typeof part === "number") {
+      current = current[part];
+    } else if (isRecord(current) && typeof part === "string") {
+      current = current[part];
+    } else {
+      return undefined;
+    }
+  }
+  return current;
+}
+
+export function isResponsesFunctionCallArguments(
+  response: ResponsesResponse,
+  path: string | readonly (string | number)[],
+): boolean {
+  const parts = typeof path === "string" ? pathFromString(path) : path;
+  if (parts.at(-1) !== "arguments") return false;
+
+  const parent = getAtPath(response, parts.slice(0, -1));
+  return (
+    isRecord(parent) &&
+    (parent.type === "function_call" || parent.type === "response.function_call_arguments.done")
+  );
+}
+
+export function restoreSerializedFunctionCallArguments(
+  text: string,
+  context: PlaceholderContext,
+  formatValue?: (original: string) => string,
+): string {
+  try {
+    JSON.parse(text);
+  } catch {
+    return text;
+  }
+
+  return restorePlaceholders(text, context, (original) => {
+    const restored = formatValue ? formatValue(original) : original;
+    return JSON.stringify(restored).slice(1, -1);
+  });
+}
+
 export const responsesExtractor: RequestExtractor<ResponsesRequest, ResponsesResponse> = {
   extractTexts(request: ResponsesRequest): TextSpan[] {
     return collectText(request).map((item, index) => ({
@@ -135,7 +180,10 @@ export const responsesExtractor: RequestExtractor<ResponsesRequest, ResponsesRes
   ): ResponsesResponse {
     let result = response;
     for (const item of collectText(response)) {
-      result = setAtPath(result, item.path, restorePlaceholders(item.value, context, formatValue));
+      const restored = isResponsesFunctionCallArguments(response, item.path)
+        ? restoreSerializedFunctionCallArguments(item.value, context, formatValue)
+        : restorePlaceholders(item.value, context, formatValue);
+      result = setAtPath(result, item.path, restored);
     }
     return result;
   },

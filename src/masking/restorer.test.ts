@@ -139,4 +139,57 @@ describe("restoreResponse applies markers through each provider extractor", () =
       output: [{ content: [{ type: "output_text", text: "Your key is [protected]sk-secret" }] }],
     });
   });
+
+  test("Responses function-call arguments remain valid serialized JSON", () => {
+    const person = 'Jane "JJ" \\vault\nline\t\u0001 café 😀 [[marker-like]]';
+    const secret = 'sk-"quoted"\\path\r\nnext';
+    const response: ResponsesResponse = {
+      output: [
+        {
+          type: "function_call",
+          arguments: JSON.stringify({
+            nested: { person: "[[PERSON_1]]" },
+            values: ["before", "[[API_KEY_SK_1]]"],
+          }),
+        },
+      ],
+    };
+
+    const result = restoreResponse(response, responsesExtractor, markerConfig, {
+      piiContext: context({ "[[PERSON_1]]": person }),
+      secretsContext: context({ "[[API_KEY_SK_1]]": secret }),
+    });
+    const output = result.output as Array<{ arguments: string }>;
+
+    expect(JSON.parse(output[0].arguments)).toEqual({
+      nested: { person: `[protected]${person}` },
+      values: ["before", `[protected]${secret}`],
+    });
+  });
+
+  test("preserves malformed serialized function-call arguments", () => {
+    const argumentsText = '{"person":"[[PERSON_1]]"';
+    const response: ResponsesResponse = {
+      output: [{ type: "function_call", arguments: argumentsText }],
+    };
+
+    const result = restoreResponse(response, responsesExtractor, defaultConfig, {
+      piiContext: context({ "[[PERSON_1]]": 'Jane "JJ"' }),
+    });
+    const output = result.output as Array<{ arguments: string }>;
+
+    expect(output[0].arguments).toBe(argumentsText);
+  });
+
+  test("does not treat arbitrary arguments fields as serialized function JSON", () => {
+    const response: ResponsesResponse = {
+      output: [{ type: "message", arguments: "Contact [[PERSON_1]]" }],
+    };
+
+    expect(
+      restoreResponse(response, responsesExtractor, defaultConfig, {
+        piiContext: context({ "[[PERSON_1]]": "Jane" }),
+      }),
+    ).toEqual({ output: [{ type: "message", arguments: "Contact Jane" }] });
+  });
 });

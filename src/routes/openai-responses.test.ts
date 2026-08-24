@@ -173,6 +173,37 @@ describe("POST /openai/v1/responses", () => {
     expect(body).not.toContain("[[EMAIL_ADDRESS_1]]");
   });
 
+  test("restores non-streaming function-call arguments as valid JSON", async () => {
+    const person = 'Jane "JJ" \\vault\nline\t\u0001 café 😀';
+    const input = `Person ${person}`;
+    mockAnalyzeRequest.mockResolvedValueOnce(emailDetection(input, person));
+    globalThis.fetch = (async (_target: string | URL | Request, _init?: RequestInit) =>
+      Response.json({
+        id: "resp_function",
+        output: [
+          {
+            id: "fc_1",
+            type: "function_call",
+            call_id: "call_1",
+            name: "save_person",
+            arguments: JSON.stringify({ nested: { person: "[[EMAIL_ADDRESS_1]]" } }),
+          },
+        ],
+      })) as typeof fetch;
+
+    const response = await app.request("/openai/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "openai/gpt-test", input }),
+    });
+    const body = (await response.json()) as {
+      output: Array<{ arguments: string }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(body.output[0].arguments)).toEqual({ nested: { person } });
+  });
+
   test("remasks known values in restored assistant history", async () => {
     const email = "history@example.com";
     const userText = `My email is ${email}`;
@@ -215,6 +246,293 @@ describe("POST /openai/v1/responses", () => {
     const serialized = JSON.stringify(upstreamBody);
     expect(serialized).not.toContain(email);
     expect(serialized.match(/\[\[EMAIL_ADDRESS_1\]\]/g)).toHaveLength(2);
+  });
+
+  test("remasks JSON-escaped known values in echoed function-call history", async () => {
+    const person = 'Ava "Snow" \\path\nline 雪';
+    const userText = `Remember ${person}`;
+    const start = userText.indexOf(person);
+    const entity = {
+      entity_type: "PERSON",
+      start,
+      end: start + person.length,
+      score: 0.99,
+    };
+    mockAnalyzeRequest.mockResolvedValueOnce({
+      hasPII: true,
+      spanEntities: [[entity], [], [], []],
+      allEntities: [entity],
+      scanTimeMs: 2,
+    });
+
+    let upstreamBody: {
+      input: Array<{ type: string; arguments?: string; content?: Array<{ text: string }> }>;
+    } | null = null;
+    globalThis.fetch = (async (_target: string | URL | Request, init?: RequestInit) => {
+      upstreamBody = JSON.parse(String(init?.body));
+      return Response.json({ id: "resp_function_history", output: [] });
+    }) as typeof fetch;
+
+    const response = await app.request("/openai/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-test",
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: userText }],
+          },
+          {
+            type: "function_call",
+            id: "fc_history",
+            call_id: "call_history",
+            name: "save_person",
+            arguments: JSON.stringify({ name: person, city: "Bolzano" }),
+          },
+          {
+            type: "custom_event",
+            arguments: JSON.stringify({ name: person }),
+          },
+          {
+            type: "function_call",
+            id: "fc_malformed",
+            call_id: "call_malformed",
+            name: "save_malformed",
+            arguments: `{"name":"${JSON.stringify(person).slice(1, -1)}`,
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstreamBody).not.toBeNull();
+    const input = upstreamBody!.input;
+    expect(input[0].content?.[0].text).toBe("Remember [[PERSON_1]]");
+    const argumentsText = input[1].arguments!;
+    expect(JSON.parse(argumentsText)).toEqual({ name: "[[PERSON_1]]", city: "Bolzano" });
+    expect(argumentsText).toContain("[[PERSON_1]]");
+    expect(argumentsText).not.toContain(JSON.stringify(person).slice(1, -1));
+    expect(JSON.parse(input[2].arguments!)).toEqual({ name: person });
+    expect(input[3].arguments).toBe('{"name":"[[PERSON_1]]');
+  });
+
+  test("keeps colliding raw and escaped function-argument values distinct", async () => {
+    const first = "A\nB";
+    const second = "A\\nB";
+    const userText = `First ${first}; second ${second}`;
+    const firstStart = userText.indexOf(first);
+    const secondStart = userText.indexOf(second, firstStart + first.length);
+    const firstEntity = {
+      entity_type: "PERSON",
+      start: firstStart,
+      end: firstStart + first.length,
+      score: 0.99,
+    };
+    const secondEntity = {
+      entity_type: "LOCATION",
+      start: secondStart,
+      end: secondStart + second.length,
+      score: 0.99,
+    };
+    mockAnalyzeRequest.mockResolvedValueOnce({
+      hasPII: true,
+      spanEntities: [[firstEntity, secondEntity], []],
+      allEntities: [firstEntity, secondEntity],
+      scanTimeMs: 2,
+    });
+
+    let upstreamBody: {
+      input: Array<{ type: string; arguments?: string; content?: Array<{ text: string }> }>;
+    } | null = null;
+    globalThis.fetch = (async (_target: string | URL | Request, init?: RequestInit) => {
+      upstreamBody = JSON.parse(String(init?.body));
+      return Response.json({ id: "resp_collision_history", output: [] });
+    }) as typeof fetch;
+
+    const response = await app.request("/openai/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-test",
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: userText }],
+          },
+          {
+            type: "function_call",
+            id: "fc_collision",
+            call_id: "call_collision",
+            name: "save_values",
+            arguments: JSON.stringify({ first, second }),
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstreamBody).not.toBeNull();
+    const input = upstreamBody!.input;
+    expect(input[0].content?.[0].text).toBe("First [[PERSON_1]]; second [[LOCATION_1]]");
+    expect(JSON.parse(input[1].arguments!)).toEqual({
+      first: "[[PERSON_1]]",
+      second: "[[LOCATION_1]]",
+    });
+  });
+
+  test("remasks a known value represented as a JSON number", async () => {
+    const phone = "3471234567";
+    const city = "Berlin";
+    const userText = `Phone ${phone}; city ${city}`;
+    const phoneStart = userText.indexOf(phone);
+    const cityStart = userText.indexOf(city);
+    const phoneEntity = {
+      entity_type: "PHONE_NUMBER",
+      start: phoneStart,
+      end: phoneStart + phone.length,
+      score: 0.99,
+    };
+    const cityEntity = {
+      entity_type: "LOCATION",
+      start: cityStart,
+      end: cityStart + city.length,
+      score: 0.99,
+    };
+    mockAnalyzeRequest.mockResolvedValueOnce({
+      hasPII: true,
+      spanEntities: [[phoneEntity, cityEntity], []],
+      allEntities: [phoneEntity, cityEntity],
+      scanTimeMs: 2,
+    });
+
+    let upstreamBody: {
+      input: Array<{ type: string; arguments?: string; content?: Array<{ text: string }> }>;
+    } | null = null;
+    globalThis.fetch = (async (_target: string | URL | Request, init?: RequestInit) => {
+      upstreamBody = JSON.parse(String(init?.body));
+      return Response.json({ id: "resp_numeric_history", output: [] });
+    }) as typeof fetch;
+
+    const response = await app.request("/openai/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-test",
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: userText }],
+          },
+          {
+            type: "function_call",
+            id: "fc_numeric",
+            call_id: "call_numeric",
+            name: "save_contact",
+            arguments: JSON.stringify({
+              phone: Number(phone),
+              city,
+              attempts: 3,
+              verified: true,
+              note: null,
+            }),
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstreamBody).not.toBeNull();
+    const input = upstreamBody!.input;
+    expect(input[0].content?.[0].text).toBe("Phone [[PHONE_NUMBER_1]]; city [[LOCATION_1]]");
+    expect(JSON.parse(input[1].arguments!)).toEqual({
+      phone: "[[PHONE_NUMBER_1]]",
+      city: "[[LOCATION_1]]",
+      attempts: 3,
+      verified: true,
+      note: null,
+    });
+  });
+
+  test("preserves unrelated serialized JSON bytes while remasking", async () => {
+    const phone = "3471234567";
+    const city = "Berlin";
+    const userText = `Phone ${phone}; city ${city}`;
+    const phoneStart = userText.indexOf(phone);
+    const cityStart = userText.indexOf(city);
+    const phoneEntity = {
+      entity_type: "PHONE_NUMBER",
+      start: phoneStart,
+      end: phoneStart + phone.length,
+      score: 0.99,
+    };
+    const cityEntity = {
+      entity_type: "LOCATION",
+      start: cityStart,
+      end: cityStart + city.length,
+      score: 0.99,
+    };
+    mockAnalyzeRequest.mockResolvedValueOnce({
+      hasPII: true,
+      spanEntities: [[phoneEntity, cityEntity], []],
+      allEntities: [phoneEntity, cityEntity],
+      scanTimeMs: 2,
+    });
+
+    const argumentsText = `{
+  "phone" : "3471234567",
+  "Berlin": "office",
+  "big": 9007199254740993,
+  "decimal": 1.0,
+  "exponent": 1e+3,
+  "duplicate": "first",
+  "duplicate": "second"
+}`;
+    const expectedArguments = `{
+  "phone" : "[[PHONE_NUMBER_1]]",
+  "[[LOCATION_1]]": "office",
+  "big": 9007199254740993,
+  "decimal": 1.0,
+  "exponent": 1e+3,
+  "duplicate": "first",
+  "duplicate": "second"
+}`;
+    let upstreamBody: {
+      input: Array<{ type: string; arguments?: string }>;
+    } | null = null;
+    globalThis.fetch = (async (_target: string | URL | Request, init?: RequestInit) => {
+      upstreamBody = JSON.parse(String(init?.body));
+      return Response.json({ id: "resp_number_format_history", output: [] });
+    }) as typeof fetch;
+
+    const response = await app.request("/openai/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-test",
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: userText }],
+          },
+          {
+            type: "function_call",
+            id: "fc_number_format",
+            call_id: "call_number_format",
+            name: "save_contact",
+            arguments: argumentsText,
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstreamBody).not.toBeNull();
+    expect(upstreamBody!.input[1].arguments).toBe(expectedArguments);
   });
 
   test("blocks stateful options when values were masked", async () => {

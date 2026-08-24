@@ -7,6 +7,7 @@ export interface StreamRestorerOptions {
   piiContext?: PlaceholderContext;
   secretsContext?: PlaceholderContext;
   config: MaskingConfig;
+  formatValue?: (original: string) => string;
 }
 
 export class StreamRestorer {
@@ -15,7 +16,7 @@ export class StreamRestorer {
   private readonly formatValue: ((original: string) => string) | undefined;
 
   constructor(private readonly options: StreamRestorerOptions) {
-    this.formatValue = createRestoreFormatter(options.config);
+    this.formatValue = options.formatValue ?? createRestoreFormatter(options.config);
   }
 
   restoreChunk(text: string): string {
@@ -44,6 +45,10 @@ export class StreamRestorer {
     }
 
     return processedText;
+  }
+
+  hasPending(): boolean {
+    return Boolean(this.piiBuffer || this.secretsBuffer);
   }
 
   flush(): string {
