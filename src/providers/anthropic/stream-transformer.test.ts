@@ -358,6 +358,52 @@ describe("createAnthropicUnmaskingStream", () => {
     expect(result).toBe(delta + stop);
   });
 
+  test("restores a placeholder without normalizing untouched JSON tokens", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Alice";
+    const originalJson =
+      '{ "big": 9007199254740993, "fixed": 1.0, "exp": 1e+3, "dup": "first", "dup": "last", "name": "[[PERSON_1]]" }';
+    const expectedJson = originalJson.replace("[[PERSON_1]]", "Alice");
+    const chunks = [
+      createInputJsonDelta(originalJson.slice(0, 45), 8),
+      createInputJsonDelta(originalJson.slice(45, 91), 8),
+      createInputJsonDelta(originalJson.slice(91), 8),
+      createBlockStop(8),
+    ];
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(createSSEStream(chunks), context, defaultConfig),
+    );
+
+    expect(concatenateToolJson(result, 8)).toBe(expectedJson);
+  });
+
+  test("restores Unicode-escaped placeholders without rewriting surrounding escapes", async () => {
+    const context = createMaskingContext();
+    const restoredValue = 'Quote " slash \\ line\n snowman ☃';
+    context.mapping["[[PERSON_1]]"] = restoredValue;
+    const encodedPlaceholder = "\\u005b\\u005bPERSON_1\\u005d\\u005d";
+    const originalJson =
+      `{ "encoded": "${encodedPlaceholder}", ` +
+      '"untouched": "quote \\" slash \\\\ newline\\n snowman \\u2603" }';
+    const serializedValue = JSON.stringify(restoredValue).slice(1, -1);
+    const expectedJson = originalJson.replace(encodedPlaceholder, serializedValue);
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(
+        createSSEStream([createInputJsonDelta(originalJson, 9), createBlockStop(9)]),
+        context,
+        defaultConfig,
+      ),
+    );
+
+    expect(concatenateToolJson(result, 9)).toBe(expectedJson);
+    expect(JSON.parse(concatenateToolJson(result, 9))).toEqual({
+      encoded: restoredValue,
+      untouched: 'quote " slash \\ newline\n snowman ☃',
+    });
+  });
+
   test("unmasks placeholders and JSON strings split across input_json_delta events", async () => {
     const context = createMaskingContext();
     context.mapping["[[EMAIL_ADDRESS_1]]"] = "alice@example.com";
@@ -435,6 +481,49 @@ describe("createAnthropicUnmaskingStream", () => {
     ).toEqual(events.map((event) => event.type));
   });
 
+  test("preserves interleaved frame identity while restoring independent tool blocks", async () => {
+    const piiContext = createMaskingContext();
+    piiContext.mapping["[[PERSON_1]]"] = "Alice";
+    const secretsContext = createMaskingContext();
+    secretsContext.mapping["[[SECRET_API_KEY_1]]"] = "sk-test";
+    const first =
+      'event: content_block_delta\r\ndata: { "type" : "content_block_delta", "index" : 11, "trace" : "first", "delta" : { "type" : "input_json_delta", "partial_json" : "{\\"owner\\":\\"[[PERSON_1]]\\"}", "ordinal" : 1 } }\r\n\r\n';
+    const second =
+      'event: content_block_delta\r\ndata: { "type" : "content_block_delta", "index" : 12, "trace" : "second", "delta" : { "type" : "input_json_delta", "partial_json" : "{\\"key\\":\\"[[SECRET_API_KEY_1]]\\"}", "ordinal" : 2 } }\r\n\r\n';
+    const firstStop = createBlockStop(11, { trace: "first-stop" });
+    const secondStop = createBlockStop(12, { trace: "second-stop" });
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(
+        createSSEStream([first, second, firstStop, secondStop]),
+        piiContext,
+        defaultConfig,
+        secretsContext,
+      ),
+    );
+
+    expect(result).toBe(
+      first.replace("[[PERSON_1]]", "Alice") +
+        second.replace("[[SECRET_API_KEY_1]]", "sk-test") +
+        firstStop +
+        secondStop,
+    );
+  });
+
+  test("preserves event and delta metadata bytes when tool JSON changes", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Alice";
+    const delta =
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":13,"big":9007199254740993,"fixed":1.0,"unicode":"\\u2603","delta":{"type":"input_json_delta","partial_json":"{\\"name\\":\\"[[PERSON_1]]\\"}","exp":1e+3},"tail":true}\n\n';
+    const stop = createBlockStop(13, { stable: "metadata" });
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(createSSEStream([delta, stop]), context, defaultConfig),
+    );
+
+    expect(result).toBe(delta.replace("[[PERSON_1]]", "Alice") + stop);
+  });
+
   test("serializes restored PII and secrets with markers as valid JSON", async () => {
     const piiContext = createMaskingContext();
     piiContext.mapping["[[PERSON_1]]"] =
@@ -455,6 +544,25 @@ describe("createAnthropicUnmaskingStream", () => {
     expect(JSON.parse(concatenateToolJson(result, 4))).toEqual({
       person: '[protected]Quote " slash \\ line\n tab\t nul\u0000 snowman ☃ [[prefix',
       secret: "[protected]secret\r\b\fvalue",
+    });
+  });
+
+  test("applies PII then secrets inside tool JSON like non-stream restoration", async () => {
+    const piiContext = createMaskingContext();
+    piiContext.mapping["[[PERSON_1]]"] = "Alice [[SECRET_API_KEY_1]]";
+    const secretsContext = createMaskingContext();
+    secretsContext.mapping["[[SECRET_API_KEY_1]]"] = "sk-test";
+    const source = createSSEStream([
+      createInputJsonDelta('{"value":"[[PERSON_1]]"}', 14),
+      createBlockStop(14),
+    ]);
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(source, piiContext, defaultConfig, secretsContext),
+    );
+
+    expect(JSON.parse(concatenateToolJson(result, 14))).toEqual({
+      value: "Alice sk-test",
     });
   });
 

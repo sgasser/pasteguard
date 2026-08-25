@@ -3,7 +3,6 @@
 
 import type { MaskingConfig } from "../../config";
 import type { PlaceholderContext } from "../../masking/context";
-import { unmaskAnthropicToolInput } from "../../masking/extractors/anthropic";
 import { createRestoreFormatter } from "../../masking/restore-policy";
 import { StreamRestorer } from "../../masking/stream-restorer";
 
@@ -58,6 +57,29 @@ function replaceDataLine(frame: string, dataLine: DataLine, data: string): strin
   return `${frame.slice(0, dataLine.start)}data: ${data}${dataLine.newline}${frame.slice(dataLine.end)}`;
 }
 
+function replacePartialJsonValue(
+  data: string,
+  originalFragment: string,
+  restoredFragment: string,
+): string | undefined {
+  const originalValue = JSON.stringify(originalFragment);
+  const restoredValue = JSON.stringify(restoredFragment);
+  const property = /"partial_json"\s*:\s*/g;
+  let match = property.exec(data);
+
+  while (match) {
+    const valueStart = match.index + match[0].length;
+    if (data.startsWith(originalValue, valueStart)) {
+      return (
+        data.slice(0, valueStart) + restoredValue + data.slice(valueStart + originalValue.length)
+      );
+    }
+    match = property.exec(data);
+  }
+
+  return undefined;
+}
+
 function distributeJson(json: string, frames: PendingToolFrame[]): string[] {
   let offset = 0;
 
@@ -70,6 +92,265 @@ function distributeJson(json: string, frames: PendingToolFrame[]): string[] {
     offset += frame.fragmentLength;
     return fragment;
   });
+}
+
+interface StringReplacement {
+  start: number;
+  end: number;
+  value: string;
+}
+
+interface SerializedCharacter {
+  start: number;
+  end: number;
+  value: string;
+}
+
+function decodeSerializedString(value: string): SerializedCharacter[] {
+  const characters: SerializedCharacter[] = [];
+  let position = 0;
+
+  while (position < value.length) {
+    if (value[position] !== "\\") {
+      characters.push({ start: position, end: position + 1, value: value[position] });
+      position++;
+      continue;
+    }
+
+    const escapeCode = value[position + 1];
+    if (escapeCode === "u") {
+      characters.push({
+        start: position,
+        end: position + 6,
+        value: String.fromCharCode(Number.parseInt(value.slice(position + 2, position + 6), 16)),
+      });
+      position += 6;
+      continue;
+    }
+
+    const escapedValues: Record<string, string> = {
+      '"': '"',
+      "\\": "\\",
+      "/": "/",
+      b: "\b",
+      f: "\f",
+      n: "\n",
+      r: "\r",
+      t: "\t",
+    };
+    characters.push({ start: position, end: position + 2, value: escapedValues[escapeCode] });
+    position += 2;
+  }
+
+  return characters;
+}
+
+function replaceSerializedPlaceholder(
+  value: string,
+  placeholder: string,
+  replacement: string,
+): string {
+  const characters = decodeSerializedString(value);
+  const decoded = characters.map((character) => character.value).join("");
+  const matches: Array<{ start: number; end: number }> = [];
+  let matchStart = decoded.indexOf(placeholder);
+
+  while (matchStart !== -1) {
+    matches.push({
+      start: characters[matchStart].start,
+      end: characters[matchStart + placeholder.length - 1].end,
+    });
+    matchStart = decoded.indexOf(placeholder, matchStart + placeholder.length);
+  }
+
+  if (matches.length === 0) return value;
+
+  let result = "";
+  let unchangedStart = 0;
+  for (const match of matches) {
+    result += value.slice(unchangedStart, match.start) + replacement;
+    unchangedStart = match.end;
+  }
+  return result + value.slice(unchangedStart);
+}
+
+function restoreSerializedString(
+  value: string,
+  contexts: Array<PlaceholderContext | undefined>,
+  formatValue: ((original: string) => string) | undefined,
+): string {
+  let result = value;
+  for (const context of contexts) {
+    const replacements = Object.entries(context?.mapping ?? {}).sort(
+      ([left], [right]) => right.length - left.length,
+    );
+
+    for (const [placeholder, original] of replacements) {
+      const serialized = JSON.stringify(formatValue ? formatValue(original) : original).slice(
+        1,
+        -1,
+      );
+      result = replaceSerializedPlaceholder(result, placeholder, serialized);
+    }
+  }
+
+  return result;
+}
+
+function restoreJsonStringValues(
+  json: string,
+  contexts: Array<PlaceholderContext | undefined>,
+  formatValue: ((original: string) => string) | undefined,
+): string | undefined {
+  let position = 0;
+  const replacements: StringReplacement[] = [];
+
+  function skipWhitespace() {
+    while (
+      json[position] === " " ||
+      json[position] === "\t" ||
+      json[position] === "\n" ||
+      json[position] === "\r"
+    ) {
+      position++;
+    }
+  }
+
+  function parseString(restoreValue: boolean) {
+    if (json[position] !== '"') throw new Error("Expected JSON string");
+    position++;
+    const contentStart = position;
+
+    while (position < json.length) {
+      const character = json[position];
+
+      if (character === '"') {
+        if (restoreValue) {
+          const original = json.slice(contentStart, position);
+          const restored = restoreSerializedString(original, contexts, formatValue);
+          if (restored !== original) {
+            replacements.push({ start: contentStart, end: position, value: restored });
+          }
+        }
+        position++;
+        return;
+      }
+
+      if (character === "\\") {
+        const escapeCode = json[position + 1];
+        if (escapeCode === "u") {
+          if (!/^[0-9a-fA-F]{4}$/.test(json.slice(position + 2, position + 6))) {
+            throw new Error("Invalid JSON Unicode escape");
+          }
+          position += 6;
+          continue;
+        }
+        if (!escapeCode || !'"\\/bfnrt'.includes(escapeCode)) {
+          throw new Error("Invalid JSON escape");
+        }
+        position += 2;
+        continue;
+      }
+
+      if (character.charCodeAt(0) < 0x20) throw new Error("Invalid JSON control character");
+      position++;
+    }
+
+    throw new Error("Incomplete JSON string");
+  }
+
+  function parseArray() {
+    position++;
+    skipWhitespace();
+    if (json[position] === "]") {
+      position++;
+      return;
+    }
+
+    while (true) {
+      parseValue();
+      skipWhitespace();
+      if (json[position] === "]") {
+        position++;
+        return;
+      }
+      if (json[position] !== ",") throw new Error("Invalid JSON array");
+      position++;
+      skipWhitespace();
+    }
+  }
+
+  function parseObject() {
+    position++;
+    skipWhitespace();
+    if (json[position] === "}") {
+      position++;
+      return;
+    }
+
+    while (true) {
+      parseString(false);
+      skipWhitespace();
+      if (json[position] !== ":") throw new Error("Invalid JSON object");
+      position++;
+      parseValue();
+      skipWhitespace();
+      if (json[position] === "}") {
+        position++;
+        return;
+      }
+      if (json[position] !== ",") throw new Error("Invalid JSON object");
+      position++;
+      skipWhitespace();
+    }
+  }
+
+  function parseValue() {
+    skipWhitespace();
+    const character = json[position];
+
+    if (character === '"') {
+      parseString(true);
+      return;
+    }
+    if (character === "{") {
+      parseObject();
+      return;
+    }
+    if (character === "[") {
+      parseArray();
+      return;
+    }
+
+    for (const literal of ["true", "false", "null"]) {
+      if (json.startsWith(literal, position)) {
+        position += literal.length;
+        return;
+      }
+    }
+
+    const number = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(json.slice(position))?.[0];
+    if (!number) throw new Error("Invalid JSON value");
+    position += number.length;
+  }
+
+  try {
+    parseValue();
+    skipWhitespace();
+    if (position !== json.length) return undefined;
+  } catch {
+    return undefined;
+  }
+
+  if (replacements.length === 0) return undefined;
+
+  let restored = "";
+  let unchangedStart = 0;
+  for (const replacement of replacements) {
+    restored += json.slice(unchangedStart, replacement.start) + replacement.value;
+    unchangedStart = replacement.end;
+  }
+  return restored + json.slice(unchangedStart);
 }
 
 export function createAnthropicUnmaskingStream(
@@ -100,22 +381,7 @@ export function createAnthropicUnmaskingStream(
       }
 
       function restoreChangedToolJson(json: string): string | undefined {
-        try {
-          let input: unknown = JSON.parse(json);
-          const normalizedJson = JSON.stringify(input);
-
-          if (piiContext) {
-            input = unmaskAnthropicToolInput(input, piiContext, formatValue);
-          }
-          if (secretsContext) {
-            input = unmaskAnthropicToolInput(input, secretsContext, formatValue);
-          }
-
-          const restoredJson = JSON.stringify(input);
-          return restoredJson === normalizedJson ? undefined : restoredJson;
-        } catch {
-          return undefined;
-        }
+        return restoreJsonStringValues(json, [piiContext, secretsContext], formatValue);
       }
 
       function finalizeToolBlock(index: number) {
@@ -129,19 +395,28 @@ export function createAnthropicUnmaskingStream(
           }
         } else {
           const fragments = distributeJson(restoredJson, state.frames);
+          const restoredData = state.frames.map((pending, frameIndex) =>
+            replacePartialJsonValue(
+              pending.dataLine.data,
+              pending.event.delta?.partial_json as string,
+              fragments[frameIndex],
+            ),
+          );
+
+          if (restoredData.some((data) => data === undefined)) {
+            for (const pending of state.frames) {
+              pending.output = pending.frame;
+            }
+            toolBlocks.delete(index);
+            return;
+          }
+
           for (let frameIndex = 0; frameIndex < state.frames.length; frameIndex++) {
             const pending = state.frames[frameIndex];
-            const modifiedEvent = {
-              ...pending.event,
-              delta: {
-                ...pending.event.delta,
-                partial_json: fragments[frameIndex],
-              },
-            };
             pending.output = replaceDataLine(
               pending.frame,
               pending.dataLine,
-              JSON.stringify(modifiedEvent),
+              restoredData[frameIndex] as string,
             );
           }
         }

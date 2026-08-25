@@ -5,7 +5,7 @@ import type {
   AnthropicRequest,
   AnthropicResponse,
 } from "../../providers/anthropic/types";
-import { anthropicExtractor } from "./anthropic";
+import { anthropicExtractor, remaskAnthropicToolUseHistory } from "./anthropic";
 
 /** Helper to create a minimal request from messages */
 function createRequest(
@@ -16,6 +16,61 @@ function createRequest(
 }
 
 describe("Anthropic Text Extractor", () => {
+  describe("remaskAnthropicToolUseHistory", () => {
+    test("remasks exact known numeric primitives without changing unrelated values", () => {
+      const phone = 3901234567;
+      const request = createRequest([
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: "tool_phone",
+              name: "lookup_contact",
+              input: {
+                phone,
+                asString: String(phone),
+                nested: [phone, { phone, unrelated: 3901234568 }, 42.5, true, false, null],
+              },
+              vendor_metadata: { stable: true },
+            },
+          ],
+        },
+      ]);
+      const context: PlaceholderContext = {
+        mapping: { "[[PHONE_NUMBER_1]]": String(phone) },
+        reverseMapping: {},
+        counters: { PHONE_NUMBER: 1 },
+      };
+
+      const result = remaskAnthropicToolUseHistory(request, context);
+
+      expect(result.messages[0]).toEqual({
+        role: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            id: "tool_phone",
+            name: "lookup_contact",
+            input: {
+              phone: "[[PHONE_NUMBER_1]]",
+              asString: "[[PHONE_NUMBER_1]]",
+              nested: [
+                "[[PHONE_NUMBER_1]]",
+                { phone: "[[PHONE_NUMBER_1]]", unrelated: 3901234568 },
+                42.5,
+                true,
+                false,
+                null,
+              ],
+            },
+            vendor_metadata: { stable: true },
+          },
+        ],
+      });
+    });
+  });
+
   describe("extractTexts", () => {
     test("extracts text from string content", () => {
       const request = createRequest([

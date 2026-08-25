@@ -5,7 +5,7 @@ import { getConfig } from "../config";
 import { formatMaskedRequestForLog } from "../logging/log-content";
 import { logRequest } from "../logging/logger";
 import type { PlaceholderContext } from "../masking/context";
-import { anthropicExtractor } from "../masking/extractors/anthropic";
+import { anthropicExtractor, remaskAnthropicToolUseHistory } from "../masking/extractors/anthropic";
 import { restoreResponse } from "../masking/restorer";
 import type { PIIDetectResult } from "../pii/request";
 import {
@@ -121,10 +121,15 @@ anthropicRoutes.post(
       });
     }
 
+    const providerRequest = remaskAnthropicToolUseHistory(
+      privacy.request,
+      privacy.piiMaskingContext,
+      secretsResult.maskingContext,
+    );
     const maskedContent =
-      piiResult.hasPII || secretsResult.masked ? formatRequestForLog(privacy.request) : undefined;
+      piiResult.hasPII || secretsResult.masked ? formatRequestForLog(providerRequest) : undefined;
 
-    return sendToAnthropic(c, privacy.request, {
+    return sendToAnthropic(c, providerRequest, {
       startTime,
       piiResult,
       piiMaskingContext: privacy.piiMaskingContext,
