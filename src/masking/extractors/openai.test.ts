@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { PlaceholderContext } from "../../masking/context";
-import type { OpenAIMessage, OpenAIRequest, OpenAIResponse } from "../../providers/openai/types";
-import { openaiExtractor } from "./openai";
+import {
+  type OpenAIMessage,
+  type OpenAIRequest,
+  type OpenAIResponse,
+  OpenAIResponseSchema,
+} from "../../providers/openai/types";
+import { openaiExtractor, remaskOpenAIToolCallArguments } from "./openai";
 
 /** Helper to create a minimal request from messages */
 function createRequest(messages: OpenAIMessage[]): OpenAIRequest {
@@ -175,6 +180,159 @@ describe("OpenAI Text Extractor", () => {
     });
   });
 
+  describe("remaskOpenAIToolCallArguments", () => {
+    test("preserves JSON bytes except known values and chooses the longest overlap", () => {
+      const argumentsText = String.raw`{ "big":9007199254740993, "decimal":1.0, "exponent":1e+3, "dup":"jane@example.com", "dup":"example.com", "quote":"say \"hi\"", "backslash":"C:\\temp", "unicode":"caf\u00e9 \uD83D\uDE00", "unrelated":"quote \" slash \\ newline \n snow 雪", "literal":"\\nbreak", "actual":"\nbreak" }`;
+      const request = createRequest([
+        { role: "user", content: "Continue" },
+        {
+          role: "assistant",
+          content: "Unscanned assistant metadata stays unchanged",
+          tool_calls: [
+            {
+              id: "call_fidelity",
+              type: "function",
+              provider_metadata: { trace: "keep" },
+              function: {
+                name: "store_values",
+                arguments: argumentsText,
+              },
+            },
+          ],
+          // biome-ignore lint/suspicious/noExplicitAny: testing passthrough field preservation
+        } as any,
+        { role: "tool", tool_call_id: "call_fidelity", content: "Done" },
+      ]);
+      // biome-ignore lint/suspicious/noExplicitAny: testing passthrough field preservation
+      (request as any).metadata = { request_id: "keep" };
+      const context: PlaceholderContext = {
+        mapping: {
+          "[[DOMAIN_1]]": "example.com",
+          "[[EMAIL_ADDRESS_1]]": "jane@example.com",
+          "[[QUOTE_1]]": 'say "hi"',
+          "[[BACKSLASH_1]]": "C:\\temp",
+          "[[UNICODE_1]]": "café 😀",
+          "[[NEWLINE_1]]": "\nbreak",
+        },
+        reverseMapping: {
+          "example.com": "[[DOMAIN_1]]",
+          "jane@example.com": "[[EMAIL_ADDRESS_1]]",
+          'say "hi"': "[[QUOTE_1]]",
+          "C:\\temp": "[[BACKSLASH_1]]",
+          "café 😀": "[[UNICODE_1]]",
+          "\nbreak": "[[NEWLINE_1]]",
+        },
+        counters: {
+          DOMAIN: 1,
+          EMAIL_ADDRESS: 1,
+          QUOTE: 1,
+          BACKSLASH: 1,
+          UNICODE: 1,
+          NEWLINE: 1,
+        },
+      };
+
+      const result = remaskOpenAIToolCallArguments(request, [context]);
+      // biome-ignore lint/suspicious/noExplicitAny: inspecting passthrough tool-call fields
+      const toolCall = (result.messages[1] as any).tool_calls[0];
+
+      expect(toolCall.function.arguments).toBe(
+        String.raw`{ "big":9007199254740993, "decimal":1.0, "exponent":1e+3, "dup":"[[EMAIL_ADDRESS_1]]", "dup":"[[DOMAIN_1]]", "quote":"[[QUOTE_1]]", "backslash":"[[BACKSLASH_1]]", "unicode":"[[UNICODE_1]]", "unrelated":"quote \" slash \\ newline \n snow 雪", "literal":"\\nbreak", "actual":"[[NEWLINE_1]]" }`,
+      );
+      expect(JSON.parse(toolCall.function.arguments)).toEqual({
+        big: 9007199254740992,
+        decimal: 1,
+        exponent: 1000,
+        dup: "[[DOMAIN_1]]",
+        quote: "[[QUOTE_1]]",
+        backslash: "[[BACKSLASH_1]]",
+        unicode: "[[UNICODE_1]]",
+        unrelated: 'quote " slash \\ newline \n snow 雪',
+        literal: "\\nbreak",
+        actual: "[[NEWLINE_1]]",
+      });
+      expect(toolCall.provider_metadata).toEqual({ trace: "keep" });
+      expect(result.messages[1].content).toBe("Unscanned assistant metadata stays unchanged");
+      // biome-ignore lint/suspicious/noExplicitAny: inspecting passthrough request metadata
+      expect((result as any).metadata).toEqual({ request_id: "keep" });
+    });
+
+    test("remasks an exact known numeric primitive without changing other number lexemes", () => {
+      const phone = "3901234567";
+      const argumentsText = `{"phone":${phone},"asString":"${phone}","larger":13901234567,"decimal":${phone}.0,"exponent":${phone}e0,"big":9007199254740993,"one":1.0,"thousand":1e+3}`;
+      const request = createRequest([
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "call_numeric",
+              type: "function",
+              function: { name: "lookup_phone", arguments: argumentsText },
+            },
+          ],
+          // biome-ignore lint/suspicious/noExplicitAny: testing passthrough tool-call arguments
+        } as any,
+      ]);
+      const context: PlaceholderContext = {
+        mapping: { "[[PHONE_NUMBER_1]]": phone },
+        reverseMapping: { [phone]: "[[PHONE_NUMBER_1]]" },
+        counters: { PHONE_NUMBER: 1 },
+      };
+
+      const result = remaskOpenAIToolCallArguments(request, [context]);
+      // biome-ignore lint/suspicious/noExplicitAny: inspecting passthrough tool-call arguments
+      const remasked = (result.messages[0] as any).tool_calls[0].function.arguments;
+
+      expect(remasked).toBe(
+        '{"phone":"[[PHONE_NUMBER_1]]","asString":"[[PHONE_NUMBER_1]]","larger":13901234567,"decimal":3901234567.0,"exponent":3901234567e0,"big":9007199254740993,"one":1.0,"thousand":1e+3}',
+      );
+    });
+
+    test("remasks safe malformed JSON while leaving unsafe string bytes unchanged", () => {
+      const context: PlaceholderContext = {
+        mapping: { "[[EMAIL_ADDRESS_1]]": "jane@example.com" },
+        reverseMapping: { "jane@example.com": "[[EMAIL_ADDRESS_1]]" },
+        counters: { EMAIL_ADDRESS: 1 },
+      };
+      const safeMalformed = '{"email":"jane@example.com",}';
+      const safeUnterminated = '{"email":"jane@example.com';
+      const unsafeMalformed = '{"email":"jane@example.com\\';
+      const request = createRequest([
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "call_safe",
+              type: "function",
+              function: { name: "safe", arguments: safeMalformed },
+            },
+            {
+              id: "call_unterminated",
+              type: "function",
+              function: { name: "unterminated", arguments: safeUnterminated },
+            },
+            {
+              id: "call_unsafe",
+              type: "function",
+              function: { name: "unsafe", arguments: unsafeMalformed },
+            },
+          ],
+          // biome-ignore lint/suspicious/noExplicitAny: testing passthrough tool-call arguments
+        } as any,
+      ]);
+
+      const result = remaskOpenAIToolCallArguments(request, [context]);
+      // biome-ignore lint/suspicious/noExplicitAny: inspecting passthrough tool-call arguments
+      const toolCalls = (result.messages[0] as any).tool_calls;
+
+      expect(toolCalls[0].function.arguments).toBe('{"email":"[[EMAIL_ADDRESS_1]]",}');
+      expect(toolCalls[1].function.arguments).toBe('{"email":"[[EMAIL_ADDRESS_1]]');
+      expect(toolCalls[2].function.arguments).toBe(unsafeMalformed);
+    });
+  });
+
   describe("unmaskResponse", () => {
     test("unmasks placeholders in response content", () => {
       const response: OpenAIResponse = {
@@ -209,6 +367,80 @@ describe("OpenAI Text Extractor", () => {
       const result = openaiExtractor.unmaskResponse(response, context);
 
       expect(result.choices[0].message.content).toBe("Hello John, your email is john@example.com");
+    });
+
+    test("unmasks placeholders in tool call function arguments as valid JSON", () => {
+      const originalValue = 'Quote " slash \\ controls \b\f\n\r\t \u0001 Unicode 雪 😀';
+      const response: OpenAIResponse = {
+        id: "test-id",
+        object: "chat.completion",
+        created: 123456,
+        model: "gpt-4",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "Hello [[PERSON_1]]",
+              tool_calls: [
+                {
+                  id: "call_123",
+                  type: "function",
+                  function: {
+                    name: "lookup_person",
+                    arguments: JSON.stringify({ person: "[[PERSON_1]]" }),
+                  },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+      };
+      const context: PlaceholderContext = {
+        mapping: { "[[PERSON_1]]": originalValue },
+        reverseMapping: { [originalValue]: "[[PERSON_1]]" },
+        counters: { PERSON: 1 },
+      };
+
+      const result = openaiExtractor.unmaskResponse(response, context);
+      const toolCalls = result.choices[0].message.tool_calls as Array<{
+        id: string;
+        type: string;
+        function: { name: string; arguments: string };
+      }>;
+
+      expect(result.choices[0].message.content).toBe(`Hello ${originalValue}`);
+      expect(toolCalls[0]).toEqual({
+        id: "call_123",
+        type: "function",
+        function: {
+          name: "lookup_person",
+          arguments: expect.any(String),
+        },
+      });
+      expect(JSON.parse(toolCalls[0].function.arguments)).toEqual({ person: originalValue });
+    });
+
+    test.each([
+      "tool_calls",
+      "function_call",
+    ] as const)("accepts the OpenAI %s finish reason", (finishReason) => {
+      expect(
+        OpenAIResponseSchema.safeParse({
+          id: "test-id",
+          object: "chat.completion",
+          created: 123456,
+          model: "gpt-4",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: null },
+              finish_reason: finishReason,
+            },
+          ],
+        }).success,
+      ).toBeTrue();
     });
 
     test("applies formatValue function when provided", () => {

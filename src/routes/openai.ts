@@ -6,7 +6,7 @@ import { getConfig, type MaskingConfig } from "../config";
 import { formatMaskedRequestForLog } from "../logging/log-content";
 import { logRequest } from "../logging/logger";
 import type { PlaceholderContext } from "../masking/context";
-import { openaiExtractor } from "../masking/extractors/openai";
+import { openaiExtractor, remaskOpenAIToolCallArguments } from "../masking/extractors/openai";
 import { restoreResponse } from "../masking/restorer";
 import type { PIIDetectResult } from "../pii/request";
 import {
@@ -78,34 +78,32 @@ openaiRoutes.post(
       throw new Error("PII detection result missing from privacy pipeline");
     }
 
-    if (config.mode === "mask") {
-      return sendToOpenAI(c, request, {
-        request: privacy.request,
-        piiResult,
-        piiMaskingContext: privacy.piiMaskingContext,
-        secretsResult,
-        startTime,
-        authHeader: c.req.header("Authorization"),
-      });
-    }
-
     // Route mode: send to local if PII/secrets detected, otherwise OpenAI
     const shouldRouteLocal =
-      piiResult.hasPII ||
-      (secretsResult.detection?.detected && config.secrets_detection.action === "route_local");
+      config.mode === "route" &&
+      (piiResult.hasPII ||
+        (secretsResult.detection?.detected && config.secrets_detection.action === "route_local"));
 
     if (shouldRouteLocal) {
+      const localRequest = remaskOpenAIToolCallArguments(privacy.requestAfterSecrets, [
+        secretsResult.maskingContext,
+      ]);
       return sendToLocal(c, request, {
-        request: privacy.requestAfterSecrets,
+        request: localRequest,
         piiResult,
         secretsResult,
         startTime,
       });
     }
 
+    const upstreamRequest = remaskOpenAIToolCallArguments(
+      config.mode === "mask" ? privacy.request : privacy.requestAfterSecrets,
+      [secretsResult.maskingContext, privacy.piiMaskingContext],
+    );
     return sendToOpenAI(c, request, {
-      request: privacy.requestAfterSecrets,
+      request: upstreamRequest,
       piiResult,
+      piiMaskingContext: privacy.piiMaskingContext,
       secretsResult,
       startTime,
       authHeader: c.req.header("Authorization"),
