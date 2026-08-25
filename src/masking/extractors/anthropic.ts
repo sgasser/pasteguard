@@ -10,7 +10,7 @@
  * System spans use messageIndex -1 to distinguish from message spans.
  */
 
-import type { PlaceholderContext } from "../../masking/context";
+import { type PlaceholderContext, restorePlaceholders } from "../../masking/context";
 import type {
   AnthropicRequest,
   AnthropicResponse,
@@ -18,11 +18,106 @@ import type {
   TextBlock,
   ThinkingBlock,
   ToolResultBlock,
+  ToolUseBlock,
 } from "../../providers/anthropic/types";
 import type { MaskedSpan, RequestExtractor, TextSpan } from "../types";
 
 /** System content uses messageIndex -1 */
 const SYSTEM_MESSAGE_INDEX = -1;
+
+export function unmaskAnthropicToolInput(
+  value: unknown,
+  context: PlaceholderContext,
+  formatValue?: (original: string) => string,
+): unknown {
+  if (typeof value === "string") {
+    return restorePlaceholders(value, context, formatValue);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => unmaskAnthropicToolInput(item, context, formatValue));
+  }
+
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        unmaskAnthropicToolInput(item, context, formatValue),
+      ]),
+    );
+  }
+
+  return value;
+}
+
+function remaskAnthropicToolInput(
+  value: unknown,
+  contexts: Array<PlaceholderContext | undefined>,
+): unknown {
+  if (typeof value === "string") {
+    let result = value;
+    const replacements = contexts
+      .flatMap((context) => (context ? Object.entries(context.mapping) : []))
+      .sort(([, left], [, right]) => right.length - left.length);
+
+    for (const [placeholder, original] of replacements) {
+      if (original) result = result.split(original).join(placeholder);
+    }
+
+    return result;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const original = String(value);
+    for (const context of contexts) {
+      for (const [placeholder, knownValue] of Object.entries(context?.mapping ?? {})) {
+        if (knownValue === original) return placeholder;
+      }
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => remaskAnthropicToolInput(item, contexts));
+  }
+
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, remaskAnthropicToolInput(item, contexts)]),
+    );
+  }
+
+  return value;
+}
+
+export function remaskAnthropicToolUseHistory(
+  request: AnthropicRequest,
+  piiContext: PlaceholderContext | undefined,
+  secretsContext?: PlaceholderContext,
+): AnthropicRequest {
+  const contexts = [piiContext, secretsContext];
+  if (!contexts.some((context) => context && Object.keys(context.mapping).length > 0)) {
+    return request;
+  }
+
+  return {
+    ...request,
+    messages: request.messages.map((message) => {
+      if (message.role !== "assistant" || !Array.isArray(message.content)) return message;
+
+      return {
+        ...message,
+        content: message.content.map((block) =>
+          block.type === "tool_use"
+            ? {
+                ...block,
+                input: remaskAnthropicToolInput(block.input, contexts) as Record<string, unknown>,
+              }
+            : block,
+        ),
+      };
+    }),
+  };
+}
 
 /**
  * Extract text from a single content block
@@ -257,20 +352,24 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
     context: PlaceholderContext,
     formatValue?: (original: string) => string,
   ): AnthropicResponse {
-    const unmaskText = (text: string): string => {
-      let result = text;
-      for (const [placeholder, original] of Object.entries(context.mapping)) {
-        const value = formatValue ? formatValue(original) : original;
-        result = result.replaceAll(placeholder, value);
-      }
-      return result;
-    };
-
     return {
       ...response,
       content: response.content.map((block) => {
         if (block.type === "text") {
-          return { ...block, text: unmaskText((block as TextBlock).text) };
+          return {
+            ...block,
+            text: restorePlaceholders((block as TextBlock).text, context, formatValue),
+          };
+        }
+        if (block.type === "tool_use") {
+          const toolUse = block as ToolUseBlock;
+          return {
+            ...toolUse,
+            input: unmaskAnthropicToolInput(toolUse.input, context, formatValue) as Record<
+              string,
+              unknown
+            >,
+          };
         }
         return block;
       }),

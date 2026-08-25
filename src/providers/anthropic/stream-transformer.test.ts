@@ -65,6 +65,52 @@ function createTextDelta(text: string, index = 0): string {
   });
 }
 
+function createBlockStop(index: number, metadata: Record<string, unknown> = {}): string {
+  return createAnthropicEvent("content_block_stop", {
+    type: "content_block_stop",
+    index,
+    ...metadata,
+  });
+}
+
+function createInputJsonDelta(
+  partialJson: string,
+  index = 0,
+  eventMetadata: Record<string, unknown> = {},
+  deltaMetadata: Record<string, unknown> = {},
+): string {
+  return createAnthropicEvent("content_block_delta", {
+    type: "content_block_delta",
+    index,
+    ...eventMetadata,
+    delta: { type: "input_json_delta", partial_json: partialJson, ...deltaMetadata },
+  });
+}
+
+function parseDataEvents(result: string): Array<{
+  type: string;
+  index?: number;
+  delta?: { type: string; partial_json?: string; text?: string; [key: string]: unknown };
+  [key: string]: unknown;
+}> {
+  return result
+    .split("\n")
+    .filter((line) => line.startsWith("data: "))
+    .map((line) => JSON.parse(line.slice(6)));
+}
+
+function concatenateToolJson(result: string, index: number): string {
+  return parseDataEvents(result)
+    .filter(
+      (event) =>
+        event.type === "content_block_delta" &&
+        event.index === index &&
+        event.delta?.type === "input_json_delta",
+    )
+    .map((event) => event.delta?.partial_json ?? "")
+    .join("");
+}
+
 describe("createAnthropicUnmaskingStream", () => {
   test("unmasks complete placeholder in single chunk", async () => {
     const context = createMaskingContext();
@@ -284,38 +330,267 @@ describe("createAnthropicUnmaskingStream", () => {
     expect(result).toContain("Bob");
   });
 
-  test("handles tool_use deltas (input_json_delta)", async () => {
+  test("unmasks a complete placeholder in input_json_delta", async () => {
     const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Alice";
 
-    const toolUseDelta = createAnthropicEvent("content_block_delta", {
-      type: "content_block_delta",
-      index: 0,
-      delta: { type: "input_json_delta", partial_json: '{"arg": "value"}' },
-    });
-    const source = createSSEStream([toolUseDelta]);
+    const source = createSSEStream([
+      createInputJsonDelta('{"name":"[[PERSON_1]]"}'),
+      createBlockStop(0),
+    ]);
 
     const unmaskedStream = createAnthropicUnmaskingStream(source, context, defaultConfig);
     const result = await consumeStream(unmaskedStream);
 
-    // input_json_delta should pass through unchanged
-    expect(result).toContain("input_json_delta");
-    expect(result).toContain("arg");
-    expect(result).toContain("value");
+    expect(JSON.parse(concatenateToolJson(result, 0))).toEqual({ name: "Alice" });
   });
 
-  test("handles content_block_stop events", async () => {
+  test("preserves tool JSON bytes when no mapped placeholder is present", async () => {
     const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Alice";
+    const delta = createInputJsonDelta('{ "count": 1e+2, "enabled": true }', 2);
+    const stop = createBlockStop(2);
 
-    const blockStop = createAnthropicEvent("content_block_stop", {
-      type: "content_block_stop",
-      index: 0,
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(createSSEStream([delta, stop]), context, defaultConfig),
+    );
+
+    expect(result).toBe(delta + stop);
+  });
+
+  test("restores a placeholder without normalizing untouched JSON tokens", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Alice";
+    const originalJson =
+      '{ "big": 9007199254740993, "fixed": 1.0, "exp": 1e+3, "dup": "first", "dup": "last", "name": "[[PERSON_1]]" }';
+    const expectedJson = originalJson.replace("[[PERSON_1]]", "Alice");
+    const chunks = [
+      createInputJsonDelta(originalJson.slice(0, 45), 8),
+      createInputJsonDelta(originalJson.slice(45, 91), 8),
+      createInputJsonDelta(originalJson.slice(91), 8),
+      createBlockStop(8),
+    ];
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(createSSEStream(chunks), context, defaultConfig),
+    );
+
+    expect(concatenateToolJson(result, 8)).toBe(expectedJson);
+  });
+
+  test("restores Unicode-escaped placeholders without rewriting surrounding escapes", async () => {
+    const context = createMaskingContext();
+    const restoredValue = 'Quote " slash \\ line\n snowman ☃';
+    context.mapping["[[PERSON_1]]"] = restoredValue;
+    const encodedPlaceholder = "\\u005b\\u005bPERSON_1\\u005d\\u005d";
+    const originalJson =
+      `{ "encoded": "${encodedPlaceholder}", ` +
+      '"untouched": "quote \\" slash \\\\ newline\\n snowman \\u2603" }';
+    const serializedValue = JSON.stringify(restoredValue).slice(1, -1);
+    const expectedJson = originalJson.replace(encodedPlaceholder, serializedValue);
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(
+        createSSEStream([createInputJsonDelta(originalJson, 9), createBlockStop(9)]),
+        context,
+        defaultConfig,
+      ),
+    );
+
+    expect(concatenateToolJson(result, 9)).toBe(expectedJson);
+    expect(JSON.parse(concatenateToolJson(result, 9))).toEqual({
+      encoded: restoredValue,
+      untouched: 'quote " slash \\ newline\n snowman ☃',
     });
-    const source = createSSEStream([blockStop]);
+  });
 
-    const unmaskedStream = createAnthropicUnmaskingStream(source, context, defaultConfig);
-    const result = await consumeStream(unmaskedStream);
+  test("unmasks placeholders and JSON strings split across input_json_delta events", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "alice@example.com";
 
-    expect(result).toContain("content_block_stop");
+    const source = createSSEStream([
+      createInputJsonDelta('{"nested":{"email":"before [[EMAIL_', 3),
+      createInputJsonDelta('ADDRESS_1]] after","items":["x",', 3),
+      createInputJsonDelta('"[[EMAIL_ADDRESS_1]]"]}}', 3),
+      createBlockStop(3),
+    ]);
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(source, context, defaultConfig),
+    );
+
+    expect(JSON.parse(concatenateToolJson(result, 3))).toEqual({
+      nested: {
+        email: "before alice@example.com after",
+        items: ["x", "alice@example.com"],
+      },
+    });
+    expect(
+      parseDataEvents(result).filter((event) => event.delta?.type === "input_json_delta"),
+    ).toHaveLength(3);
+  });
+
+  test("keeps independent state for interleaved tool block indexes and preserves event metadata", async () => {
+    const piiContext = createMaskingContext();
+    piiContext.mapping["[[PERSON_1]]"] = "Alice";
+    const secretsContext = createMaskingContext();
+    secretsContext.mapping["[[SECRET_API_KEY_1]]"] = "sk-test";
+
+    const chunks = [
+      createInputJsonDelta('{"owner":"[[PER', 1, { trace: "first" }, { ordinal: 1 }),
+      createInputJsonDelta('{"key":"[[SECRET_', 2, { trace: "second" }, { ordinal: 2 }),
+      createTextDelta("Visible [[PERSON_1]]", 0),
+      createInputJsonDelta('SON_1]]"}', 1, { trace: "third" }, { ordinal: 3 }),
+      createBlockStop(1, { stop_metadata: "one" }),
+      createInputJsonDelta('API_KEY_1]]"}', 2, { trace: "fourth" }, { ordinal: 4 }),
+      createBlockStop(2, { stop_metadata: "two" }),
+    ];
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(
+        createSSEStream(chunks),
+        piiContext,
+        defaultConfig,
+        secretsContext,
+      ),
+    );
+    const events = parseDataEvents(result);
+
+    expect(events.map((event) => [event.type, event.index])).toEqual([
+      ["content_block_delta", 1],
+      ["content_block_delta", 2],
+      ["content_block_delta", 0],
+      ["content_block_delta", 1],
+      ["content_block_stop", 1],
+      ["content_block_delta", 2],
+      ["content_block_stop", 2],
+    ]);
+    expect(JSON.parse(concatenateToolJson(result, 1))).toEqual({ owner: "Alice" });
+    expect(JSON.parse(concatenateToolJson(result, 2))).toEqual({ key: "sk-test" });
+    expect(events[0].trace).toBe("first");
+    expect(events[0].delta?.ordinal).toBe(1);
+    expect(events[3].trace).toBe("third");
+    expect(events[4].stop_metadata).toBe("one");
+    expect(events[6].stop_metadata).toBe("two");
+    expect(events[2].delta?.text).toBe("Visible Alice");
+    expect(
+      result
+        .split("\n")
+        .filter((line) => line.startsWith("event: "))
+        .map((line) => line.slice(7)),
+    ).toEqual(events.map((event) => event.type));
+  });
+
+  test("preserves interleaved frame identity while restoring independent tool blocks", async () => {
+    const piiContext = createMaskingContext();
+    piiContext.mapping["[[PERSON_1]]"] = "Alice";
+    const secretsContext = createMaskingContext();
+    secretsContext.mapping["[[SECRET_API_KEY_1]]"] = "sk-test";
+    const first =
+      'event: content_block_delta\r\ndata: { "type" : "content_block_delta", "index" : 11, "trace" : "first", "delta" : { "type" : "input_json_delta", "partial_json" : "{\\"owner\\":\\"[[PERSON_1]]\\"}", "ordinal" : 1 } }\r\n\r\n';
+    const second =
+      'event: content_block_delta\r\ndata: { "type" : "content_block_delta", "index" : 12, "trace" : "second", "delta" : { "type" : "input_json_delta", "partial_json" : "{\\"key\\":\\"[[SECRET_API_KEY_1]]\\"}", "ordinal" : 2 } }\r\n\r\n';
+    const firstStop = createBlockStop(11, { trace: "first-stop" });
+    const secondStop = createBlockStop(12, { trace: "second-stop" });
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(
+        createSSEStream([first, second, firstStop, secondStop]),
+        piiContext,
+        defaultConfig,
+        secretsContext,
+      ),
+    );
+
+    expect(result).toBe(
+      first.replace("[[PERSON_1]]", "Alice") +
+        second.replace("[[SECRET_API_KEY_1]]", "sk-test") +
+        firstStop +
+        secondStop,
+    );
+  });
+
+  test("preserves event and delta metadata bytes when tool JSON changes", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Alice";
+    const delta =
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":13,"big":9007199254740993,"fixed":1.0,"unicode":"\\u2603","delta":{"type":"input_json_delta","partial_json":"{\\"name\\":\\"[[PERSON_1]]\\"}","exp":1e+3},"tail":true}\n\n';
+    const stop = createBlockStop(13, { stable: "metadata" });
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(createSSEStream([delta, stop]), context, defaultConfig),
+    );
+
+    expect(result).toBe(delta.replace("[[PERSON_1]]", "Alice") + stop);
+  });
+
+  test("serializes restored PII and secrets with markers as valid JSON", async () => {
+    const piiContext = createMaskingContext();
+    piiContext.mapping["[[PERSON_1]]"] =
+      'Quote " slash \\ line\n tab\t nul\u0000 snowman ☃ [[prefix';
+    const secretsContext = createMaskingContext();
+    secretsContext.mapping["[[SECRET_API_KEY_1]]"] = "secret\r\b\fvalue";
+
+    const source = createSSEStream([
+      createInputJsonDelta('{"person":"[[PERSON_', 4),
+      createInputJsonDelta('1]]","secret":"[[SECRET_API_', 4),
+      createInputJsonDelta('KEY_1]]"}', 4),
+      createBlockStop(4),
+    ]);
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(source, piiContext, markerConfig, secretsContext),
+    );
+
+    expect(JSON.parse(concatenateToolJson(result, 4))).toEqual({
+      person: '[protected]Quote " slash \\ line\n tab\t nul\u0000 snowman ☃ [[prefix',
+      secret: "[protected]secret\r\b\fvalue",
+    });
+  });
+
+  test("applies PII then secrets inside tool JSON like non-stream restoration", async () => {
+    const piiContext = createMaskingContext();
+    piiContext.mapping["[[PERSON_1]]"] = "Alice [[SECRET_API_KEY_1]]";
+    const secretsContext = createMaskingContext();
+    secretsContext.mapping["[[SECRET_API_KEY_1]]"] = "sk-test";
+    const source = createSSEStream([
+      createInputJsonDelta('{"value":"[[PERSON_1]]"}', 14),
+      createBlockStop(14),
+    ]);
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(source, piiContext, defaultConfig, secretsContext),
+    );
+
+    expect(JSON.parse(concatenateToolJson(result, 14))).toEqual({
+      value: "Alice sk-test",
+    });
+  });
+
+  test("restores complete tool JSON on clean stream end without a stop event", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Alice";
+    const finalEvent = createInputJsonDelta('{"name":"[[PERSON_1]]"}', 7).trimEnd();
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(createSSEStream([finalEvent]), context, defaultConfig),
+    );
+
+    expect(JSON.parse(concatenateToolJson(result, 7))).toEqual({ name: "Alice" });
+  });
+
+  test("passes through malformed accumulated tool JSON unchanged on stop and end", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[PERSON_1]]"] = "Alice";
+    const stopped = createInputJsonDelta('{"name":"[[PERSON_1]]"', 5);
+    const stop = createBlockStop(5);
+    const ended = createInputJsonDelta('{"other":"[[PERSON_1]]"', 6).trimEnd();
+    const sourceText = stopped + stop + ended;
+
+    const result = await consumeStream(
+      createAnthropicUnmaskingStream(createSSEStream([sourceText]), context, defaultConfig),
+    );
+
+    expect(result).toBe(sourceText);
   });
 
   test("handles message_delta events", async () => {

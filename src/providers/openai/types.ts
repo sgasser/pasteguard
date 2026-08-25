@@ -56,7 +56,9 @@ export const OpenAIResponseSchema = z.object({
     z.object({
       index: z.number(),
       message: OpenAIMessageSchema.passthrough(),
-      finish_reason: z.enum(["stop", "length", "content_filter"]).nullable(),
+      finish_reason: z
+        .enum(["stop", "length", "content_filter", "tool_calls", "function_call"])
+        .nullable(),
     }),
   ),
   usage: z
