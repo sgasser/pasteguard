@@ -6,7 +6,7 @@ import { getConfig, type MaskingConfig } from "../config";
 import { formatMaskedRequestForLog } from "../logging/log-content";
 import { logRequest } from "../logging/logger";
 import type { PlaceholderContext } from "../masking/context";
-import { openaiExtractor, remaskOpenAIToolCallArguments } from "../masking/extractors/openai";
+import { openaiExtractor } from "../masking/extractors/openai";
 import { restoreResponse } from "../masking/restorer";
 import type { PIIDetectResult } from "../pii/request";
 import {
@@ -78,35 +78,37 @@ openaiRoutes.post(
       throw new Error("PII detection result missing from privacy pipeline");
     }
 
+    if (config.mode === "mask") {
+      return sendToOpenAI(c, request, {
+        request: privacy.request,
+        piiResult,
+        piiMaskingContext: privacy.piiMaskingContext,
+        secretsResult,
+        startTime,
+        clientHeaders: c.req.header(),
+      });
+    }
+
     // Route mode: send to local if PII/secrets detected, otherwise OpenAI
     const shouldRouteLocal =
-      config.mode === "route" &&
-      (piiResult.hasPII ||
-        (secretsResult.detection?.detected && config.secrets_detection.action === "route_local"));
+      piiResult.hasPII ||
+      (secretsResult.detection?.detected && config.secrets_detection.action === "route_local");
 
     if (shouldRouteLocal) {
-      const localRequest = remaskOpenAIToolCallArguments(privacy.requestAfterSecrets, [
-        secretsResult.maskingContext,
-      ]);
       return sendToLocal(c, request, {
-        request: localRequest,
+        request: privacy.requestAfterSecrets,
         piiResult,
         secretsResult,
         startTime,
       });
     }
 
-    const upstreamRequest = remaskOpenAIToolCallArguments(
-      config.mode === "mask" ? privacy.request : privacy.requestAfterSecrets,
-      [secretsResult.maskingContext, privacy.piiMaskingContext],
-    );
     return sendToOpenAI(c, request, {
-      request: upstreamRequest,
+      request: privacy.requestAfterSecrets,
       piiResult,
-      piiMaskingContext: privacy.piiMaskingContext,
       secretsResult,
       startTime,
-      authHeader: c.req.header("Authorization"),
+      clientHeaders: c.req.header(),
     });
   },
 );
@@ -187,7 +189,7 @@ interface OpenAIOptions {
   piiMaskingContext?: PlaceholderContext;
   secretsResult: SecretsProcessResult<OpenAIRequest>;
   startTime: number;
-  authHeader?: string;
+  clientHeaders?: Record<string, string>;
 }
 
 interface LocalOptions {
@@ -264,7 +266,7 @@ function respondDetectionError(c: Context, body: OpenAIRequest, startTime: numbe
 
 async function sendToOpenAI(c: Context, originalRequest: OpenAIRequest, opts: OpenAIOptions) {
   const config = getConfig();
-  const { request, piiResult, piiMaskingContext, secretsResult, startTime, authHeader } = opts;
+  const { request, piiResult, piiMaskingContext, secretsResult, startTime, clientHeaders } = opts;
 
   const maskedContent =
     piiResult.hasPII || secretsResult.masked ? formatRequestForLog(request) : undefined;
@@ -278,7 +280,7 @@ async function sendToOpenAI(c: Context, originalRequest: OpenAIRequest, opts: Op
   );
 
   try {
-    const result = await callOpenAI(request, config.providers.openai, authHeader);
+    const result = await callOpenAI(request, config.providers.openai, clientHeaders);
 
     logRequest(
       createLogData({

@@ -26,10 +26,48 @@ export type ProviderResult =
 /**
  * Call OpenAI chat completion API
  */
+const FORWARDED_HEADERS = new Set([
+  "accept",
+  "api-key",
+  "authorization",
+  "http-referer",
+  "idempotency-key",
+  "openai-beta",
+  "openai-organization",
+  "x-opencode-session",
+  "x-title",
+]);
+
+const FORWARDED_HEADER_PREFIXES = ["x-stainless-", "x-codex-"];
+
+function buildUpstreamHeaders(
+  clientHeaders: Record<string, string>,
+  providerApiKey: string | undefined,
+): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  let hasClientAuth = false;
+
+  for (const [name, value] of Object.entries(clientHeaders)) {
+    const lower = name.toLowerCase();
+    if (FORWARDED_HEADERS.has(lower) || FORWARDED_HEADER_PREFIXES.some((p) => lower.startsWith(p))) {
+      headers[name] = value;
+      if (lower === "authorization") hasClientAuth = true;
+    }
+  }
+
+  if (!hasClientAuth && providerApiKey) {
+    headers.Authorization = `Bearer ${providerApiKey}`;
+  }
+  return headers;
+}
+
+/**
+ * Call OpenAI chat completion API
+ */
 export async function callOpenAI(
   request: OpenAIRequest,
   config: OpenAIProviderConfig,
-  authHeader?: string,
+  clientHeaders?: Record<string, string>,
 ): Promise<ProviderResult> {
   const model = request.model;
   const isStreaming = request.stream ?? false;
@@ -41,16 +79,7 @@ export async function callOpenAI(
   const baseUrl = config.base_url.replace(/\/$/, "");
   const endpoint = `${baseUrl}/chat/completions`;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  // Use client's auth header if provided, otherwise fall back to config
-  if (authHeader) {
-    headers.Authorization = authHeader;
-  } else if (config.api_key) {
-    headers.Authorization = `Bearer ${config.api_key}`;
-  }
+  const headers = buildUpstreamHeaders(clientHeaders ?? {}, config.api_key);
 
   // Build request body
   const body: Record<string, unknown> = {
