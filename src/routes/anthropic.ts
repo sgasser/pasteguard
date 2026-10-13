@@ -20,6 +20,7 @@ import {
   AnthropicRequestSchema,
   type AnthropicResponse,
 } from "../providers/anthropic/types";
+import { forwardClientHeaders } from "../providers/forwarded-headers";
 import { callLocalAnthropic } from "../providers/local";
 import type { SecretsProcessResult } from "../secrets/request";
 import {
@@ -158,14 +159,16 @@ anthropicRoutes.all("/*", async (c) => {
   const baseUrl = config.providers.anthropic.base_url || "https://api.anthropic.com";
   const path = c.req.path.replace(/^\/anthropic/, "");
   const query = c.req.url.includes("?") ? c.req.url.slice(c.req.url.indexOf("?")) : "";
+  const headers = forwardClientHeaders(c.req.header());
+  const originalHost = c.req.header("host");
+  headers.delete("X-Forwarded-Host");
+  if (originalHost) {
+    headers.set("X-Forwarded-Host", originalHost);
+  }
 
   return proxy(`${baseUrl}${path}${query}`, {
     ...c.req,
-    headers: {
-      ...c.req.header(),
-      "X-Forwarded-Host": c.req.header("host"),
-      host: undefined,
-    },
+    headers,
   });
 });
 
@@ -326,14 +329,8 @@ async function sendToAnthropic(c: Context, request: AnthropicRequest, opts: Send
     toSecretsHeaderData(secretsResult),
   );
 
-  const clientHeaders = {
-    apiKey: c.req.header("x-api-key"),
-    authorization: c.req.header("Authorization"),
-    beta: c.req.header("anthropic-beta"),
-  };
-
   try {
-    const result = await callAnthropic(request, config.providers.anthropic!, clientHeaders);
+    const result = await callAnthropic(request, config.providers.anthropic!, c.req.header());
 
     logRequest(
       createLogData({

@@ -21,6 +21,7 @@ import {
 } from "../privacy/pipeline";
 import { createResponsesUnmaskingStream } from "../protocols/responses/stream-transformer";
 import { ProviderError } from "../providers/errors";
+import { buildUpstreamHeaders } from "../providers/forwarded-headers";
 import type { SecretsProcessResult } from "../secrets/request";
 import {
   createLogData,
@@ -53,28 +54,6 @@ const OpenAIResponsesRequestSchema = z
       });
     }
   });
-
-const FORWARDED_HEADERS = new Set([
-  "accept",
-  "anthropic-beta",
-  "api-key",
-  "authorization",
-  "http-referer",
-  "idempotency-key",
-  "openai-beta",
-  "openai-organization",
-  "openai-project",
-  "traceparent",
-  "tracestate",
-  "user-agent",
-  "x-anthropic-beta",
-  "x-api-key",
-  "x-client-request-id",
-  "x-request-id",
-  "x-title",
-]);
-
-const FORWARDED_HEADER_PREFIXES = ["x-openai-", "x-openrouter-", "x-stainless-"];
 
 export const openaiResponsesRoutes = new Hono();
 
@@ -250,7 +229,7 @@ async function callOpenAIResponses(
   const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
   const response = await fetch(`${provider.base_url.replace(/\/$/, "")}/responses${query}`, {
     method: "POST",
-    headers: buildUpstreamHeaders(clientHeaders, provider),
+    headers: buildUpstreamHeaders(clientHeaders, provider.api_key),
     body: JSON.stringify(request),
     signal,
   });
@@ -259,33 +238,6 @@ async function callOpenAIResponses(
     throw new ProviderError(response.status, response.statusText, await response.text());
   }
   return response;
-}
-
-function buildUpstreamHeaders(
-  clientHeaders: Record<string, string>,
-  provider: OpenAIProviderConfig,
-): Record<string, string> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  let hasClientAuth = false;
-
-  for (const [name, value] of Object.entries(clientHeaders)) {
-    const lower = name.toLowerCase();
-    if (
-      !FORWARDED_HEADERS.has(lower) &&
-      !FORWARDED_HEADER_PREFIXES.some((prefix) => lower.startsWith(prefix))
-    ) {
-      continue;
-    }
-    headers[name] = value;
-    if (lower === "authorization" || lower === "api-key" || lower === "x-api-key") {
-      hasClientAuth = true;
-    }
-  }
-
-  if (!hasClientAuth && provider.api_key) {
-    headers.Authorization = `Bearer ${provider.api_key}`;
-  }
-  return headers;
 }
 
 function remaskKnownValues(

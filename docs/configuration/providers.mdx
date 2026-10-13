@@ -19,7 +19,7 @@ providers:
 | Option | Description |
 |--------|-------------|
 | `base_url` | API endpoint (any OpenAI-compatible URL) |
-| `api_key` | Optional. Used if client doesn't send Authorization header |
+| `api_key` | Optional fallback Bearer token |
 
 ### Compatible APIs
 
@@ -72,7 +72,7 @@ providers:
 | Option | Description |
 |--------|-------------|
 | `base_url` | Anthropic API endpoint |
-| `api_key` | Optional. Used if client doesn't send `x-api-key` header |
+| `api_key` | Optional fallback `x-api-key` |
 
 ## Codex CLI Backend
 
@@ -145,20 +145,14 @@ local:
   api_key: ${LOCAL_API_KEY}  # if required
 ```
 
+## Client Headers
+
+OpenAI, Anthropic, and Codex exclude `x-pasteguard-*`, Open WebUI identity headers (`x-openwebui-user-*`, `x-openwebui-chat-id`), and original host/connection headers. Other headers pass through unmasked.
+
+JSON calls rebuild body headers; passthrough preserves content type, encoding, and length.
+
 ## API Key Handling
 
-PasteGuard forwards your client's authentication headers to the configured upstream. You can optionally set `api_key` in config as a fallback for OpenAI and Anthropic. Codex CLI traffic uses the CLI's ChatGPT-login authorization header:
+Client auth takes priority. Configured keys are fallbacks for protected OpenAI/Anthropic calls. Local reroutes use local credentials.
 
-```yaml
-providers:
-  openai:
-    base_url: https://api.openai.com/v1
-    api_key: ${OPENAI_API_KEY}  # Used if client doesn't send auth
-
-  anthropic:
-    base_url: https://api.anthropic.com
-    api_key: ${ANTHROPIC_API_KEY}  # Used if client doesn't send x-api-key
-
-  codex:
-    base_url: https://chatgpt.com/backend-api/codex
-```
+Anthropic supplies `anthropic-version: 2023-06-01` only when absent.

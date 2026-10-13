@@ -4,6 +4,7 @@
 
 import { getConfig, type OpenAIProviderConfig } from "../../config";
 import { ProviderError } from "../errors";
+import { buildUpstreamHeaders } from "../forwarded-headers";
 import type { OpenAIRequest, OpenAIResponse } from "./types";
 
 export { ProviderError } from "../errors";
@@ -29,7 +30,7 @@ export type ProviderResult =
 export async function callOpenAI(
   request: OpenAIRequest,
   config: OpenAIProviderConfig,
-  authHeader?: string,
+  clientHeaders: Record<string, string> = {},
 ): Promise<ProviderResult> {
   const model = request.model;
   const isStreaming = request.stream ?? false;
@@ -40,17 +41,6 @@ export async function callOpenAI(
 
   const baseUrl = config.base_url.replace(/\/$/, "");
   const endpoint = `${baseUrl}/chat/completions`;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  // Use client's auth header if provided, otherwise fall back to config
-  if (authHeader) {
-    headers.Authorization = authHeader;
-  } else if (config.api_key) {
-    headers.Authorization = `Bearer ${config.api_key}`;
-  }
 
   // Build request body
   const body: Record<string, unknown> = {
@@ -68,7 +58,7 @@ export async function callOpenAI(
   const timeoutMs = getConfig().server.request_timeout * 1000;
   const response = await fetch(endpoint, {
     method: "POST",
-    headers,
+    headers: buildUpstreamHeaders(clientHeaders, config.api_key),
     body: JSON.stringify(body),
     signal: timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined,
   });

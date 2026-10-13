@@ -35,6 +35,7 @@ app.route("/anthropic", anthropicRoutes);
 const originalFetch = globalThis.fetch;
 const config = getConfig();
 const originalMode = config.mode;
+const originalAPIKey = config.providers.anthropic.api_key;
 const originalLocal = config.local ? { ...config.local } : undefined;
 const originalPiiScanRoles = [...config.pii_detection.scan_roles];
 const originalSecretsEnabled = config.secrets_detection.enabled;
@@ -44,6 +45,7 @@ const originalSecretsScanRoles = [...config.secrets_detection.scan_roles];
 afterEach(() => {
   globalThis.fetch = originalFetch;
   config.mode = originalMode;
+  config.providers.anthropic.api_key = originalAPIKey;
   if (originalLocal) config.local = { ...originalLocal };
   else delete config.local;
   config.pii_detection.scan_roles = [...originalPiiScanRoles];
@@ -56,6 +58,67 @@ afterEach(() => {
 });
 
 describe("POST /anthropic/v1/messages", () => {
+  test("forwards client headers except internal and transport headers", async () => {
+    config.mode = "mask";
+    config.providers.anthropic.api_key = "configured-key";
+    const forwardedHeaders = {
+      "Anthropic-Beta": "prompt-caching-2024-07-31",
+      "X-New-Provider-Feature": "future-value",
+      "X-Stainless-Runtime": "bun",
+      Cookie: "provider-session=value",
+    };
+    const rejectedHeaders = {
+      Host: "proxy.example",
+      Connection: "keep-alive, X-Hop-Token",
+      "Keep-Alive": "timeout=5",
+      "Content-Encoding": "gzip",
+      "Content-Length": "999",
+      "Proxy-Authorization": "Bearer proxy-token",
+      "X-Hop-Token": "connection-only",
+      "X-PasteGuard-Source": "client",
+      "X-PasteGuard-Future": "internal",
+      "X-OpenWebUI-User-Email": "identity@example.com",
+      "X-OpenWebUI-Chat-Id": "chat-123",
+    };
+    let upstreamHeaders = new Headers();
+    globalThis.fetch = (async (_target: string | URL | Request, init?: RequestInit) => {
+      upstreamHeaders = new Headers(init?.headers);
+      return Response.json({ content: [], model: "claude-test" });
+    }) as typeof fetch;
+
+    for (const clientVersion of [undefined, "2025-01-01"]) {
+      const response = await app.request("/anthropic/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          ...(clientVersion
+            ? { "Anthropic-Version": clientVersion, "X-Api-Key": "client-key" }
+            : {}),
+          ...forwardedHeaders,
+          ...rejectedHeaders,
+        },
+        body: JSON.stringify({
+          model: "claude-test",
+          max_tokens: 128,
+          messages: [{ role: "user", content: "Reply ok" }],
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(upstreamHeaders.get("anthropic-version")).toBe(clientVersion ?? "2023-06-01");
+      expect(upstreamHeaders.get("x-api-key")).toBe(
+        clientVersion ? "client-key" : "configured-key",
+      );
+      expect(upstreamHeaders.get("content-type")).toBe("application/json");
+      for (const [name, value] of Object.entries(forwardedHeaders)) {
+        expect(upstreamHeaders.get(name)).toBe(value);
+      }
+      for (const name of Object.keys(rejectedHeaders)) {
+        expect(upstreamHeaders.get(name)).toBeNull();
+      }
+    }
+  });
+
   test("isolates local credentials and remasks restored tool-history secrets while keeping PII clear", async () => {
     config.mode = "route";
     config.secrets_detection.enabled = true;

@@ -14,6 +14,7 @@ import {
   type PrivacyPipelineResult,
   processPrivacyPipeline,
 } from "../privacy/pipeline";
+import { forwardClientHeaders } from "../providers/forwarded-headers";
 import { callLocal } from "../providers/local";
 import { callOpenAI, getOpenAIInfo, type ProviderResult } from "../providers/openai/client";
 import { createUnmaskingStream } from "../providers/openai/stream-transformer";
@@ -106,7 +107,7 @@ openaiRoutes.post(
       piiMaskingContext: privacy.piiMaskingContext,
       secretsResult,
       startTime,
-      authHeader: c.req.header("Authorization"),
+      clientHeaders: c.req.header(),
     });
   },
 );
@@ -130,14 +131,14 @@ openaiRoutes.all("/*", (c) => {
   const { baseUrl } = getOpenAIInfo(config.providers.openai);
   const path = c.req.path.replace(/^\/openai\/v1/, "");
   const query = c.req.url.includes("?") ? c.req.url.slice(c.req.url.indexOf("?")) : "";
+  const headers = forwardClientHeaders(c.req.header());
+  const host = c.req.header("host");
+  headers.delete("X-Forwarded-Host");
+  if (host) headers.set("X-Forwarded-Host", host);
 
   return proxy(`${baseUrl}${path}${query}`, {
     ...c.req,
-    headers: {
-      ...c.req.header(),
-      "X-Forwarded-Host": c.req.header("host"),
-      host: undefined,
-    },
+    headers,
   });
 });
 
@@ -187,7 +188,7 @@ interface OpenAIOptions {
   piiMaskingContext?: PlaceholderContext;
   secretsResult: SecretsProcessResult<OpenAIRequest>;
   startTime: number;
-  authHeader?: string;
+  clientHeaders?: Record<string, string>;
 }
 
 interface LocalOptions {
@@ -264,7 +265,7 @@ function respondDetectionError(c: Context, body: OpenAIRequest, startTime: numbe
 
 async function sendToOpenAI(c: Context, originalRequest: OpenAIRequest, opts: OpenAIOptions) {
   const config = getConfig();
-  const { request, piiResult, piiMaskingContext, secretsResult, startTime, authHeader } = opts;
+  const { request, piiResult, piiMaskingContext, secretsResult, startTime, clientHeaders } = opts;
 
   const maskedContent =
     piiResult.hasPII || secretsResult.masked ? formatRequestForLog(request) : undefined;
@@ -278,7 +279,7 @@ async function sendToOpenAI(c: Context, originalRequest: OpenAIRequest, opts: Op
   );
 
   try {
-    const result = await callOpenAI(request, config.providers.openai, authHeader);
+    const result = await callOpenAI(request, config.providers.openai, clientHeaders);
 
     logRequest(
       createLogData({

@@ -99,6 +99,53 @@ describe("Codex proxy", () => {
     expect(mockLogRequest).toHaveBeenCalled();
   });
 
+  test("forwards client headers without PasteGuard or transport headers on protected responses", async () => {
+    let upstreamHeaders = new Headers();
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      upstreamHeaders = new Headers(init?.headers);
+      return Response.json({ output: [] });
+    }) as typeof fetch;
+
+    const res = await app.request("/codex/responses", {
+      method: "POST",
+      body: JSON.stringify({ model: "gpt-5.5", input: "Reply ok" }),
+      headers: {
+        Authorization: "Bearer chatgpt-token",
+        "X-Future-Provider-Feature": "enabled",
+        "X-PasteGuard-Internal": "private",
+        "X-OpenWebUI-User-Email": "identity@example.com",
+        "X-OpenWebUI-Chat-Id": "chat-123",
+        Host: "pasteguard.example",
+        "X-Forwarded-Host": "client-supplied.example",
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Encoding": "gzip",
+        "Content-Length": "999",
+        Connection: "keep-alive, X-Client-Connection",
+        "Keep-Alive": "timeout=5",
+        "X-Client-Connection": "private",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(upstreamHeaders.get("authorization")).toBe("Bearer chatgpt-token");
+    expect(upstreamHeaders.get("x-future-provider-feature")).toBe("enabled");
+    expect(upstreamHeaders.get("x-forwarded-host")).toBe("pasteguard.example");
+    expect(upstreamHeaders.get("content-type")).toBe("application/json");
+    for (const name of [
+      "x-pasteguard-internal",
+      "x-openwebui-user-email",
+      "x-openwebui-chat-id",
+      "host",
+      "content-length",
+      "content-encoding",
+      "connection",
+      "keep-alive",
+      "x-client-connection",
+    ]) {
+      expect(upstreamHeaders.has(name)).toBe(false);
+    }
+  });
+
   test("masks PII in POST /codex/responses and logs it for the dashboard", async () => {
     mockAnalyzeRequest.mockResolvedValueOnce({
       hasPII: true,
@@ -454,6 +501,12 @@ describe("Codex proxy", () => {
     const res = await app.request("/codex/models?client_version=0.128.0", {
       headers: {
         Authorization: "Bearer chatgpt-token",
+        "X-Future-Provider-Feature": "enabled",
+        "X-PasteGuard-Internal": "private",
+        Host: "pasteguard.example",
+        "X-Forwarded-Host": "client-supplied.example",
+        Connection: "X-Client-Connection",
+        "X-Client-Connection": "private",
       },
     });
 
@@ -461,5 +514,12 @@ describe("Codex proxy", () => {
     expect(calls[0].url).toBe(
       `${getConfig().providers.codex.base_url.replace(/\/$/, "")}/models?client_version=0.128.0`,
     );
+    expect(calls[0].headers.get("authorization")).toBe("Bearer chatgpt-token");
+    expect(calls[0].headers.get("x-future-provider-feature")).toBe("enabled");
+    expect(calls[0].headers.get("x-forwarded-host")).toBe("pasteguard.example");
+    expect(calls[0].headers.has("x-pasteguard-internal")).toBe(false);
+    expect(calls[0].headers.has("host")).toBe(false);
+    expect(calls[0].headers.has("connection")).toBe(false);
+    expect(calls[0].headers.has("x-client-connection")).toBe(false);
   });
 });

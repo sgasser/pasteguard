@@ -11,7 +11,7 @@ POST /openai/v1/responses
 ```
 
 <Note>
-These endpoints receive PII detection and masking. Other OpenAI endpoints (`/models`, `/embeddings`, `/files`, etc.) are proxied directly without modification.
+These endpoints receive PII detection and masking. Other OpenAI endpoints (`/models`, `/embeddings`, `/files`, etc.) pass their request bodies through unchanged.
 </Note>
 
 ## Chat Completions request

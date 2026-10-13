@@ -7,6 +7,7 @@ import { getConfig, type LocalProviderConfig } from "../config";
 import { HEALTH_CHECK_TIMEOUT_MS } from "../constants/timeouts";
 import type { AnthropicResult } from "./anthropic/client";
 import type { AnthropicRequest, AnthropicResponse } from "./anthropic/types";
+import { buildUpstreamHeaders } from "./forwarded-headers";
 import { ProviderError, type ProviderResult } from "./openai/client";
 import type { OpenAIRequest } from "./openai/types";
 
@@ -21,17 +22,12 @@ export async function callLocal(
   const endpoint =
     config.type === "ollama" ? `${baseUrl}/v1/chat/completions` : `${baseUrl}/chat/completions`;
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (config.api_key) {
-    headers.Authorization = `Bearer ${config.api_key}`;
-  }
-
   const isStreaming = request.stream ?? false;
   const timeoutMs = getConfig().server.request_timeout * 1000;
 
   const response = await fetch(endpoint, {
     method: "POST",
-    headers,
+    headers: buildUpstreamHeaders({}, config.api_key),
     body: JSON.stringify({ ...request, model: config.model, stream: isStreaming }),
     signal: timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined,
   });
@@ -63,19 +59,12 @@ export async function callLocalAnthropic(
   // Ollama's Anthropic-compatible endpoint
   const endpoint = `${baseUrl}/v1/messages`;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (config.api_key) {
-    headers.Authorization = `Bearer ${config.api_key}`;
-  }
-
   const isStreaming = request.stream ?? false;
   const timeoutMs = getConfig().server.request_timeout * 1000;
 
   const response = await fetch(endpoint, {
     method: "POST",
-    headers,
+    headers: buildUpstreamHeaders({}, config.api_key),
     body: JSON.stringify({ ...request, model: config.model, stream: isStreaming }),
     signal: timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined,
   });

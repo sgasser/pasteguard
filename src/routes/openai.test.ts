@@ -39,6 +39,7 @@ app.route("/openai", openaiRoutes);
 const originalFetch = globalThis.fetch;
 const config = getConfig();
 const originalMode = config.mode;
+const originalAPIKey = config.providers.openai.api_key;
 const originalLocal = config.local ? { ...config.local } : undefined;
 const originalSecretsDetection = {
   enabled: config.secrets_detection.enabled,
@@ -50,6 +51,7 @@ const originalSecretsDetection = {
 afterEach(() => {
   globalThis.fetch = originalFetch;
   config.mode = originalMode;
+  config.providers.openai.api_key = originalAPIKey;
   if (originalLocal) config.local = { ...originalLocal };
   else delete config.local;
   config.secrets_detection.enabled = originalSecretsDetection.enabled;
@@ -62,6 +64,85 @@ afterEach(() => {
 });
 
 describe("POST /openai/v1/chat/completions", () => {
+  test.each([
+    "mask",
+    "route",
+  ] as const)("forwards client headers except internal and transport headers in %s mode", async (mode) => {
+    config.mode = mode;
+    config.providers.openai.api_key = "configured-key";
+    const forwardedHeaders = {
+      Accept: "application/json",
+      "OpenAI-Organization": "org-test",
+      "OpenAI-Project": "proj-test",
+      "HTTP-Referer": "https://client.example",
+      "X-Opencode-Session": "session-123",
+      "X-OpenRouter-Title": "Test client",
+      "X-Stainless-Runtime": "bun",
+      "X-New-Provider-Feature": "future-value",
+      "X-OpenWebUI-Feature": "enabled",
+      "X-Forwarded-For": "192.0.2.1",
+      Cookie: "provider-session=value",
+    };
+    const rejectedHeaders = {
+      Host: "proxy.example",
+      Connection: "keep-alive, X-Hop-Token",
+      "Keep-Alive": "timeout=5",
+      "Content-Encoding": "gzip",
+      "Content-Length": "999",
+      "Proxy-Authenticate": "Basic realm=proxy",
+      "Proxy-Authorization": "Bearer proxy-token",
+      TE: "trailers",
+      Trailer: "X-Trailer",
+      "Transfer-Encoding": "chunked",
+      Upgrade: "websocket",
+      "X-Hop-Token": "connection-only",
+      "X-PasteGuard-Source": "client",
+      "X-PasteGuard-Future": "internal",
+      "X-OpenWebUI-User-Email": "identity@example.com",
+      "X-OpenWebUI-User-Name": "Synthetic User",
+      "X-OpenWebUI-User-Id": "user-123",
+      "X-OpenWebUI-Chat-Id": "chat-123",
+      "X-OpenWebUI-User-Future": "private",
+    };
+    let upstream: Request | undefined;
+    globalThis.fetch = (async (target: string | URL | Request, init?: RequestInit) => {
+      upstream = target instanceof Request ? target : new Request(target, init);
+      return Response.json({ choices: [], output: [] });
+    }) as typeof fetch;
+
+    for (const endpoint of ["chat/completions", "responses"]) {
+      for (const authorization of [undefined, "Bearer client-token"]) {
+        const response = await app.request(`/openai/v1/${endpoint}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            ...(authorization ? { Authorization: authorization } : {}),
+            ...forwardedHeaders,
+            ...rejectedHeaders,
+          },
+          body: JSON.stringify({
+            model: "gpt-test",
+            messages: [{ role: "user", content: "Reply ok" }],
+            input: "Reply ok",
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        expect(upstream?.url).toBe(`${config.providers.openai.base_url}/${endpoint}`);
+        expect(upstream?.headers.get("authorization")).toBe(
+          authorization ?? "Bearer configured-key",
+        );
+        expect(upstream?.headers.get("content-type")).toBe("application/json");
+        for (const [name, value] of Object.entries(forwardedHeaders)) {
+          expect(upstream?.headers.get(name)).toBe(value);
+        }
+        for (const name of Object.keys(rejectedHeaders)) {
+          expect(upstream?.headers.get(name)).toBeNull();
+        }
+      }
+    }
+  });
+
   test("returns 400 for missing messages", async () => {
     const res = await app.request("/openai/v1/chat/completions", {
       method: "POST",
@@ -333,6 +414,7 @@ describe("POST /openai/v1/chat/completions", () => {
       type: "openai",
       base_url: "http://local.test/v1",
       model: "local-model",
+      api_key: "local-provider-token",
     };
     config.secrets_detection.enabled = true;
     config.secrets_detection.action = "mask";
@@ -368,9 +450,11 @@ describe("POST /openai/v1/chat/completions", () => {
 
     let upstreamUrl: string | undefined;
     let upstreamBody: Record<string, unknown> | undefined;
+    let upstreamHeaders = new Headers();
     globalThis.fetch = (async (target: string | URL | Request, init?: RequestInit) => {
       upstreamUrl = target instanceof Request ? target.url : String(target);
       upstreamBody = JSON.parse(String(init?.body));
+      upstreamHeaders = new Headers(init?.headers);
       return Response.json({
         id: "chatcmpl_local",
         object: "chat.completion",
@@ -400,7 +484,13 @@ describe("POST /openai/v1/chat/completions", () => {
     try {
       response = await app.request("/openai/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer cloud-token",
+          "X-Api-Key": "cloud-api-key",
+          Cookie: "cloud-session=value",
+          "X-New-Provider-Feature": "cloud-only",
+        },
         body: JSON.stringify({
           model: "gpt-test",
           messages: [
@@ -430,6 +520,10 @@ describe("POST /openai/v1/chat/completions", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("X-PasteGuard-Provider")).toBe("local");
     expect(upstreamUrl).toBe("http://local.test/v1/chat/completions");
+    expect(upstreamHeaders.get("authorization")).toBe("Bearer local-provider-token");
+    expect(upstreamHeaders.get("x-api-key")).toBeNull();
+    expect(upstreamHeaders.get("cookie")).toBeNull();
+    expect(upstreamHeaders.get("x-new-provider-feature")).toBeNull();
     const messages = upstreamBody?.messages as Array<Record<string, unknown>>;
     expect(messages[0].content).toBe(`Email ${email} Key [[API_KEY_SK_1]]`);
     expect(

@@ -21,6 +21,7 @@ import {
 } from "../privacy/pipeline";
 import { createResponsesUnmaskingStream } from "../protocols/responses/stream-transformer";
 import { ProviderError } from "../providers/errors";
+import { buildUpstreamHeaders, forwardClientHeaders } from "../providers/forwarded-headers";
 import type { SecretsProcessResult } from "../secrets/request";
 import {
   createLogData,
@@ -99,7 +100,7 @@ codexRoutes.post(
       piiMaskingContext: privacy.piiMaskingContext,
       secretsResult,
       startTime,
-      headers: getForwardHeaders(c),
+      headers: c.req.header(),
     });
   },
 );
@@ -109,14 +110,14 @@ codexRoutes.all("/*", (c) => {
   const normalizedBaseUrl = config.providers.codex.base_url.replace(/\/$/, "");
   const path = c.req.path.replace(/^\/codex/, "");
   const query = c.req.url.includes("?") ? c.req.url.slice(c.req.url.indexOf("?")) : "";
+  const headers = forwardClientHeaders(c.req.header());
+  const host = c.req.header("host");
+  headers.delete("X-Forwarded-Host");
+  if (host) headers.set("X-Forwarded-Host", host);
 
   return proxy(`${normalizedBaseUrl}${path}${query}`, {
     ...c.req,
-    headers: {
-      ...c.req.header(),
-      "X-Forwarded-Host": c.req.header("host"),
-      host: undefined,
-    },
+    headers,
   });
 });
 
@@ -127,13 +128,12 @@ async function callCodex(
 ): Promise<Response> {
   const endpoint = `${baseUrl.replace(/\/$/, "")}/responses`;
   const timeoutMs = getConfig().server.request_timeout * 1000;
+  const upstreamHeaders = buildUpstreamHeaders(headers);
+  upstreamHeaders.set("X-Forwarded-Host", headers.host || "");
 
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      ...headers,
-      "Content-Type": "application/json",
-    },
+    headers: upstreamHeaders,
     body: JSON.stringify(request),
     signal: timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined,
   });
@@ -152,17 +152,6 @@ interface CodexOptions {
   secretsResult: SecretsProcessResult<CodexResponsesRequest>;
   startTime: number;
   headers: Record<string, string>;
-}
-
-function getForwardHeaders(c: Context): Record<string, string> {
-  const headers: Record<string, string> = {};
-  for (const [key, value] of Object.entries(c.req.header())) {
-    const lower = key.toLowerCase();
-    if (lower === "host" || lower === "content-length" || lower === "content-type") continue;
-    headers[key] = value;
-  }
-  headers["X-Forwarded-Host"] = c.req.header("host") || "";
-  return headers;
 }
 
 function formatCodexForLog(request: CodexResponsesRequest): string | undefined {
