@@ -36,6 +36,31 @@ The first start loads the detection model and can take a little longer; the
 container reports healthy once both the proxy and the detector are ready.
 </Note>
 
+## Detector startup crash in 0.9.3
+
+The 0.9.3 image can terminate the detector with `SIGSEGV` while importing ONNX
+Runtime 1.29.0. Its telemetry initialization fails in the runtime image, which
+has no shell. The proxy then reports HTTP 503 from `/health`.
+
+For an existing 0.9.3 deployment, disable ONNX Runtime telemetry:
+
+```bash
+docker run --rm -p 3000:3000 -e ORT_DISABLE_TELEMETRY=1 \
+  ghcr.io/sgasser/pasteguard:0.9.3
+```
+
+With Docker Compose, add this to the `pasteguard` service and recreate the
+container with `docker compose up -d --force-recreate pasteguard`:
+
+```yaml
+environment:
+  ORT_DISABLE_TELEMETRY: "1"
+```
+
+Images built from the current Dockerfile set this automatically. GLiNER
+detection remains enabled. The build also checks real detector startup and
+inference in the offline runtime as the same nonroot user that runs the service.
+
 ## Production Setup
 
 For persistent logs and custom configuration:
@@ -87,6 +112,7 @@ default. Custom Hugging Face and local models are documented under
 | `DETECTOR_TIMEOUT` | `30` | Seconds to wait for each detector `/analyze` request when using the example config. Increase for very large messages; set to `0` to disable. |
 | `DETECTOR_BACKEND` | `gliner` | Semantic detector backend. GLiNER is currently the only supported value. |
 | `DETECTOR_MODEL` | `urchade/gliner_multi_pii-v1` | Hugging Face model ID or local model directory used by the detector. |
+| `ORT_DISABLE_TELEMETRY` | `1` (Docker) | Disables ONNX Runtime telemetry before import; required by ONNX Runtime 1.29.0 in the shell-free runtime. |
 | `PASTEGUARD_STARTUP_TIMEOUT` | `180` | Seconds to wait for the detector to become ready at startup |
 
 ## Next Steps
