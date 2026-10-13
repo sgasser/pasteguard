@@ -114,7 +114,11 @@ anthropicRoutes.post(
 
     if (shouldRouteToLocal) {
       return sendToLocal(c, request, {
-        request: privacy.requestAfterSecrets,
+        request: remaskAnthropicToolUseHistory(
+          privacy.requestAfterSecrets,
+          undefined,
+          secretsResult.maskingContext,
+        ),
         startTime,
         piiResult,
         secretsResult,
