@@ -87,6 +87,10 @@ ENV HF_HOME=/opt/models
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 ENV HOME=/home/nonroot
+# ONNX Runtime 1.29.0 (required by GLiNER 0.2.28 in 0.9.3) crashes during import
+# when telemetry is on and /bin/sh is absent. GLiNER 0.2.29 made ONNX Runtime
+# optional; keep telemetry off in case a dependency pulls it in again.
+ENV ORT_DISABLE_TELEMETRY=1
 
 EXPOSE 5002
 HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=5 \
