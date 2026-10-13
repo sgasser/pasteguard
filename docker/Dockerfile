@@ -97,6 +97,8 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=5 \
     CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5002/health').status==200 else 1)"]
 
 USER 65532
+# Exercise startup and inference in the offline, nonroot runtime, not the builder.
+RUN ["python", "-X", "faulthandler", "-m", "detector.smoke"]
 ENTRYPOINT []
 CMD ["uvicorn", "detector.app:app", "--host", "0.0.0.0", "--port", "5002"]
 
