@@ -15,7 +15,7 @@ dependencies = [
     "gliner>=0.2.27,<0.3",
     "huggingface-hub>=1,<2",
     "torch>=2.6",
-    "transformers>=5.6.2,<5.7",
+    "transformers[sentencepiece]>=5.6.2,<5.7",
     "python-stdnum>=1.20",
     "phonenumbers>=8.13",
 ]
