@@ -104,6 +104,23 @@ describe("POST /api/mask", () => {
     expect(body.entities).toEqual([]);
   });
 
+  test("preserves leading and trailing whitespace in masked text", async () => {
+    const text = "  John Smith lives in Berlin\n\n";
+    mockDetectPII.mockResolvedValueOnce([{ entity_type: "PERSON", start: 2, end: 12, score: 0.9 }]);
+
+    const res = await app.request("/api/mask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockDetectPII).toHaveBeenLastCalledWith(text);
+    const body = (await res.json()) as { masked: string; context: Record<string, string> };
+    expect(body.masked).toBe("  [[PERSON_1]] lives in Berlin\n\n");
+    expect(body.context["[[PERSON_1]]"]).toBe("John Smith");
+  });
+
   test("masks PII entities", async () => {
     mockDetectPII.mockResolvedValueOnce([
       { entity_type: "EMAIL_ADDRESS", start: 6, end: 22, score: 0.9 },

@@ -24,7 +24,8 @@ import { createLogData } from "./utils";
 
 // Request schema
 const MaskRequestSchema = z.object({
-  text: z.string().trim().min(1, "text is required"),
+  // Reject blank text without trimming it: clients align `masked` against the original input.
+  text: z.string().refine((text) => text.trim().length > 0, "text is required"),
   startFrom: z.record(z.string(), z.number()).optional(),
   detect: z.array(z.enum(["pii", "secrets"])).optional(),
 });
