@@ -129,7 +129,7 @@ Route Mode sends requests containing sensitive data to a local LLM such as Ollam
 
 ## What It Catches
 
-**Personal data**: Names, locations, emails, phone numbers, credit cards, IBANs, IP addresses, and EU VAT numbers. Detection is multilingual.
+**Personal data**: Names, locations, emails, phone numbers, credit cards, IBANs, IP addresses, EU VAT numbers, and Chinese Resident ID numbers. Detection is multilingual.
 
 **Secrets**: API keys for providers such as OpenAI, Anthropic, Stripe, AWS, and GitHub; SSH and PEM private keys; JWT tokens; bearer tokens; passwords; and connection strings.
 

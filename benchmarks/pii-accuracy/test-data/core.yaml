@@ -416,3 +416,25 @@ cases:
       - entity: VAT_CODE
         text: FR40303265045
         match: exact
+
+  - id: core_cn_resident_id
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "The passenger's Chinese ID card number is 360426199101010071."
+    expected:
+      - entity: CN_RESIDENT_ID
+        text: "360426199101010071"
+        match: exact
+
+  - id: core_cn_resident_id_luhn_valid
+    suite: core
+    category: core
+    split: test
+    language: en
+    text: "Resident ID 110105199001010256 was verified at check-in."
+    expected:
+      - entity: CN_RESIDENT_ID
+        text: "110105199001010256"
+        match: exact

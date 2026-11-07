@@ -14,9 +14,11 @@ import re
 import phonenumbers
 from stdnum import iban as _iban_lib
 from stdnum import luhn as _luhn
+from stdnum.cn import ric as _cn_ric
 from stdnum.eu import vat as _eu_vat
 
 from .entities import (
+    CN_RESIDENT_ID,
     CREDIT_CARD,
     EMAIL_ADDRESS,
     IBAN_CODE,
@@ -55,6 +57,9 @@ _VAT_RE = re.compile(
     r"(?<![A-Za-z0-9])(?=(?P<code>" + _VAT_CC + r")[ ]?(?P<body>[0-9A-Za-z]{8,12})(?![A-Za-z0-9]))",
     re.IGNORECASE,
 )
+# Chinese Resident ID: 17 digits + digit/X check character. ASCII-only boundaries
+# because CJK characters are `\w` and IDs often sit directly next to them.
+_CN_RIC_RE = re.compile(r"(?<![0-9A-Za-z])[0-9]{17}[0-9Xx](?![0-9A-Za-z])")
 
 
 def _email(text: str) -> list[Span]:
@@ -115,6 +120,15 @@ def _vat(text: str) -> list[Span]:
     return out
 
 
+def _cn_resident_id(text: str) -> list[Span]:
+    # stdnum checks the checksum, birth date, and birth-place code.
+    return [
+        Span(CN_RESIDENT_ID, m.start(), m.end(), 1.0)
+        for m in _CN_RIC_RE.finditer(text)
+        if _cn_ric.is_valid(m.group())
+    ]
+
+
 def _credit_card(text: str) -> list[Span]:
     out: list[Span] = []
     for m in _CC_RE.finditer(text):
@@ -156,7 +170,11 @@ def _phone(text: str, phone_regions: list[str] | None = None) -> list[Span]:
     return [s for i, s in enumerate(out) if not any(overlaps(s, prev) for prev in out[:i])]
 
 
-def detect_deterministic(text: str, phone_regions: list[str] | None = None) -> list[Span]:
+def detect_deterministic(
+    text: str,
+    phone_regions: list[str] | None = None,
+    entities: list[str] | None = None,
+) -> list[Span]:
     if not text:
         return []
 
@@ -166,8 +184,16 @@ def detect_deterministic(text: str, phone_regions: list[str] | None = None) -> l
     ordered += _ipv4(text)
     ordered += _iban(text)
     ordered += _vat(text)
+    # Before credit cards: about 1 in 10 valid IDs also passes Luhn.
+    ordered += _cn_resident_id(text)
     ordered += _credit_card(text)
     ordered += _phone(text, phone_regions)
+
+    # Filter before overlap resolution so a type the caller did not request
+    # cannot suppress a requested one (e.g. an ID that also passes Luhn).
+    if entities:
+        allow = set(entities)
+        ordered = [s for s in ordered if s.entity_type in allow]
 
     accepted: list[Span] = []
     for span in ordered:

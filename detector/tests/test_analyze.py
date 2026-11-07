@@ -92,6 +92,19 @@ def test_entity_filter(client):
     assert types == {"IBAN_CODE"}
 
 
+def test_cn_resident_id_label_follows_requested_entities(client):
+    # This valid ID also passes Luhn: configs without CN_RESIDENT_ID keep masking it.
+    text = "身份证110105199001010256。"
+    for entities, expected in [
+        (["CREDIT_CARD", "CN_RESIDENT_ID"], "CN_RESIDENT_ID"),
+        (["CREDIT_CARD"], "CREDIT_CARD"),
+    ]:
+        r = client.post("/analyze", json={"text": text, "entities": entities})
+        assert [(e["entity_type"], text[e["start"] : e["end"]]) for e in r.json()] == [
+            (expected, "110105199001010256")
+        ]
+
+
 def test_phone_regions_control_national_formats(client):
     text = "English ticket text with Indian callback 98765 43210."
     r = client.post(

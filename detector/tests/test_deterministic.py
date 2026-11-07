@@ -4,6 +4,7 @@ from itertools import pairwise
 
 from detector.deterministic import detect_deterministic
 from detector.entities import (
+    CN_RESIDENT_ID,
     CREDIT_CARD,
     EMAIL_ADDRESS,
     IBAN_CODE,
@@ -106,6 +107,45 @@ def test_vat_word_prefix_does_not_swallow_following_vat():
     # A lowercase word that is also a country code ("es", "it") must not hide the real VAT.
     for text in ["es DE136695976", "it DE136695976"]:
         assert (VAT_CODE, "DE136695976") in types_texts(text)
+
+
+# --- Chinese Resident ID (stdnum-validated) ---
+def test_cn_resident_id_next_to_cjk_text():
+    text = "张三的身份证号是360426199101010071请核对。"
+    assert types_texts(text) == [(CN_RESIDENT_ID, "360426199101010071")]
+
+
+def test_cn_resident_id_x_check_character():
+    assert (CN_RESIDENT_ID, "11010519900101007X") in types_texts("ID 11010519900101007X ok")
+    assert (CN_RESIDENT_ID, "11010519900101007x") in types_texts("id 11010519900101007x ok")
+
+
+def test_cn_resident_id_wins_over_luhn_valid_credit_card():
+    # This valid ID also passes Luhn; it must not be labeled CREDIT_CARD.
+    assert types_texts("身份证110105199001010256。") == [(CN_RESIDENT_ID, "110105199001010256")]
+
+
+def test_cn_resident_id_invalid_rejected():
+    for number in [
+        "360426199101010072",  # wrong check digit
+        "360426199102300070",  # Feb 30 birth date, correct check digit
+        "999999199101010072",  # unknown region code, correct check digit
+    ]:
+        assert all(t != CN_RESIDENT_ID for t, _ in types_texts(f"身份证号{number}。"))
+
+
+def test_cn_resident_id_not_matched_inside_longer_token():
+    for text in ["1360426199101010071", "3604261991010100710", "A360426199101010071"]:
+        assert all(t != CN_RESIDENT_ID for t, _ in types_texts(text))
+
+
+def test_unrequested_type_does_not_suppress_requested_one():
+    # Without CN_RESIDENT_ID requested, a Luhn-valid ID stays masked as CREDIT_CARD.
+    text = "身份证110105199001010256。"
+    assert [
+        (s.entity_type, text[s.start : s.end])
+        for s in detect_deterministic(text, entities=[CREDIT_CARD])
+    ] == [(CREDIT_CARD, "110105199001010256")]
 
 
 # --- Email / IP ---

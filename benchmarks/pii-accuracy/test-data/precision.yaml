@@ -284,3 +284,12 @@ cases:
     entities: [VAT_CODE]
     text: "Die Referenz DE136695977 hat keine gueltige Pruefsumme."
     expected: []
+
+  - id: precision_invalid_cn_resident_id_checksum
+    suite: precision
+    category: precision
+    split: test
+    language: en
+    entities: [CN_RESIDENT_ID]
+    text: "Reference 360426199101010072 has an invalid check digit."
+    expected: []

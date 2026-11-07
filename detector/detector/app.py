@@ -55,7 +55,7 @@ def health() -> dict[str, str]:
 
 @app.post("/analyze", response_model=list[Entity])
 def analyze(req: AnalyzeRequest) -> list[Entity]:
-    deterministic = detect_deterministic(req.text, req.phone_regions)
+    deterministic = detect_deterministic(req.text, req.phone_regions, req.entities)
     semantic = detect_semantic(req.text, req.score_threshold)
     spans = merge(deterministic, semantic, req.entities, 0.0)
     to_u16 = _utf16_mapper(req.text)

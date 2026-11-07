@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # Entity type strings returned on the /analyze response. The Presidio drop-in
-# set plus VAT_CODE (EU VAT numbers, checksum-validated). Other structured types
+# set plus VAT_CODE (EU VAT numbers) and CN_RESIDENT_ID (Chinese Resident
+# Identity Card numbers), both checksum-validated. Other structured types
 # (org/address/fiscal/BIC/crypto) are not currently emitted.
 PERSON = "PERSON"
 LOCATION = "LOCATION"
@@ -19,6 +20,7 @@ CREDIT_CARD = "CREDIT_CARD"
 IBAN_CODE = "IBAN_CODE"
 IP_ADDRESS = "IP_ADDRESS"
 VAT_CODE = "VAT_CODE"
+CN_RESIDENT_ID = "CN_RESIDENT_ID"
 
 
 @dataclass(frozen=True)
