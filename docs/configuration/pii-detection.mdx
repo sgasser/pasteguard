@@ -18,6 +18,7 @@ pii_detection:
     - IBAN_CODE
     - IP_ADDRESS
     - VAT_CODE
+    - CN_RESIDENT_ID
 ```
 
 ## Options
@@ -66,8 +67,9 @@ Keep the list focused. More regions can mean more false positives on IDs and tic
 | `IBAN_CODE` | DE89 3704 0044 0532 0130 00 |
 | `IP_ADDRESS` | 192.168.1.1 |
 | `VAT_CODE` | EU VAT number, e.g. `DE136695976`, `IT00743110157`, `FR40303265045` |
+| `CN_RESIDENT_ID` | Chinese Resident Identity Card number, e.g. `360426199101010071`, `11010519900101007X` |
 
-Names and locations are multilingual. IBAN, credit card, email, IP, and `+` phone numbers work internationally. `VAT_CODE` requires a country prefix and is validated with `python-stdnum`.
+Names and locations are multilingual. IBAN, credit card, email, IP, and `+` phone numbers work internationally. `VAT_CODE` requires a country prefix and `CN_RESIDENT_ID` requires all 18 characters; both are validated with `python-stdnum`.
 
 ## Score Threshold
 

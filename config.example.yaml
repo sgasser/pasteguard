@@ -91,6 +91,7 @@ pii_detection:
     - IBAN_CODE
     - IP_ADDRESS
     - VAT_CODE  # EU VAT number (any member state; requires country prefix)
+    - CN_RESIDENT_ID  # Chinese Resident Identity Card number (18 characters)
 
 # Secrets Detection settings (Secrets Shield)
 # Detects private keys, API keys, tokens and other secret credentials in requests

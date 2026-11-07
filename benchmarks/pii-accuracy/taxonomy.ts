@@ -12,6 +12,7 @@ export const CONFIGURED_PII_ENTITIES = [
   "PERSON",
   "PHONE_NUMBER",
   "VAT_CODE",
+  "CN_RESIDENT_ID",
 ] as const;
 
 export const SUPPORTED_LANGUAGES = ["en", "de", "es", "fr", "it", "nl", "pl", "pt", "ro"] as const;

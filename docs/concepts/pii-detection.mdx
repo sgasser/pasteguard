@@ -33,8 +33,9 @@ Backend selection does not change the deterministic layer or response contract.
 | `CREDIT_CARD` | 4111 1111 1111 1111 |
 | `IP_ADDRESS` | 192.168.1.1 |
 | `VAT_CODE` | EU VAT number, e.g. `DE136695976`, `IT00743110157`, `FR40303265045` |
+| `CN_RESIDENT_ID` | Chinese Resident Identity Card number, e.g. `360426199101010071`, `11010519900101007X` |
 
-Names and locations use the multilingual model. IBAN, credit card, email, and IP work internationally. Phone numbers are `+` international-only by default; set `phone_regions` for local formats. `VAT_CODE` requires a country prefix and is validated with `python-stdnum`.
+Names and locations use the multilingual model. IBAN, credit card, email, and IP work internationally. Phone numbers are `+` international-only by default; set `phone_regions` for local formats. `VAT_CODE` requires a country prefix and `CN_RESIDENT_ID` requires all 18 characters; both are validated with `python-stdnum`.
 
 ## Languages and phone regions
 

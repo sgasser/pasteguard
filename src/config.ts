@@ -144,6 +144,7 @@ const PIIDetectionSchema = z.object({
       "IBAN_CODE",
       "IP_ADDRESS",
       "VAT_CODE",
+      "CN_RESIDENT_ID",
     ]),
   scan_roles: scanRolesField,
 });
