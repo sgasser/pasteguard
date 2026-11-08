@@ -204,20 +204,20 @@ const SecretsDetectionSchema = z.object({
 const ConfigSchema = z
   .object({
     mode: z.enum(["route", "mask"]).default("route"),
-    server: ServerSchema.default({}),
+    server: ServerSchema.prefault({}),
     // Providers
     providers: z.object({
-      openai: OpenAIProviderSchema.default({}),
-      anthropic: AnthropicProviderSchema.default({}),
-      codex: CodexProviderSchema.default({}),
+      openai: OpenAIProviderSchema.prefault({}),
+      anthropic: AnthropicProviderSchema.prefault({}),
+      codex: CodexProviderSchema.prefault({}),
     }),
     // Local provider - only for route mode
     local: LocalProviderSchema.optional(),
-    masking: MaskingSchema.default({}),
+    masking: MaskingSchema.prefault({}),
     pii_detection: PIIDetectionSchema,
-    logging: LoggingSchema.default({}),
-    dashboard: DashboardSchema.default({}),
-    secrets_detection: SecretsDetectionSchema.default({}),
+    logging: LoggingSchema.prefault({}),
+    dashboard: DashboardSchema.prefault({}),
+    secrets_detection: SecretsDetectionSchema.prefault({}),
   })
   .refine(
     (config) => {
@@ -330,7 +330,7 @@ export function loadConfig(configPath?: string): Config {
 
   if (!result.success) {
     console.error("Config validation errors:");
-    for (const error of result.error.errors) {
+    for (const error of result.error.issues) {
       console.error(`  - ${error.path.join(".")}: ${error.message}`);
     }
     throw new Error("Invalid configuration");

@@ -16,6 +16,50 @@ function cleanupConfig(path: string): void {
 }
 
 describe("config", () => {
+  test("applies nested defaults when configuration sections are omitted", () => {
+    const path = writeConfig(`
+mode: mask
+providers: {}
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+
+    try {
+      const config = loadConfig(path);
+
+      expect(config.server).toEqual({ port: 3000, host: "0.0.0.0", request_timeout: 600 });
+      expect(config.providers).toEqual({
+        openai: { base_url: "https://api.openai.com/v1" },
+        anthropic: { base_url: "https://api.anthropic.com" },
+        codex: { base_url: "https://chatgpt.com/backend-api/codex" },
+      });
+      expect(config.masking).toEqual({
+        show_markers: false,
+        marker_text: "[protected]",
+        allowlist: [
+          { pattern: "You are Claude Code, Anthropic's official CLI for Claude.", regex: false },
+        ],
+        denylist: [],
+      });
+      expect(config.logging).toEqual({
+        driver: "sqlite",
+        database: "./data/pasteguard.db",
+        retention_days: 30,
+        log_masked_content: true,
+      });
+      expect(config.dashboard).toEqual({ enabled: true });
+      expect(config.secrets_detection).toMatchObject({
+        enabled: true,
+        action: "mask",
+        max_scan_chars: 200000,
+        log_detected_types: true,
+        scan_roles: ["user", "tool", "function", "mcp"],
+      });
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
   test("accepts a valid detector HTTP URL", () => {
     const path = writeConfig(`
 mode: mask

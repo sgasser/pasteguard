@@ -35,7 +35,7 @@ export const ToolUseBlockSchema = z
     type: z.literal("tool_use"),
     id: z.string(),
     name: z.string(),
-    input: z.record(z.unknown()),
+    input: z.record(z.string(), z.unknown()),
   })
   .passthrough();
 
@@ -91,7 +91,7 @@ export const ToolSchema = z
     input_schema: z
       .object({
         type: z.literal("object"),
-        properties: z.record(z.unknown()).optional(),
+        properties: z.record(z.string(), z.unknown()).optional(),
         required: z.array(z.string()).optional(),
       })
       .passthrough(),

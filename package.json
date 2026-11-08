@@ -24,7 +24,7 @@
     "pg": "^8.22.0",
     "tailwindcss": "^4.3.0",
     "yaml": "^2.9.0",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",

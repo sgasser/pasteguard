@@ -93,7 +93,7 @@ async function maskHandler(c: Context, getDetector: DetectorProvider) {
         error: {
           message: "Invalid request",
           type: "validation_error",
-          details: parseResult.error.errors.map((e) => ({
+          details: parseResult.error.issues.map((e) => ({
             path: e.path.join("."),
             message: e.message,
           })),

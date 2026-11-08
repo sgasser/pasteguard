@@ -101,7 +101,7 @@ async function loadCases(dir: string): Promise<BenchmarkCase[]> {
       const parsed = BenchmarkFileSchema.safeParse(parseYaml(raw));
 
       if (!parsed.success) {
-        const details = parsed.error.errors
+        const details = parsed.error.issues
           .map((error) => `${error.path.join(".")}: ${error.message}`)
           .join("; ");
         throw new Error(`Invalid benchmark file ${file}: ${details}`);

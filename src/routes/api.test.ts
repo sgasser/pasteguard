@@ -48,6 +48,28 @@ app.route(
 );
 
 describe("POST /api/mask", () => {
+  test("reports field paths for invalid masking options", async () => {
+    const res = await app.request("/api/mask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: "Hello",
+        startFrom: { PERSON: "invalid" },
+        detect: ["invalid"],
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as {
+      error: { type: string; details: { path: string; message: string }[] };
+    };
+    expect(body.error.type).toBe("validation_error");
+    expect(body.error.details).toEqual([
+      { path: "startFrom.PERSON", message: expect.any(String) },
+      { path: "detect.0", message: expect.any(String) },
+    ]);
+  });
+
   test("returns 400 for missing text", async () => {
     const res = await app.request("/api/mask", {
       method: "POST",
