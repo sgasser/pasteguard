@@ -9,7 +9,8 @@ description: Run PasteGuard locally and connect Browser Chat, Apps & APIs, or Co
 docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:latest
 ```
 
-PasteGuard runs on `http://localhost:3000`. Open `http://localhost:3000` to see the dashboard.
+PasteGuard runs on `http://localhost:3000`. Open `http://localhost:3000/health` to
+check the service. The dashboard is disabled by default.
 
 <Note>
 For custom configuration, Docker Compose, or persistent logs, see [Installation](/installation).
@@ -61,7 +62,8 @@ The name and email were masked before reaching OpenAI and restored in the respon
 
 ## 5. View Dashboard
 
-Open `http://localhost:3000` in your browser to see:
+Set `dashboard.enabled: true` in a mounted `config.yaml` (see [Installation](/installation))
+and restart PasteGuard. Open `http://localhost:3000/dashboard` in your browser to see:
 
 - Request history
 - Detected PII and secrets

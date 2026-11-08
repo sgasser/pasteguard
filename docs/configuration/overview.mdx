@@ -56,9 +56,14 @@ dashboard:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `enabled` | `true` | Enable dashboard at `/dashboard` |
+| `enabled` | `false` | Enable dashboard at `/dashboard` |
 | `auth.username` | - | Basic auth username |
 | `auth.password` | - | Basic auth password |
+
+Set `dashboard.enabled: true` to enable the dashboard and its logs/statistics APIs.
+Authentication is optional. Without `dashboard.auth`, anyone who can reach the
+server can read dashboard data; configure authentication or restrict network access.
+Existing configurations with `enabled: true` remain enabled.
 
 ## Environment Variables
 
