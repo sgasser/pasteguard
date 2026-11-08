@@ -160,7 +160,7 @@ Codex:      http://${host}:${port}/codex
 Mask API:   http://${host}:${port}/api/mask
 Health:     http://${host}:${port}/health
 Info:       http://${host}:${port}/info
-Dashboard:  http://${host}:${port}/dashboard
+Dashboard:  ${config.dashboard.enabled ? `http://${host}:${port}/dashboard` : "disabled"}
 
 Mode:       ${config.mode.toUpperCase()}
 ${modeInfo}

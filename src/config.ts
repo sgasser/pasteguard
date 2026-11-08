@@ -174,7 +174,7 @@ const DashboardAuthSchema = z.object({
 });
 
 const DashboardSchema = z.object({
-  enabled: z.boolean().default(true),
+  enabled: z.boolean().default(false),
   auth: DashboardAuthSchema.optional(),
 });
 

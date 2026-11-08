@@ -47,7 +47,7 @@ pii_detection:
         retention_days: 30,
         log_masked_content: true,
       });
-      expect(config.dashboard).toEqual({ enabled: true });
+      expect(config.dashboard).toEqual({ enabled: false });
       expect(config.secrets_detection).toMatchObject({
         enabled: true,
         action: "mask",
@@ -58,6 +58,31 @@ pii_detection:
     } finally {
       cleanupConfig(path);
     }
+  });
+
+  test.each([
+    ["omitted dashboard", "", false],
+    ["empty dashboard", "dashboard: {}", false],
+    ["explicitly disabled dashboard", "dashboard:\n  enabled: false", false],
+    ["explicitly enabled dashboard", "dashboard:\n  enabled: true", true],
+  ])("loads %s", (_label, dashboard, enabled) => {
+    const path = writeConfig(`
+mode: mask
+providers: {}
+pii_detection:
+  detector_url: http://localhost:5002
+${dashboard}
+`);
+
+    try {
+      expect(loadConfig(path).dashboard.enabled).toBe(enabled);
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("ships with the dashboard disabled in the example configuration", () => {
+    expect(loadConfig("config.example.yaml").dashboard.enabled).toBe(false);
   });
 
   test("accepts a valid detector HTTP URL", () => {

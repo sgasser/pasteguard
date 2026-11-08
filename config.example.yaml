@@ -146,11 +146,12 @@ logging:
   # Only scanned roles (scan_roles) are stored, after PII and secrets are masked.
   log_masked_content: true
 
-# Dashboard settings
+# Dashboard settings (disabled by default)
 dashboard:
-  enabled: true
+  enabled: false
 
   # Basic auth for dashboard (optional)
+  # Without auth, anyone who can reach the server can read dashboard logs.
   # auth:
   #   username: admin
   #   password: ${DASHBOARD_PASSWORD}
