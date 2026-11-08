@@ -87,7 +87,10 @@ docker run --rm -p 3000:3000 ghcr.io/sgasser/pasteguard:latest
 If the detector in 0.9.3 exits with `SIGSEGV`, add `-e ORT_DISABLE_TELEMETRY=1`
 to `docker run`; see [installation troubleshooting](https://pasteguard.com/docs/installation).
 
-Open [localhost:3000](http://localhost:3000) for the dashboard.
+Open [localhost:3000/health](http://localhost:3000/health) to check the service.
+
+The dashboard is disabled by default. Set `dashboard.enabled: true` in `config.yaml`
+to enable it; see [dashboard configuration](https://pasteguard.com/docs/configuration/overview#dashboard).
 
 Point your app or agent to PasteGuard instead of the provider:
 
