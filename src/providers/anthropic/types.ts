@@ -74,15 +74,17 @@ const KnownContentBlockSchema = z.discriminatedUnion("type", [
   RedactedThinkingBlockSchema,
 ]);
 
-const KNOWN_BLOCK_TYPES = new Set(KnownContentBlockSchema.options.map((o) => o.shape.type.value));
+const KNOWN_BLOCK_TYPES = new Set<string>(
+  KnownContentBlockSchema.options.map((option) => option.shape.type.value),
+);
 
 // Block types PasteGuard doesn't know (e.g. Claude Code's tool_addition) are forwarded
 // unchanged, so new Anthropic block types don't break the proxy. Known types still
 // have to match their schema.
-export const UnknownBlockSchema = z
+const UnknownBlockSchema = z
   .object({ type: z.string() })
   .passthrough()
-  .refine((block) => !KNOWN_BLOCK_TYPES.has(block.type as never));
+  .refine((block) => !KNOWN_BLOCK_TYPES.has(block.type));
 
 export const ContentBlockSchema = z.union([KnownContentBlockSchema, UnknownBlockSchema]);
 
