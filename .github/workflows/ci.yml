@@ -67,7 +67,7 @@ jobs:
 
       - name: Type check
         working-directory: detector
-        run: .venv/bin/pyright
+        run: .venv/bin/pyright --pythonversion ${{ matrix.python-version }}
 
       - name: Run tests
         working-directory: detector
