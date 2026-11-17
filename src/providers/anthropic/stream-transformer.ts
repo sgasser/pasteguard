@@ -486,9 +486,9 @@ export function createAnthropicUnmaskingStream(
               ),
             });
           } else {
-            pendingFrames.push({
-              output: frame.slice(0, dataLine.start) + frame.slice(dataLine.end),
-            });
+            // Text is buffered for a possible partial placeholder: drop the whole frame.
+            // An event line without data is not valid for SSE clients.
+            pendingFrames.push({ output: "" });
           }
         } else {
           pendingFrames.push({ output: frame });
