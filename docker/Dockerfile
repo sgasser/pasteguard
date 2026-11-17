@@ -20,6 +20,12 @@
 ARG BUN_IMAGE=oven/bun:1-slim@sha256:d56a2534ffd262e92c12fd3249d3924d296d97086da773f821d7d0477435ea04
 ARG PYTHON_BUILD_IMAGE=cgr.dev/chainguard/python:latest-dev@sha256:7a568bcee42666f73f041645a41c913ce1d442f4c24cf6019bc543a90820e531
 ARG PYTHON_RUNTIME_IMAGE=cgr.dev/chainguard/python:latest@sha256:a0365f7b90bf7b78a5e35f2709efb7c9263acf9c7b1905e0ec4c3e943c88e64d
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.13.8@sha256:5cc1805e2426484abca4ad46ea783bab281fdb225fd82d8ce6d66a81254bac85
+
+# =============================================================================
+# Stage: uv — installs the detector from detector/uv.lock (build-time only)
+# =============================================================================
+FROM ${UV_IMAGE} AS uv
 
 # =============================================================================
 # Stage: bun-builder — build the Bun application
@@ -41,23 +47,26 @@ FROM ${PYTHON_BUILD_IMAGE} AS detector-builder
 
 USER root
 
-RUN python -m venv /opt/venv
+COPY --from=uv /uv /usr/local/bin/uv
+
+# Install exactly the versions locked in detector/uv.lock into /opt/venv, with
+# the image's own Python. The lock takes torch from the CPU-only PyTorch index,
+# so no CUDA libraries are pulled in. --locked fails the build if uv.lock does
+# not match pyproject.toml. uv does not install pip into the venv.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_COMPILE_BYTECODE=1 \
+    UV_NO_CACHE=1 \
+    UV_LINK_MODE=copy \
+    UV_HTTP_TIMEOUT=120 \
+    UV_HTTP_RETRIES=5
+
+WORKDIR /srv/detector
+COPY detector/pyproject.toml detector/uv.lock ./
+COPY detector/detector ./detector
+RUN uv sync --locked --no-dev --no-editable --group image --python /usr/bin/python \
+    && uv pip check --python /opt/venv/bin/python
 ENV PATH="/opt/venv/bin:${PATH}"
-
-# The explicit CPU index prevents PyPI from pulling unused CUDA libraries.
-RUN pip install --no-cache-dir typing-extensions \
-    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-
-RUN pip install --no-cache-dir setuptools==83.0.0
-
-ENV PIP_DEFAULT_TIMEOUT=120
-ENV PIP_RETRIES=5
-
-COPY detector/pyproject.toml /srv/detector/
-COPY detector/detector /srv/detector/detector
-RUN pip install --no-cache-dir supervisor==4.3.0 /srv/detector \
-    && pip check \
-    && pip uninstall -y pip
 
 ENV DETECTOR_MODEL=urchade/gliner_multi_pii-v1
 ENV HF_HOME=/opt/models

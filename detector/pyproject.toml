@@ -23,6 +23,29 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6", "pyright>=1.1"]
 
+[dependency-groups]
+# Installed only in the Docker image, where supervisord runs the proxy and the detector.
+image = ["supervisor>=4.3.0"]
+
+# uv.lock pins every version the Docker image and CI install. See CONTRIBUTING.md.
+[tool.uv]
+# The release image is built for both architectures, so the lock must have wheels for both.
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+# CPU-only Torch, so the detector does not pull in CUDA libraries. Only torch
+# comes from this index; everything else, including torch's own dependencies,
+# comes from PyPI.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.setuptools]
 packages = ["detector"]
 
