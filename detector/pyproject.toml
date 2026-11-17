@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "pasteguard-detector"
 version = "0.1.0"
 description = "/analyze PII detector with deterministic checks and a semantic backend."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 dependencies = [
     "fastapi>=0.110",
@@ -40,7 +40,7 @@ select = ["F", "E", "W", "I", "UP", "B", "SIM", "RUF"]
 include = ["detector"]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.10"
+pythonVersion = "3.11"
 typeCheckingMode = "basic"
 # Third-party deps (gliner, python-stdnum, phonenumbers) ship no type stubs;
 # their symbols are treated as untyped rather than flagged.
