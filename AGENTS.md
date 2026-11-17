@@ -50,3 +50,4 @@ Primary endpoints:
 - `src/masking/extractors/` contains provider-specific text extraction and insertion.
 - `src/logging/logger.ts` owns SQLite dashboard logging.
 - `docs/mint.json` registers API reference docs.
+- `detector/uv.lock` pins the detector's Python dependencies for the Docker image and CI. Update it as described in `CONTRIBUTING.md`.

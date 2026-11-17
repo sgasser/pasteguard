@@ -32,24 +32,30 @@ jobs:
         run: bun test
 
   detector:
-    name: Detector Lint, Types & Tests
+    name: Detector Lint, Types & Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the floor in detector/pyproject.toml; 3.14 is what the Docker image runs.
+        python-version: ["3.11", "3.14"]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.8"
+
+      # Installs exactly the versions in uv.lock (CPU-only torch) and fails if
+      # the lock does not match pyproject.toml.
       - name: Install detector
         working-directory: detector
-        run: |
-          python -m venv .venv
-          .venv/bin/pip install --upgrade pip
-          # CPU-only torch so the gliner dependency does not pull the CUDA build.
-          .venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
-          .venv/bin/pip install -e ".[dev]"
+        run: uv sync --locked --extra dev --python ${{ matrix.python-version }} --no-python-downloads
 
       - name: Lint
         working-directory: detector
@@ -61,11 +67,25 @@ jobs:
 
       - name: Type check
         working-directory: detector
-        run: .venv/bin/pyright
+        run: .venv/bin/pyright --pythonversion ${{ matrix.python-version }}
 
       - name: Run tests
         working-directory: detector
         run: .venv/bin/python -m pytest -q
+
+  # Branch protection requires this check name. It passes only when every
+  # Python version above passed.
+  detector-result:
+    name: Detector Lint, Types & Tests
+    if: always()
+    needs: detector
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require every detector job to pass
+        env:
+          RESULT: ${{ needs.detector.result }}
+        run: test "$RESULT" = success
 
   docker-build:
     name: Docker Build Test

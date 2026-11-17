@@ -25,6 +25,39 @@ bun run check
 bun run format
 ```
 
+## Detector Dependencies
+
+The PII detector in `detector/` is a Python project managed with
+[uv](https://docs.astral.sh/uv/). `detector/uv.lock` pins every package
+version. The Docker image and CI install from it with `uv sync --locked`, each
+getting the locked versions for its Python version and platform. CI tests on
+Python 3.11, the minimum, and on 3.14, the version the image runs. Torch comes
+from the CPU-only PyTorch index configured in `detector/pyproject.toml`.
+
+Use the uv version that CI and `docker/Dockerfile` pin (currently 0.13.8). To
+work on the detector locally (Python 3.11 or later):
+
+```bash
+cd detector
+uv sync --extra dev
+.venv/bin/python -m pytest -q
+```
+
+To change a dependency, edit `detector/pyproject.toml`, run `uv lock` in
+`detector/`, and commit both files together. CI and the Docker build fail when
+`uv.lock` does not match `pyproject.toml`.
+
+To update locked versions within the ranges in `pyproject.toml`:
+
+```bash
+cd detector
+uv lock --upgrade-package transformers  # one package
+uv lock --upgrade                       # every package
+```
+
+Then run the detector checks from `.github/workflows/ci.yml` and build the image
+with `docker build -f docker/Dockerfile .`.
+
 ## Pull Request Process
 
 1. Create a feature branch from `main`
