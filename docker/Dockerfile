@@ -63,6 +63,8 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
 
 WORKDIR /srv/detector
 COPY detector/pyproject.toml detector/uv.lock ./
+# Dependencies first, so a detector source change does not reinstall torch.
+RUN uv sync --locked --no-dev --no-install-project --group image --python /usr/bin/python
 COPY detector/detector ./detector
 RUN uv sync --locked --no-dev --no-editable --group image --python /usr/bin/python \
     && uv pip check --python /opt/venv/bin/python
