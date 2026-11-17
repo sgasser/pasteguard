@@ -495,6 +495,33 @@ describe("POST /anthropic/v1/messages", () => {
     }
   });
 
+  test("passes unknown content block types through unchanged", () => {
+    const toolAddition = { type: "tool_addition", tool: { name: "Read" } };
+    const result = AnthropicRequestSchema.safeParse({
+      model: "claude-opus-4-8",
+      max_tokens: 64000,
+      messages: [
+        { role: "user", content: [{ type: "text", text: "Hello" }] },
+        { role: "system", content: [{ type: "text", text: "Tools" }, toolAddition] },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data.messages[1].content as unknown[])[1]).toEqual(toolAddition);
+    }
+  });
+
+  test("still rejects a known block type with an invalid shape", () => {
+    const result = AnthropicRequestSchema.safeParse({
+      model: "claude-opus-4-8",
+      max_tokens: 64000,
+      messages: [{ role: "user", content: [{ type: "text" }] }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   test("returns 400 for missing model", async () => {
     const res = await app.request("/anthropic/v1/messages", {
       method: "POST",
