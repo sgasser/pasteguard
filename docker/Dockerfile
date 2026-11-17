@@ -23,7 +23,7 @@ ARG PYTHON_RUNTIME_IMAGE=cgr.dev/chainguard/python:latest@sha256:a0365f7b90bf7b7
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.13.8@sha256:5cc1805e2426484abca4ad46ea783bab281fdb225fd82d8ce6d66a81254bac85
 
 # =============================================================================
-# Stage: uv — installs the detector from detector/uv.lock (build-time only)
+# Stage: uv — the pinned uv binary for detector-builder (build-time only)
 # =============================================================================
 FROM ${UV_IMAGE} AS uv
 
