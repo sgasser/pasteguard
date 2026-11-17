@@ -29,9 +29,10 @@ bun run format
 
 The PII detector in `detector/` is a Python project managed with
 [uv](https://docs.astral.sh/uv/). `detector/uv.lock` pins every package
-version. The Docker image and CI install from it with `uv sync --locked`, so the
-versions CI tests are the versions the image ships. Torch comes from the
-CPU-only PyTorch index configured in `detector/pyproject.toml`.
+version. The Docker image and CI install from it with `uv sync --locked`, each
+getting the locked versions for its Python version and platform. CI tests on
+Python 3.11, the minimum, and on 3.14, the version the image runs. Torch comes
+from the CPU-only PyTorch index configured in `detector/pyproject.toml`.
 
 Use the uv version that CI and `docker/Dockerfile` pin (currently 0.13.8). To
 work on the detector locally (Python 3.11 or later):
