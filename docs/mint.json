@@ -62,6 +62,7 @@
         "api-reference/anthropic",
         "api-reference/codex",
         "api-reference/mask",
+        "api-reference/otlp-traces",
         "api-reference/status",
         "api-reference/dashboard-api"
       ]
