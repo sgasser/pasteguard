@@ -13,6 +13,7 @@ import { dashboardRoutes } from "./routes/dashboard";
 import { healthRoutes } from "./routes/health";
 import { infoRoutes } from "./routes/info";
 import { openaiRoutes } from "./routes/openai";
+import { otlpRoutes } from "./routes/otlp";
 
 type Variables = {
   requestId: string;
@@ -49,6 +50,7 @@ app.route("/openai", openaiRoutes);
 app.route("/anthropic", anthropicRoutes);
 app.route("/codex", codexRoutes);
 app.route("/api", apiRoutes);
+app.route("/otlp", otlpRoutes);
 
 if (config.dashboard.enabled) {
   app.route("/dashboard", dashboardRoutes);
@@ -158,6 +160,7 @@ OpenAI API: http://${host}:${port}/openai/v1/chat/completions
 Anthropic:  http://${host}:${port}/anthropic/v1/messages
 Codex:      http://${host}:${port}/codex
 Mask API:   http://${host}:${port}/api/mask
+OTLP:       ${config.telemetry.otlp_forward ? `http://${host}:${port}/otlp/v1/traces → ${config.telemetry.otlp_forward.url}` : "disabled"}
 Health:     http://${host}:${port}/health
 Info:       http://${host}:${port}/info
 Dashboard:  ${config.dashboard.enabled ? `http://${host}:${port}/dashboard` : "disabled"}

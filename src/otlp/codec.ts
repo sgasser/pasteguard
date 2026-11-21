@@ -108,7 +108,7 @@ export async function decodeTraceRequest(
 export async function encodeTraceRequest(
   request: OtlpTraceRequest,
   encoding: OtlpEncoding,
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   if (encoding === "json") {
     return new TextEncoder().encode(JSON.stringify(request));
   }

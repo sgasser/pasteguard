@@ -1,0 +1,179 @@
+/**
+ * OTLP trace masking route
+ *
+ * POST /otlp/v1/traces accepts an OTLP/HTTP ExportTraceServiceRequest
+ * (protobuf or JSON), masks PII and secrets in every string attribute with
+ * the shared privacy pipeline, and forwards the masked batch to the
+ * configured telemetry.otlp_forward.url. Enabled only when that URL is set.
+ */
+
+import { type Context, Hono } from "hono";
+import { getConfig } from "../config";
+import { logRequest, normalizeRequestSource } from "../logging/logger";
+import { otlpTraceExtractor } from "../masking/extractors/otlp";
+import {
+  decodeTraceRequest,
+  encodeTraceRequest,
+  encodingFromContentType,
+  OTLP_CONTENT_TYPES,
+  type OtlpTraceRequest,
+} from "../otlp/codec";
+import { PrivacyPipelineDetectionError, processPrivacyPipeline } from "../privacy/pipeline";
+import {
+  createLogData,
+  setResponseHeaders,
+  toPIIHeaderData,
+  toPIILogData,
+  toSecretsHeaderData,
+  toSecretsLogData,
+} from "./utils";
+
+const MODEL_LABEL = "otlp/traces";
+
+function errorJson(c: Context, status: 400 | 404 | 415 | 502 | 503, message: string, type: string) {
+  return c.json({ error: { message, type } }, status);
+}
+
+async function tracesHandler(c: Context) {
+  const startTime = Date.now();
+  const config = getConfig();
+  const forward = config.telemetry.otlp_forward;
+  const userAgent = c.req.header("user-agent") || null;
+  const source = normalizeRequestSource("api", c.req.header("x-pasteguard-source"));
+
+  if (!forward) {
+    return errorJson(
+      c,
+      404,
+      "OTLP forwarding is not configured (telemetry.otlp_forward.url)",
+      "not_found",
+    );
+  }
+
+  if (c.req.header("content-encoding")) {
+    return errorJson(
+      c,
+      415,
+      "Compressed OTLP bodies are not supported; set OTEL_EXPORTER_OTLP_COMPRESSION=none",
+      "unsupported_media_type",
+    );
+  }
+
+  const encoding = encodingFromContentType(c.req.header("content-type"));
+  if (!encoding) {
+    return errorJson(
+      c,
+      415,
+      "Content-Type must be application/x-protobuf or application/json",
+      "unsupported_media_type",
+    );
+  }
+
+  let request: OtlpTraceRequest;
+  try {
+    request = await decodeTraceRequest(new Uint8Array(await c.req.arrayBuffer()), encoding);
+  } catch (error) {
+    return errorJson(
+      c,
+      400,
+      `Invalid OTLP ${encoding} body: ${error instanceof Error ? error.message : "decode failed"}`,
+      "validation_error",
+    );
+  }
+
+  // Telemetry is always masked, never routed or blocked: a dropped batch would
+  // hide exactly the request the operator wants to see in their traces.
+  const pipelineConfig = {
+    mode: "mask" as const,
+    secrets_detection: { ...config.secrets_detection, action: "mask" as const },
+  };
+
+  let privacy: Awaited<ReturnType<typeof processPrivacyPipeline<OtlpTraceRequest, unknown>>>;
+  try {
+    privacy = await processPrivacyPipeline(request, pipelineConfig, otlpTraceExtractor);
+  } catch (error) {
+    if (error instanceof PrivacyPipelineDetectionError) {
+      console.error("OTLP PII detection error:", error.cause ?? error);
+      logRequest(
+        createLogData({
+          provider: "api",
+          source,
+          model: MODEL_LABEL,
+          startTime,
+          pii: { hasPII: false, entityTypes: [], scanTimeMs: 0 },
+          statusCode: 503,
+          errorMessage: "PII detection service unavailable",
+        }),
+        userAgent,
+      );
+      return errorJson(c, 503, "PII detection service unavailable", "detection_error");
+    }
+    throw error;
+  }
+
+  const { secretsResult, piiResult } = privacy;
+  if (!piiResult) {
+    throw new Error("PII detection result missing from privacy pipeline");
+  }
+
+  const contentType = OTLP_CONTENT_TYPES[encoding];
+  const body = await encodeTraceRequest(privacy.request, encoding);
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(forward.url, {
+      method: "POST",
+      headers: { ...forward.headers, "content-type": contentType },
+      body,
+      signal: forward.timeout_ms > 0 ? AbortSignal.timeout(forward.timeout_ms) : undefined,
+    });
+  } catch (error) {
+    const message = `OTLP forward failed: ${error instanceof Error ? error.message : "unknown error"}`;
+    logRequest(
+      createLogData({
+        provider: "api",
+        source,
+        model: MODEL_LABEL,
+        startTime,
+        pii: toPIILogData(piiResult),
+        secrets: toSecretsLogData(secretsResult),
+        statusCode: 502,
+        errorMessage: message,
+      }),
+      userAgent,
+    );
+    return errorJson(c, 502, message, "server_error");
+  }
+
+  logRequest(
+    createLogData({
+      provider: "api",
+      source,
+      model: MODEL_LABEL,
+      startTime,
+      pii: toPIILogData(piiResult),
+      secrets: toSecretsLogData(secretsResult),
+      statusCode: upstream.status,
+    }),
+    userAgent,
+  );
+
+  setResponseHeaders(
+    c,
+    "mask",
+    "api",
+    toPIIHeaderData(piiResult),
+    toSecretsHeaderData(secretsResult),
+  );
+  const headers = new Headers(c.res.headers);
+  headers.set("content-type", upstream.headers.get("content-type") ?? contentType);
+  return new Response(await upstream.arrayBuffer(), { status: upstream.status, headers });
+}
+
+export function createOtlpRoutes(): Hono {
+  const routes = new Hono();
+  routes.post("/v1/traces", tracesHandler);
+  return routes;
+}
+
+export const otlpRoutes = createOtlpRoutes();
