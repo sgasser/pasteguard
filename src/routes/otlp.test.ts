@@ -275,6 +275,26 @@ describe("POST /otlp/v1/traces", () => {
     expect(res.status).toBe(502);
   });
 
+  test("returns 502 when the forward target fails while sending the body", async () => {
+    globalThis.fetch = (async () => {
+      const response = new Response("{}");
+      response.arrayBuffer = () => Promise.reject(new DOMException("timed out", "TimeoutError"));
+      return response;
+    }) as unknown as typeof fetch;
+    const res = await post(JSON.stringify(batch), "application/json");
+    expect(res.status).toBe(502);
+    expect(mockLogRequest).toHaveBeenCalledTimes(1);
+    const [entry] = mockLogRequest.mock.calls[0] as unknown as [{ statusCode: number }];
+    expect(entry.statusCode).toBe(502);
+  });
+
+  test("forwards exactly the OTLP content type over a configured Content-Type", async () => {
+    config.telemetry.otlp_forward!.headers = { "Content-Type": "text/plain" };
+    const res = await post(JSON.stringify(batch), "application/json");
+    expect(res.status).toBe(200);
+    expect(captured?.contentType).toBe("application/json");
+  });
+
   test("logs one dashboard entry per batch", async () => {
     await post(JSON.stringify(batch), "application/json");
     expect(mockLogRequest).toHaveBeenCalledTimes(1);

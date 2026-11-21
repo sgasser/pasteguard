@@ -119,14 +119,20 @@ async function tracesHandler(c: Context) {
   const contentType = OTLP_CONTENT_TYPES[encoding];
   const body = await encodeTraceRequest(privacy.request, encoding);
 
+  const forwardHeaders = new Headers(forward.headers);
+  forwardHeaders.set("content-type", contentType);
+
   let upstream: Response;
+  let upstreamBody: ArrayBuffer;
   try {
     upstream = await fetch(forward.url, {
       method: "POST",
-      headers: { ...forward.headers, "content-type": contentType },
+      headers: forwardHeaders,
       body,
       signal: forward.timeout_ms > 0 ? AbortSignal.timeout(forward.timeout_ms) : undefined,
     });
+    // Read inside the guard: a target that stalls or resets mid-body is a 502 too.
+    upstreamBody = await upstream.arrayBuffer();
   } catch (error) {
     const message = `OTLP forward failed: ${error instanceof Error ? error.message : "unknown error"}`;
     logRequest(
@@ -167,7 +173,7 @@ async function tracesHandler(c: Context) {
   );
   const headers = new Headers(c.res.headers);
   headers.set("content-type", upstream.headers.get("content-type") ?? contentType);
-  return new Response(await upstream.arrayBuffer(), { status: upstream.status, headers });
+  return new Response(upstreamBody, { status: upstream.status, headers });
 }
 
 export function createOtlpRoutes(): Hono {
