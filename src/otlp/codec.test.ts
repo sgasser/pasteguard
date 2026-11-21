@@ -6,7 +6,7 @@ import {
   type OtlpTraceRequest,
 } from "./codec";
 
-export const fixtureBatch: OtlpTraceRequest = {
+const fixtureBatch: OtlpTraceRequest = {
   resourceSpans: [
     {
       resource: { attributes: [{ key: "service.name", value: { stringValue: "agent" } }] },
@@ -60,30 +60,28 @@ describe("encodingFromContentType", () => {
 });
 
 describe("protobuf codec", () => {
-  test("round-trips a batch byte-for-byte and preserves ids and non-string values", async () => {
-    const bytes = await encodeTraceRequest(fixtureBatch, "protobuf");
-    const decoded = await decodeTraceRequest(bytes, "protobuf");
+  test("round-trips a batch byte-for-byte and preserves ids and non-string values", () => {
+    const bytes = encodeTraceRequest(fixtureBatch, "protobuf");
+    const decoded = decodeTraceRequest(bytes, "protobuf");
     expect(decoded).toEqual(fixtureBatch);
-    const again = await encodeTraceRequest(decoded, "protobuf");
+    const again = encodeTraceRequest(decoded, "protobuf");
     expect(Buffer.compare(Buffer.from(bytes), Buffer.from(again))).toBe(0);
   });
 
-  test("rejects garbage bytes", async () => {
-    await expect(
-      decodeTraceRequest(new Uint8Array([0xff, 0xff, 0xff]), "protobuf"),
-    ).rejects.toThrow();
+  test("rejects garbage bytes", () => {
+    expect(() => decodeTraceRequest(new Uint8Array([0xff, 0xff, 0xff]), "protobuf")).toThrow();
   });
 });
 
 describe("json codec", () => {
-  test("round-trips a batch", async () => {
-    const bytes = await encodeTraceRequest(fixtureBatch, "json");
+  test("round-trips a batch", () => {
+    const bytes = encodeTraceRequest(fixtureBatch, "json");
     expect(new TextDecoder().decode(bytes)).toBe(JSON.stringify(fixtureBatch));
-    expect(await decodeTraceRequest(bytes, "json")).toEqual(fixtureBatch);
+    expect(decodeTraceRequest(bytes, "json")).toEqual(fixtureBatch);
   });
 
-  test("rejects a non-object body", async () => {
+  test("rejects a non-object body", () => {
     const bytes = new TextEncoder().encode("[1,2,3]");
-    await expect(decodeTraceRequest(bytes, "json")).rejects.toThrow();
+    expect(() => decodeTraceRequest(bytes, "json")).toThrow();
   });
 });

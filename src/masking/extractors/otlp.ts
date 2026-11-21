@@ -52,7 +52,7 @@ function collectAttributed(node: OtlpAttributed | undefined, path: string, out: 
 }
 
 function setByPath(target: unknown, path: string, text: string): void {
-  const segments = path.split("/").filter((segment) => segment.length > 0);
+  const segments = path.split("/").slice(1);
   let node = target as Record<string, unknown>;
   for (const segment of segments.slice(0, -1)) {
     node = node[segment] as Record<string, unknown>;
@@ -63,13 +63,13 @@ function setByPath(target: unknown, path: string, text: string): void {
 export const otlpTraceExtractor: RequestExtractor<OtlpTraceRequest, unknown> = {
   extractTexts(request: OtlpTraceRequest): TextSpan[] {
     const out: TextSpan[] = [];
-    request.resourceSpans?.forEach((resourceSpans, r) => {
+    for (const [r, resourceSpans] of (request.resourceSpans ?? []).entries()) {
       const rPath = `/resourceSpans/${r}`;
       collectAttributed(resourceSpans.resource, `${rPath}/resource`, out);
-      resourceSpans.scopeSpans?.forEach((scopeSpans, s) => {
+      for (const [s, scopeSpans] of (resourceSpans.scopeSpans ?? []).entries()) {
         const sPath = `${rPath}/scopeSpans/${s}`;
         collectAttributed(scopeSpans.scope, `${sPath}/scope`, out);
-        scopeSpans.spans?.forEach((span, k) => {
+        for (const [k, span] of (scopeSpans.spans ?? []).entries()) {
           const kPath = `${sPath}/spans/${k}`;
           collectAttributed(span, kPath, out);
           for (const [e, event] of (span.events ?? []).entries()) {
@@ -78,13 +78,15 @@ export const otlpTraceExtractor: RequestExtractor<OtlpTraceRequest, unknown> = {
           for (const [l, link] of (span.links ?? []).entries()) {
             collectAttributed(link, `${kPath}/links/${l}`, out);
           }
-        });
-      });
-    });
+        }
+      }
+    }
     return out;
   },
 
   applyMasked(request: OtlpTraceRequest, maskedSpans: MaskedSpan[]): OtlpTraceRequest {
+    // The pipeline calls this with no spans in the common clean case; skip the deep copy.
+    if (maskedSpans.length === 0) return request;
     const copy = structuredClone(request);
     for (const span of maskedSpans) {
       setByPath(copy, span.path, span.maskedText);

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { RequestExtractor } from "../masking/types";
 import { decodeTraceRequest, encodeTraceRequest, type OtlpTraceRequest } from "../otlp/codec";
 import type { PIIDetectionResult, PIIEntity } from "../pii/detect";
+import { createPIIResultFromSpans } from "../test-utils/detection-results";
 
 // Fake detector: flags email addresses and the name "Max Mustermann" in every extracted span.
 const mockAnalyzeRequest = mock(
@@ -31,8 +32,7 @@ const mockAnalyzeRequest = mock(
       }
       return entities;
     });
-    const allEntities = spanEntities.flat();
-    return { hasPII: allEntities.length > 0, spanEntities, allEntities, scanTimeMs: 1 };
+    return createPIIResultFromSpans(spanEntities, { scanTimeMs: 1 });
   },
 );
 const mockLogRequest = mock(() => {});
@@ -218,11 +218,11 @@ describe("POST /otlp/v1/traces", () => {
   });
 
   test("masks a protobuf batch and forwards protobuf", async () => {
-    const bytes = await encodeTraceRequest(batch, "protobuf");
+    const bytes = encodeTraceRequest(batch, "protobuf");
     const res = await post(bytes, "application/x-protobuf");
     expect(res.status).toBe(200);
     expect(captured?.contentType).toBe("application/x-protobuf");
-    const sent = await decodeTraceRequest(captured!.body, "protobuf");
+    const sent = decodeTraceRequest(captured!.body, "protobuf");
     const spans = sent.resourceSpans?.[0].scopeSpans?.[0].spans ?? [];
     expect(spans[0].attributes?.[0].value?.stringValue).toBe(
       "Mail [[EMAIL_ADDRESS_1]] about [[PERSON_1]]",

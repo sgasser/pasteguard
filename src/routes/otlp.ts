@@ -18,8 +18,13 @@ import {
   OTLP_CONTENT_TYPES,
   type OtlpTraceRequest,
 } from "../otlp/codec";
-import { PrivacyPipelineDetectionError, processPrivacyPipeline } from "../privacy/pipeline";
 import {
+  PrivacyPipelineDetectionError,
+  type PrivacyPipelineResult,
+  processPrivacyPipeline,
+} from "../privacy/pipeline";
+import {
+  type CreateLogDataOptions,
   createLogData,
   setResponseHeaders,
   toPIIHeaderData,
@@ -40,6 +45,18 @@ async function tracesHandler(c: Context) {
   const forward = config.telemetry.otlp_forward;
   const userAgent = c.req.header("user-agent") || null;
   const source = normalizeRequestSource("api", c.req.header("x-pasteguard-source"));
+  const log = (extra: Partial<CreateLogDataOptions>) =>
+    logRequest(
+      createLogData({
+        provider: "api",
+        source,
+        model: MODEL_LABEL,
+        startTime,
+        mode: "mask",
+        ...extra,
+      }),
+      userAgent,
+    );
 
   if (!forward) {
     return errorJson(
@@ -71,7 +88,7 @@ async function tracesHandler(c: Context) {
 
   let request: OtlpTraceRequest;
   try {
-    request = await decodeTraceRequest(new Uint8Array(await c.req.arrayBuffer()), encoding);
+    request = decodeTraceRequest(new Uint8Array(await c.req.arrayBuffer()), encoding);
   } catch (error) {
     return errorJson(
       c,
@@ -88,24 +105,17 @@ async function tracesHandler(c: Context) {
     secrets_detection: { ...config.secrets_detection, action: "mask" as const },
   };
 
-  let privacy: Awaited<ReturnType<typeof processPrivacyPipeline<OtlpTraceRequest, unknown>>>;
+  let privacy: PrivacyPipelineResult<OtlpTraceRequest>;
   try {
     privacy = await processPrivacyPipeline(request, pipelineConfig, otlpTraceExtractor);
   } catch (error) {
     if (error instanceof PrivacyPipelineDetectionError) {
       console.error("OTLP PII detection error:", error.cause ?? error);
-      logRequest(
-        createLogData({
-          provider: "api",
-          source,
-          model: MODEL_LABEL,
-          startTime,
-          pii: { hasPII: false, entityTypes: [], scanTimeMs: 0 },
-          statusCode: 503,
-          errorMessage: "PII detection service unavailable",
-        }),
-        userAgent,
-      );
+      log({
+        pii: { hasPII: false, entityTypes: [], scanTimeMs: 0 },
+        statusCode: 503,
+        errorMessage: "PII detection service unavailable",
+      });
       return errorJson(c, 503, "PII detection service unavailable", "detection_error");
     }
     throw error;
@@ -117,7 +127,7 @@ async function tracesHandler(c: Context) {
   }
 
   const contentType = OTLP_CONTENT_TYPES[encoding];
-  const body = await encodeTraceRequest(privacy.request, encoding);
+  const body = encodeTraceRequest(privacy.request, encoding);
 
   const forwardHeaders = new Headers(forward.headers);
   forwardHeaders.set("content-type", contentType);
@@ -135,34 +145,20 @@ async function tracesHandler(c: Context) {
     upstreamBody = await upstream.arrayBuffer();
   } catch (error) {
     const message = `OTLP forward failed: ${error instanceof Error ? error.message : "unknown error"}`;
-    logRequest(
-      createLogData({
-        provider: "api",
-        source,
-        model: MODEL_LABEL,
-        startTime,
-        pii: toPIILogData(piiResult),
-        secrets: toSecretsLogData(secretsResult),
-        statusCode: 502,
-        errorMessage: message,
-      }),
-      userAgent,
-    );
+    log({
+      pii: toPIILogData(piiResult),
+      secrets: toSecretsLogData(secretsResult),
+      statusCode: 502,
+      errorMessage: message,
+    });
     return errorJson(c, 502, message, "server_error");
   }
 
-  logRequest(
-    createLogData({
-      provider: "api",
-      source,
-      model: MODEL_LABEL,
-      startTime,
-      pii: toPIILogData(piiResult),
-      secrets: toSecretsLogData(secretsResult),
-      statusCode: upstream.status,
-    }),
-    userAgent,
-  );
+  log({
+    pii: toPIILogData(piiResult),
+    secrets: toSecretsLogData(secretsResult),
+    statusCode: upstream.status,
+  });
 
   setResponseHeaders(
     c,
@@ -176,10 +172,4 @@ async function tracesHandler(c: Context) {
   return new Response(upstreamBody, { status: upstream.status, headers });
 }
 
-export function createOtlpRoutes(): Hono {
-  const routes = new Hono();
-  routes.post("/v1/traces", tracesHandler);
-  return routes;
-}
-
-export const otlpRoutes = createOtlpRoutes();
+export const otlpRoutes = new Hono().post("/v1/traces", tracesHandler);

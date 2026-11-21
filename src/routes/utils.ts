@@ -168,6 +168,8 @@ export interface CreateLogDataOptions {
   maskedContent?: string;
   statusCode?: number;
   errorMessage?: string;
+  /** Overrides config.mode for routes that always mask (telemetry). */
+  mode?: RequestLogData["mode"];
 }
 
 export function createLogData(options: CreateLogDataOptions): RequestLogData {
@@ -177,7 +179,7 @@ export function createLogData(options: CreateLogDataOptions): RequestLogData {
 
   return {
     timestamp: new Date().toISOString(),
-    mode: config.mode,
+    mode: options.mode ?? config.mode,
     provider,
     source: options.source,
     model: model || "unknown",

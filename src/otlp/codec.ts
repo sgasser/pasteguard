@@ -99,10 +99,7 @@ export function encodingFromContentType(contentType: string | undefined): OtlpEn
   return undefined;
 }
 
-export async function decodeTraceRequest(
-  body: Uint8Array,
-  encoding: OtlpEncoding,
-): Promise<OtlpTraceRequest> {
+export function decodeTraceRequest(body: Uint8Array, encoding: OtlpEncoding): OtlpTraceRequest {
   if (encoding === "json") {
     const parsed: unknown = JSON.parse(new TextDecoder().decode(body));
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
@@ -115,10 +112,10 @@ export async function decodeTraceRequest(
   return type.toObject(message, TO_OBJECT_OPTIONS) as OtlpTraceRequest;
 }
 
-export async function encodeTraceRequest(
+export function encodeTraceRequest(
   request: OtlpTraceRequest,
   encoding: OtlpEncoding,
-): Promise<Uint8Array<ArrayBuffer>> {
+): Uint8Array<ArrayBuffer> {
   if (encoding === "json") {
     return new TextEncoder().encode(JSON.stringify(request));
   }
