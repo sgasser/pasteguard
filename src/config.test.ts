@@ -560,4 +560,58 @@ pii_detection:
       cleanupConfig(path);
     }
   });
+
+  test("telemetry defaults to no OTLP forwarding", () => {
+    const path = writeConfig(`
+mode: mask
+providers: {}
+pii_detection:
+  detector_url: http://localhost:5002
+`);
+    try {
+      expect(loadConfig(path).telemetry).toEqual({});
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("telemetry.otlp_forward applies defaults for headers and timeout", () => {
+    const path = writeConfig(`
+mode: mask
+providers: {}
+pii_detection:
+  detector_url: http://localhost:5002
+telemetry:
+  otlp_forward:
+    url: http://collector:4318/v1/traces
+`);
+    try {
+      expect(loadConfig(path).telemetry).toEqual({
+        otlp_forward: {
+          url: "http://collector:4318/v1/traces",
+          headers: {},
+          timeout_ms: 10000,
+        },
+      });
+    } finally {
+      cleanupConfig(path);
+    }
+  });
+
+  test("telemetry.otlp_forward rejects a non-URL target", () => {
+    const path = writeConfig(`
+mode: mask
+providers: {}
+pii_detection:
+  detector_url: http://localhost:5002
+telemetry:
+  otlp_forward:
+    url: not-a-url
+`);
+    try {
+      expect(() => loadConfig(path)).toThrow();
+    } finally {
+      cleanupConfig(path);
+    }
+  });
 });
