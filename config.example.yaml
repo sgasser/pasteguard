@@ -155,3 +155,15 @@ dashboard:
   # auth:
   #   username: admin
   #   password: ${DASHBOARD_PASSWORD}
+
+# Telemetry settings (optional)
+# When otlp_forward.url is set, POST /otlp/v1/traces masks OpenTelemetry trace
+# exports with the same PII and secrets rules and forwards them to that URL.
+# Set OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://<host>:3000/otlp/v1/traces (not the
+# generic OTEL_EXPORTER_OTLP_ENDPOINT, which also sends metrics and logs here, where
+# they get 404) and OTEL_EXPORTER_OTLP_COMPRESSION=none.
+# telemetry:
+#   otlp_forward:
+#     url: http://localhost:4318/v1/traces
+#     headers: {}
+#     timeout_ms: 10000

@@ -18,6 +18,7 @@ describe("browser access middleware", () => {
     "/openai/v1/chat/completions",
     "/anthropic/v1/messages",
     "/codex/responses",
+    "/otlp/v1/traces",
   ])("rejects browser requests before proxy route %s runs", async (path) => {
     const { app, handledRequests } = createApp();
     const response = await app.request(`http://127.0.0.1:3000${path}`, {
@@ -39,6 +40,26 @@ describe("browser access middleware", () => {
     });
 
     expect(response.status).toBe(403);
+  });
+
+  test("rejects CORS preflight and cross-site requests on the OTLP route", async () => {
+    const { app, handledRequests } = createApp();
+    const preflight = await app.request("http://127.0.0.1:3000/otlp/v1/traces", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://attacker.example",
+        "Access-Control-Request-Method": "POST",
+      },
+    });
+    const crossSite = await app.request("http://127.0.0.1:3000/otlp/v1/traces", {
+      method: "POST",
+      headers: { "Sec-Fetch-Site": "cross-site" },
+    });
+
+    expect(preflight.status).toBe(403);
+    expect(preflight.headers.get("access-control-allow-origin")).toBeNull();
+    expect(crossSite.status).toBe(403);
+    expect(handledRequests()).toBe(0);
   });
 
   test("allows non-browser proxy clients without CORS headers", async () => {

@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 
-const PROXY_PATH_PREFIXES = ["/openai", "/anthropic", "/codex"];
+const PROXY_PATH_PREFIXES = ["/openai", "/anthropic", "/codex", "/otlp"];
 const publicCors = cors();
 
 function isProxyPath(path: string): boolean {

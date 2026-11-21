@@ -178,6 +178,16 @@ const DashboardSchema = z.object({
   auth: DashboardAuthSchema.optional(),
 });
 
+const OtlpForwardSchema = z.object({
+  url: z.string().url(),
+  headers: z.record(z.string(), z.string()).default({}),
+  timeout_ms: z.coerce.number().int().min(0).default(10000),
+});
+
+const TelemetrySchema = z.object({
+  otlp_forward: OtlpForwardSchema.optional(),
+});
+
 // All supported secret entity types
 const SecretEntityTypes = [
   "OPENSSH_PRIVATE_KEY",
@@ -218,6 +228,7 @@ const ConfigSchema = z
     logging: LoggingSchema.prefault({}),
     dashboard: DashboardSchema.prefault({}),
     secrets_detection: SecretsDetectionSchema.prefault({}),
+    telemetry: TelemetrySchema.prefault({}),
   })
   .refine(
     (config) => {
@@ -255,6 +266,8 @@ export type AllowlistPattern = z.infer<typeof AllowlistPatternSchema>;
 export type DenylistPattern = z.infer<typeof DenylistPatternSchema>;
 export type SecretsDetectionConfig = z.infer<typeof SecretsDetectionSchema>;
 export type ServerConfig = z.infer<typeof ServerSchema>;
+export type TelemetryConfig = z.infer<typeof TelemetrySchema>;
+export type OtlpForwardConfig = z.infer<typeof OtlpForwardSchema>;
 
 /**
  * Replaces ${VAR} and ${VAR:-default} patterns with environment variable values

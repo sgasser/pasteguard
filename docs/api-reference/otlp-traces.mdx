@@ -1,0 +1,126 @@
+---
+title: OTLP Traces
+description: POST /otlp/v1/traces
+---
+
+Masks OpenTelemetry trace exports before they reach your trace store. Point an OpenTelemetry SDK at PasteGuard instead of the collector or backend, and every string attribute in the batch is masked with the same PII and secrets detection used for LLM requests.
+
+```
+POST /otlp/v1/traces
+```
+
+The route is enabled only when `telemetry.otlp_forward.url` is configured. Without it the route returns 404 and nothing else changes.
+
+## Use Cases
+
+- Agent frameworks that record prompts, completions and tool arguments as span attributes
+- Shared trace stores where raw personal data must never land
+- Keeping LLM traffic and telemetry masked by the same rules
+
+## Configuration
+
+```yaml
+telemetry:
+  otlp_forward:
+    url: http://phoenix:6006/v1/traces   # required to enable the route
+    headers: {}                          # optional, e.g. Authorization
+    timeout_ms: 10000                    # 0 disables the timeout
+```
+
+## Request
+
+Both OTLP/HTTP encodings are accepted and forwarded unchanged in kind:
+
+| Content-Type | Encoding |
+|--------------|----------|
+| `application/x-protobuf` | Protobuf (SDK default) |
+| `application/json` | JSON |
+
+Compressed bodies are rejected with 415. Set `OTEL_EXPORTER_OTLP_COMPRESSION=none` in the exporting application.
+
+```bash
+curl -X POST http://localhost:3000/otlp/v1/traces \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceSpans": [{
+      "scopeSpans": [{
+        "spans": [{
+          "name": "chat",
+          "attributes": [
+            { "key": "gen_ai.prompt", "value": { "stringValue": "Mail john@example.com" } }
+          ]
+        }]
+      }]
+    }]
+  }'
+```
+
+Forwarded body:
+
+```json
+{
+  "resourceSpans": [{
+    "scopeSpans": [{
+      "spans": [{
+        "name": "chat",
+        "attributes": [
+          { "key": "gen_ai.prompt", "value": { "stringValue": "Mail [[EMAIL_ADDRESS_1]]" } }
+        ]
+      }]
+    }]
+  }]
+}
+```
+
+## Pointing an SDK at PasteGuard
+
+```bash
+export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:3000/otlp/v1/traces
+export OTEL_EXPORTER_OTLP_COMPRESSION=none
+```
+
+Use the signal-specific `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`; SDKs use it as given. The generic `OTEL_EXPORTER_OTLP_ENDPOINT` also redirects the metrics and logs exporters to PasteGuard, which only serves traces and answers them with 404.
+
+The detector is called once per string attribute, one call after another, so a large batch means many detector calls before it is forwarded. For busy services, lower `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` and raise `OTEL_EXPORTER_OTLP_TIMEOUT` so exports finish within the SDK timeout.
+
+## What Is Masked
+
+- String attribute values on resources, instrumentation scopes, spans, span events and span links, including strings nested in array and key-value list values
+- Secrets are masked per attribute when secrets detection is enabled (the default), even when `secrets_detection.action` is `block` or `route_local`, so the batch still arrives and the incident stays visible
+
+Not masked: span names, event names, span status messages, attribute keys, numeric, boolean and bytes values.
+
+Every extracted attribute is scanned with role `user`. Narrowing `pii_detection.scan_roles` or `secrets_detection.scan_roles` to exclude `user` turns off telemetry masking for that detector.
+
+Placeholders are numbered per request, so the same value appears as the same placeholder across all spans in one batch.
+
+## Response
+
+The response from the forward target is returned as received, including its status and body. PasteGuard always adds these headers (`X-PasteGuard-PII-Detected` is `true` or `false`):
+
+```http
+X-PasteGuard-Mode: mask
+X-PasteGuard-Provider: api
+X-PasteGuard-PII-Detected: true
+```
+
+These are added only when something was detected:
+
+```http
+X-PasteGuard-PII-Masked: true
+X-PasteGuard-Secrets-Detected: true
+X-PasteGuard-Secrets-Types: API_KEY_SK
+X-PasteGuard-Secrets-Masked: true
+```
+
+Each batch appears in the dashboard with model `otlp/traces`.
+
+## Error Responses
+
+| Status | When |
+|--------|------|
+| 400 | Body could not be decoded in the declared encoding |
+| 404 | `telemetry.otlp_forward.url` is not configured |
+| 415 | Unsupported `Content-Type` or a `Content-Encoding` header other than `identity` |
+| 502 | Forward target unreachable or timed out |
+| 503 | PII detector unavailable; nothing is forwarded |

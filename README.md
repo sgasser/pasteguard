@@ -57,6 +57,8 @@ The experimental browser extension is available for ChatGPT, Claude, and Gemini.
 
 Change one base URL. PasteGuard masks the request, forwards it to the configured provider, and restores supported placeholders in the response.
 
+Telemetry gets the same treatment: point an OpenTelemetry SDK's trace exporter at `/otlp/v1/traces` and trace attributes are masked before they reach your trace store. See the [OTLP Traces](https://pasteguard.com/docs/api-reference/otlp-traces) reference.
+
 **[Apps & APIs docs](https://pasteguard.com/docs/use-cases/api-integration)**
 
 ### Coding Agents
