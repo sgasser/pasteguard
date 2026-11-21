@@ -187,6 +187,30 @@ describe("POST /otlp/v1/traces", () => {
     expect(body.error.message).toContain("OTEL_EXPORTER_OTLP_COMPRESSION=none");
   });
 
+  test("treats Content-Encoding identity as uncompressed", async () => {
+    const res = await post(JSON.stringify(batch), "application/json", {
+      "content-encoding": "identity",
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test("returns 400 for snake_case OTLP/JSON instead of forwarding it unmasked", async () => {
+    const snake = JSON.stringify({
+      resource_spans: [
+        {
+          scope_spans: [
+            {
+              spans: [{ attributes: [{ key: "a", value: { string_value: "john@example.com" } }] }],
+            },
+          ],
+        },
+      ],
+    });
+    const res = await post(snake, "application/json");
+    expect(res.status).toBe(400);
+    expect(captured).toBeUndefined();
+  });
+
   test("returns 400 for undecodable JSON", async () => {
     const res = await post("{not json", "application/json");
     expect(res.status).toBe(400);

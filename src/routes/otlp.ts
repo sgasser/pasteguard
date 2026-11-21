@@ -67,7 +67,8 @@ async function tracesHandler(c: Context) {
     );
   }
 
-  if (c.req.header("content-encoding")) {
+  const contentEncoding = c.req.header("content-encoding")?.toLowerCase();
+  if (contentEncoding && contentEncoding !== "identity") {
     return errorJson(
       c,
       415,

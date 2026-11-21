@@ -88,7 +88,7 @@ The detector is called once per string attribute, one call after another, so a l
 - String attribute values on resources, instrumentation scopes, spans, span events and span links, including strings nested in array and key-value list values
 - Secrets are masked per attribute when secrets detection is enabled (the default), even when `secrets_detection.action` is `block` or `route_local`, so the batch still arrives and the incident stays visible
 
-Not masked: span names, event names, attribute keys, numeric, boolean and bytes values.
+Not masked: span names, event names, span status messages, attribute keys, numeric, boolean and bytes values.
 
 Every extracted attribute is scanned with role `user`. Narrowing `pii_detection.scan_roles` or `secrets_detection.scan_roles` to exclude `user` turns off telemetry masking for that detector.
 
@@ -121,6 +121,6 @@ Each batch appears in the dashboard with model `otlp/traces`.
 |--------|------|
 | 400 | Body could not be decoded in the declared encoding |
 | 404 | `telemetry.otlp_forward.url` is not configured |
-| 415 | Unsupported `Content-Type` or a `Content-Encoding` header |
+| 415 | Unsupported `Content-Type` or a `Content-Encoding` header other than `identity` |
 | 502 | Forward target unreachable or timed out |
 | 503 | PII detector unavailable; nothing is forwarded |

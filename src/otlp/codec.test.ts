@@ -80,6 +80,15 @@ describe("json codec", () => {
     expect(decodeTraceRequest(bytes, "json")).toEqual(fixtureBatch);
   });
 
+  test("rejects snake_case field names but allows underscores in values", () => {
+    const snake = new TextEncoder().encode('{"resource_spans":[]}');
+    expect(() => decodeTraceRequest(snake, "json")).toThrow(/lowerCamelCase/);
+    const ok = new TextEncoder().encode(
+      '{"resourceSpans":[{"scopeSpans":[{"spans":[{"attributes":[{"key":"http_method","value":{"stringValue":"a_b"}}]}]}]}]}',
+    );
+    expect(() => decodeTraceRequest(ok, "json")).not.toThrow();
+  });
+
   test("rejects a non-object body", () => {
     const bytes = new TextEncoder().encode("[1,2,3]");
     expect(() => decodeTraceRequest(bytes, "json")).toThrow();

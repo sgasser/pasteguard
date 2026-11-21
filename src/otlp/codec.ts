@@ -99,12 +99,29 @@ export function encodingFromContentType(contentType: string | undefined): OtlpEn
   return undefined;
 }
 
+// The extractor only knows the lowerCamelCase field names of OTLP/JSON. A
+// snake_case body (the proto names, which some parsers also accept) would
+// decode fine and then be forwarded with nothing masked, so reject it.
+function assertCamelCaseKeys(node: unknown): void {
+  if (Array.isArray(node)) {
+    for (const item of node) assertCamelCaseKeys(item);
+  } else if (node && typeof node === "object") {
+    for (const [key, value] of Object.entries(node)) {
+      if (key.includes("_")) {
+        throw new Error(`OTLP/JSON field names must be lowerCamelCase (got "${key}")`);
+      }
+      assertCamelCaseKeys(value);
+    }
+  }
+}
+
 export function decodeTraceRequest(body: Uint8Array, encoding: OtlpEncoding): OtlpTraceRequest {
   if (encoding === "json") {
     const parsed: unknown = JSON.parse(new TextDecoder().decode(body));
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       throw new Error("OTLP JSON body must be an object");
     }
+    assertCamelCaseKeys(parsed);
     return parsed as OtlpTraceRequest;
   }
   const type = loadRequestType();
