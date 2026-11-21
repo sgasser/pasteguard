@@ -4,11 +4,19 @@
  * Decodes and re-encodes ExportTraceServiceRequest bodies in the two OTLP/HTTP
  * encodings (protobuf and JSON) into one plain-object shape so masking can
  * walk both the same way. Proto files are vendored from opentelemetry-proto
- * v1.9.0 under ./proto and loaded once at first use.
+ * v1.9.0 under ./proto and bundled as text imports, so they survive
+ * `bun build`; they are parsed once at first use.
  */
 
-import path from "node:path";
 import protobuf from "protobufjs";
+import traceServiceProto from "./proto/opentelemetry/proto/collector/trace/v1/trace_service.proto" with {
+  type: "text",
+};
+import commonProto from "./proto/opentelemetry/proto/common/v1/common.proto" with { type: "text" };
+import resourceProto from "./proto/opentelemetry/proto/resource/v1/resource.proto" with {
+  type: "text",
+};
+import traceProto from "./proto/opentelemetry/proto/trace/v1/trace.proto" with { type: "text" };
 
 export type OtlpEncoding = "protobuf" | "json";
 
@@ -60,15 +68,17 @@ export interface OtlpTraceRequest {
 }
 
 const REQUEST_TYPE = "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest";
-const ENTRY_PROTO = "opentelemetry/proto/collector/trace/v1/trace_service.proto";
 
-let requestType: Promise<protobuf.Type> | undefined;
+let requestType: protobuf.Type | undefined;
 
-function loadRequestType(): Promise<protobuf.Type> {
+function loadRequestType(): protobuf.Type {
   if (!requestType) {
     const root = new protobuf.Root();
-    root.resolvePath = (_origin, target) => path.join(import.meta.dir, "proto", target);
-    requestType = root.load(ENTRY_PROTO).then((loaded) => loaded.lookupType(REQUEST_TYPE));
+    // Dependency order: each file only references types parsed before it.
+    for (const source of [commonProto, resourceProto, traceProto, traceServiceProto]) {
+      protobuf.parse(source, root, { keepCase: false });
+    }
+    requestType = root.resolveAll().lookupType(REQUEST_TYPE);
   }
   return requestType;
 }
@@ -100,7 +110,7 @@ export async function decodeTraceRequest(
     }
     return parsed as OtlpTraceRequest;
   }
-  const type = await loadRequestType();
+  const type = loadRequestType();
   const message = type.decode(body);
   return type.toObject(message, TO_OBJECT_OPTIONS) as OtlpTraceRequest;
 }
@@ -112,7 +122,7 @@ export async function encodeTraceRequest(
   if (encoding === "json") {
     return new TextEncoder().encode(JSON.stringify(request));
   }
-  const type = await loadRequestType();
+  const type = loadRequestType();
   // Copy into a fresh Uint8Array so the result is Uint8Array<ArrayBuffer> and
   // usable as a fetch body under TypeScript 5.7+ typed-array generics.
   return new Uint8Array(type.encode(type.fromObject(request)).finish());
