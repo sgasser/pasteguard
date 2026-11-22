@@ -22,7 +22,7 @@ type DashboardAuth = Config["dashboard"]["auth"];
  * Builds the dashboard's Tailwind CSS
  */
 function buildDashboardCss(): Promise<string> {
-	return buildCss({ in: DASHBOARD_CSS_INPUT });
+	return buildCss({ in: DASHBOARD_CSS_INPUT, minify: true });
 }
 
 /**
