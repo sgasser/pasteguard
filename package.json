@@ -30,7 +30,7 @@
     "@biomejs/biome": "^2.4.16",
     "@types/bun": "latest",
     "@types/pg": "^8.20.0",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   },
   "overrides": {
     "postcss": "8.5.32"
