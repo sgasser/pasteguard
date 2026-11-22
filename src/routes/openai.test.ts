@@ -64,84 +64,84 @@ afterEach(() => {
 });
 
 describe("POST /openai/v1/chat/completions", () => {
-  test.each([
-    "mask",
-    "route",
-  ] as const)("forwards client headers except internal and transport headers in %s mode", async (mode) => {
-    config.mode = mode;
-    config.providers.openai.api_key = "configured-key";
-    const forwardedHeaders = {
-      Accept: "application/json",
-      "OpenAI-Organization": "org-test",
-      "OpenAI-Project": "proj-test",
-      "HTTP-Referer": "https://client.example",
-      "X-Opencode-Session": "session-123",
-      "X-OpenRouter-Title": "Test client",
-      "X-Stainless-Runtime": "bun",
-      "X-New-Provider-Feature": "future-value",
-      "X-OpenWebUI-Feature": "enabled",
-      "X-Forwarded-For": "192.0.2.1",
-      Cookie: "provider-session=value",
-    };
-    const rejectedHeaders = {
-      Host: "proxy.example",
-      Connection: "keep-alive, X-Hop-Token",
-      "Keep-Alive": "timeout=5",
-      "Content-Encoding": "gzip",
-      "Content-Length": "999",
-      "Proxy-Authenticate": "Basic realm=proxy",
-      "Proxy-Authorization": "Bearer proxy-token",
-      TE: "trailers",
-      Trailer: "X-Trailer",
-      "Transfer-Encoding": "chunked",
-      Upgrade: "websocket",
-      "X-Hop-Token": "connection-only",
-      "X-PasteGuard-Source": "client",
-      "X-PasteGuard-Future": "internal",
-      "X-OpenWebUI-User-Email": "identity@example.com",
-      "X-OpenWebUI-User-Name": "Synthetic User",
-      "X-OpenWebUI-User-Id": "user-123",
-      "X-OpenWebUI-Chat-Id": "chat-123",
-      "X-OpenWebUI-User-Future": "private",
-    };
-    let upstream: Request | undefined;
-    globalThis.fetch = (async (target: string | URL | Request, init?: RequestInit) => {
-      upstream = target instanceof Request ? target : new Request(target, init);
-      return Response.json({ choices: [], output: [] });
-    }) as typeof fetch;
+  test.each(["mask", "route"] as const)(
+    "forwards client headers except internal and transport headers in %s mode",
+    async (mode) => {
+      config.mode = mode;
+      config.providers.openai.api_key = "configured-key";
+      const forwardedHeaders = {
+        Accept: "application/json",
+        "OpenAI-Organization": "org-test",
+        "OpenAI-Project": "proj-test",
+        "HTTP-Referer": "https://client.example",
+        "X-Opencode-Session": "session-123",
+        "X-OpenRouter-Title": "Test client",
+        "X-Stainless-Runtime": "bun",
+        "X-New-Provider-Feature": "future-value",
+        "X-OpenWebUI-Feature": "enabled",
+        "X-Forwarded-For": "192.0.2.1",
+        Cookie: "provider-session=value",
+      };
+      const rejectedHeaders = {
+        Host: "proxy.example",
+        Connection: "keep-alive, X-Hop-Token",
+        "Keep-Alive": "timeout=5",
+        "Content-Encoding": "gzip",
+        "Content-Length": "999",
+        "Proxy-Authenticate": "Basic realm=proxy",
+        "Proxy-Authorization": "Bearer proxy-token",
+        TE: "trailers",
+        Trailer: "X-Trailer",
+        "Transfer-Encoding": "chunked",
+        Upgrade: "websocket",
+        "X-Hop-Token": "connection-only",
+        "X-PasteGuard-Source": "client",
+        "X-PasteGuard-Future": "internal",
+        "X-OpenWebUI-User-Email": "identity@example.com",
+        "X-OpenWebUI-User-Name": "Synthetic User",
+        "X-OpenWebUI-User-Id": "user-123",
+        "X-OpenWebUI-Chat-Id": "chat-123",
+        "X-OpenWebUI-User-Future": "private",
+      };
+      let upstream: Request | undefined;
+      globalThis.fetch = (async (target: string | URL | Request, init?: RequestInit) => {
+        upstream = target instanceof Request ? target : new Request(target, init);
+        return Response.json({ choices: [], output: [] });
+      }) as typeof fetch;
 
-    for (const endpoint of ["chat/completions", "responses"]) {
-      for (const authorization of [undefined, "Bearer client-token"]) {
-        const response = await app.request(`/openai/v1/${endpoint}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json; charset=utf-8",
-            ...(authorization ? { Authorization: authorization } : {}),
-            ...forwardedHeaders,
-            ...rejectedHeaders,
-          },
-          body: JSON.stringify({
-            model: "gpt-test",
-            messages: [{ role: "user", content: "Reply ok" }],
-            input: "Reply ok",
-          }),
-        });
+      for (const endpoint of ["chat/completions", "responses"]) {
+        for (const authorization of [undefined, "Bearer client-token"]) {
+          const response = await app.request(`/openai/v1/${endpoint}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json; charset=utf-8",
+              ...(authorization ? { Authorization: authorization } : {}),
+              ...forwardedHeaders,
+              ...rejectedHeaders,
+            },
+            body: JSON.stringify({
+              model: "gpt-test",
+              messages: [{ role: "user", content: "Reply ok" }],
+              input: "Reply ok",
+            }),
+          });
 
-        expect(response.status).toBe(200);
-        expect(upstream?.url).toBe(`${config.providers.openai.base_url}/${endpoint}`);
-        expect(upstream?.headers.get("authorization")).toBe(
-          authorization ?? "Bearer configured-key",
-        );
-        expect(upstream?.headers.get("content-type")).toBe("application/json");
-        for (const [name, value] of Object.entries(forwardedHeaders)) {
-          expect(upstream?.headers.get(name)).toBe(value);
-        }
-        for (const name of Object.keys(rejectedHeaders)) {
-          expect(upstream?.headers.get(name)).toBeNull();
+          expect(response.status).toBe(200);
+          expect(upstream?.url).toBe(`${config.providers.openai.base_url}/${endpoint}`);
+          expect(upstream?.headers.get("authorization")).toBe(
+            authorization ?? "Bearer configured-key",
+          );
+          expect(upstream?.headers.get("content-type")).toBe("application/json");
+          for (const [name, value] of Object.entries(forwardedHeaders)) {
+            expect(upstream?.headers.get(name)).toBe(value);
+          }
+          for (const name of Object.keys(rejectedHeaders)) {
+            expect(upstream?.headers.get(name)).toBeNull();
+          }
         }
       }
-    }
-  });
+    },
+  );
 
   test("returns 400 for missing messages", async () => {
     const res = await app.request("/openai/v1/chat/completions", {

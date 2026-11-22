@@ -114,7 +114,7 @@ openaiRoutes.post(
 
 openaiRoutes.route("/v1", openaiResponsesRoutes);
 
-openaiRoutes.all("/*", (c) => {
+openaiRoutes.all("/*", async (c) => {
   const normalizedPath = normalizeOpenAIPath(c.req.path);
   if (!normalizedPath || normalizedPath === "/v1/responses") {
     return c.json(

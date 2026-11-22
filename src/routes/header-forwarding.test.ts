@@ -32,59 +32,62 @@ describe("Provider passthrough headers", () => {
     ["openai", "/openai/v1/files", "/files"],
     ["anthropic", "/anthropic/v1/files", "/v1/files"],
     ["codex", "/codex/files", "/files"],
-  ] as const)("%s preserves raw body headers and excludes internal/connection headers", async (provider, path, upstreamPath) => {
-    config.providers.anthropic ??= { base_url: "https://anthropic.test" };
-    const compressed = Bun.gzipSync(new TextEncoder().encode("file payload"));
-    let upstream: Request | undefined;
-    globalThis.fetch = (async (target: string | URL | Request, init?: RequestInit) => {
-      upstream = target instanceof Request ? target : new Request(target, init);
-      return Response.json({ id: "file_test" });
-    }) as typeof fetch;
+  ] as const)(
+    "%s preserves raw body headers and excludes internal/connection headers",
+    async (provider, path, upstreamPath) => {
+      config.providers.anthropic ??= { base_url: "https://anthropic.test" };
+      const compressed = Bun.gzipSync(new TextEncoder().encode("file payload"));
+      let upstream: Request | undefined;
+      globalThis.fetch = (async (target: string | URL | Request, init?: RequestInit) => {
+        upstream = target instanceof Request ? target : new Request(target, init);
+        return Response.json({ id: "file_test" });
+      }) as typeof fetch;
 
-    for (const host of [undefined, "pasteguard.test"]) {
-      const response = await app.request(`${path}?purpose=test`, {
-        method: "POST",
-        headers: {
-          ...identityHeaders,
-          Authorization: "Bearer client-token",
-          "Content-Type": "application/octet-stream",
-          "Content-Encoding": "gzip",
-          "Content-Length": String(compressed.length),
-          ...(host ? { Host: host } : {}),
-          "X-Forwarded-Host": "client-supplied.example",
-          Connection: "keep-alive, X-Hop-Token",
-          "Keep-Alive": "timeout=5",
-          "X-Hop-Token": "connection-only",
-          "X-PasteGuard-Source": "client",
-          "X-New-Provider-Feature": "future-value",
-        },
-        body: compressed,
-      });
+      for (const host of [undefined, "pasteguard.test"]) {
+        const response = await app.request(`${path}?purpose=test`, {
+          method: "POST",
+          headers: {
+            ...identityHeaders,
+            Authorization: "Bearer client-token",
+            "Content-Type": "application/octet-stream",
+            "Content-Encoding": "gzip",
+            "Content-Length": String(compressed.length),
+            ...(host ? { Host: host } : {}),
+            "X-Forwarded-Host": "client-supplied.example",
+            Connection: "keep-alive, X-Hop-Token",
+            "Keep-Alive": "timeout=5",
+            "X-Hop-Token": "connection-only",
+            "X-PasteGuard-Source": "client",
+            "X-New-Provider-Feature": "future-value",
+          },
+          body: compressed,
+        });
 
-      expect(response.status).toBe(200);
-      expect(upstream?.url).toBe(
-        `${config.providers[provider]!.base_url.replace(/\/$/, "")}${upstreamPath}?purpose=test`,
-      );
-      expect(upstream?.method).toBe("POST");
-      expect(upstream?.headers.get("authorization")).toBe("Bearer client-token");
-      expect(upstream?.headers.get("x-new-provider-feature")).toBe("future-value");
-      expect(upstream?.headers.get("x-forwarded-host")).toBe(host ?? null);
-      expect(upstream?.headers.get("content-type")).toBe("application/octet-stream");
-      expect(upstream?.headers.get("content-encoding")).toBe("gzip");
-      expect(upstream?.headers.get("content-length")).toBe(String(compressed.length));
-      for (const name of [
-        "host",
-        "connection",
-        "keep-alive",
-        "x-hop-token",
-        "x-pasteguard-source",
-        ...Object.keys(identityHeaders),
-      ]) {
-        expect(upstream?.headers.get(name)).toBeNull();
+        expect(response.status).toBe(200);
+        expect(upstream?.url).toBe(
+          `${config.providers[provider]!.base_url.replace(/\/$/, "")}${upstreamPath}?purpose=test`,
+        );
+        expect(upstream?.method).toBe("POST");
+        expect(upstream?.headers.get("authorization")).toBe("Bearer client-token");
+        expect(upstream?.headers.get("x-new-provider-feature")).toBe("future-value");
+        expect(upstream?.headers.get("x-forwarded-host")).toBe(host ?? null);
+        expect(upstream?.headers.get("content-type")).toBe("application/octet-stream");
+        expect(upstream?.headers.get("content-encoding")).toBe("gzip");
+        expect(upstream?.headers.get("content-length")).toBe(String(compressed.length));
+        for (const name of [
+          "host",
+          "connection",
+          "keep-alive",
+          "x-hop-token",
+          "x-pasteguard-source",
+          ...Object.keys(identityHeaders),
+        ]) {
+          expect(upstream?.headers.get(name)).toBeNull();
+        }
+        expect(new Uint8Array(await upstream!.arrayBuffer())).toEqual(compressed);
       }
-      expect(new Uint8Array(await upstream!.arrayBuffer())).toEqual(compressed);
-    }
-  });
+    },
+  );
 
   test.each([
     ["openai", "/openai/v1/files"],
@@ -144,35 +147,35 @@ describe("Provider passthrough headers", () => {
 });
 
 describe("Shared upstream authentication", () => {
-  test.each([
-    "authorization",
-    "x-api-key",
-  ] as const)("uses configured %s only without client authentication", (authHeader) => {
-    const fallback = authHeader === "authorization" ? "Bearer configured-key" : "configured-key";
-    expect(buildUpstreamHeaders({}, "configured-key", authHeader).get(authHeader)).toBe(fallback);
-    expect(buildUpstreamHeaders({}, undefined, authHeader).get(authHeader)).toBeNull();
+  test.each(["authorization", "x-api-key"] as const)(
+    "uses configured %s only without client authentication",
+    (authHeader) => {
+      const fallback = authHeader === "authorization" ? "Bearer configured-key" : "configured-key";
+      expect(buildUpstreamHeaders({}, "configured-key", authHeader).get(authHeader)).toBe(fallback);
+      expect(buildUpstreamHeaders({}, undefined, authHeader).get(authHeader)).toBeNull();
 
-    for (const clientHeaders of [
-      { Authorization: "Bearer client-token" },
-      { "Api-Key": "client-key" },
-      { "X-Api-Key": "client-key" },
-      { Authorization: "Bearer client-token", "X-Api-Key": "client-key" },
-    ] as Record<string, string>[]) {
-      const upstream = buildUpstreamHeaders(clientHeaders, "configured-key", authHeader);
-      for (const name of ["authorization", "api-key", "x-api-key"]) {
-        expect(upstream.get(name)).toBe(new Headers(clientHeaders).get(name));
+      for (const clientHeaders of [
+        { Authorization: "Bearer client-token" },
+        { "Api-Key": "client-key" },
+        { "X-Api-Key": "client-key" },
+        { Authorization: "Bearer client-token", "X-Api-Key": "client-key" },
+      ] as Record<string, string>[]) {
+        const upstream = buildUpstreamHeaders(clientHeaders, "configured-key", authHeader);
+        for (const name of ["authorization", "api-key", "x-api-key"]) {
+          expect(upstream.get(name)).toBe(new Headers(clientHeaders).get(name));
+        }
       }
-    }
 
-    for (const clientHeaders of [
-      { "Proxy-Authorization": "Bearer hop-token" },
-      { Authorization: "Bearer hop-token", Connection: "aUtHoRiZaTiOn" },
-      { "X-Api-Key": "hop-key", Connection: "X-Api-Key" },
-    ] as Record<string, string>[]) {
-      const upstream = buildUpstreamHeaders(clientHeaders, "configured-key", authHeader);
-      expect(upstream.get(authHeader)).toBe(fallback);
-      expect(upstream.has("proxy-authorization")).toBe(false);
-      expect(upstream.has("connection")).toBe(false);
-    }
-  });
+      for (const clientHeaders of [
+        { "Proxy-Authorization": "Bearer hop-token" },
+        { Authorization: "Bearer hop-token", Connection: "aUtHoRiZaTiOn" },
+        { "X-Api-Key": "hop-key", Connection: "X-Api-Key" },
+      ] as Record<string, string>[]) {
+        const upstream = buildUpstreamHeaders(clientHeaders, "configured-key", authHeader);
+        expect(upstream.get(authHeader)).toBe(fallback);
+        expect(upstream.has("proxy-authorization")).toBe(false);
+        expect(upstream.has("connection")).toBe(false);
+      }
+    },
+  );
 });
