@@ -545,21 +545,22 @@ describe("createUnmaskingStream", () => {
         finish_reason: null,
       },
     ],
-  ] satisfies Array<
-    [string, ChoiceDelta]
-  >)("passes through tool arguments without an explicit %s", async (_description, choice) => {
-    const context = createMaskingContext();
-    context.mapping["[[PERSON_1]]"] = "Taylor Example";
-    const input = createSSEEvent({ id: "chunk-missing-index", choices: [choice] });
+  ] satisfies Array<[string, ChoiceDelta]>)(
+    "passes through tool arguments without an explicit %s",
+    async (_description, choice) => {
+      const context = createMaskingContext();
+      context.mapping["[[PERSON_1]]"] = "Taylor Example";
+      const input = createSSEEvent({ id: "chunk-missing-index", choices: [choice] });
 
-    const output = await consumeStream(
-      createUnmaskingStream(createSSEStream([input, "data: [DONE]\n\n"]), context, defaultConfig),
-    );
+      const output = await consumeStream(
+        createUnmaskingStream(createSSEStream([input, "data: [DONE]\n\n"]), context, defaultConfig),
+      );
 
-    expect(parseJsonEvents(output)[0].choices[0].delta.tool_calls?.[0].function?.arguments).toBe(
-      '{"person":"[[PERSON_1]]"}',
-    );
-  });
+      expect(parseJsonEvents(output)[0].choices[0].delta.tool_calls?.[0].function?.arguments).toBe(
+        '{"person":"[[PERSON_1]]"}',
+      );
+    },
+  );
 
   test("flushes incomplete tool arguments before finish and DONE without changing malformed data", async () => {
     const context = createMaskingContext();

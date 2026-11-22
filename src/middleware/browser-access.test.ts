@@ -14,22 +14,21 @@ function createApp() {
 }
 
 describe("browser access middleware", () => {
-  test.each([
-    "/openai/v1/chat/completions",
-    "/anthropic/v1/messages",
-    "/codex/responses",
-  ])("rejects browser requests before proxy route %s runs", async (path) => {
-    const { app, handledRequests } = createApp();
-    const response = await app.request(`http://127.0.0.1:3000${path}`, {
-      method: "POST",
-      headers: { Origin: "https://attacker.example" },
-      body: "{}",
-    });
+  test.each(["/openai/v1/chat/completions", "/anthropic/v1/messages", "/codex/responses"])(
+    "rejects browser requests before proxy route %s runs",
+    async (path) => {
+      const { app, handledRequests } = createApp();
+      const response = await app.request(`http://127.0.0.1:3000${path}`, {
+        method: "POST",
+        headers: { Origin: "https://attacker.example" },
+        body: "{}",
+      });
 
-    expect(response.status).toBe(403);
-    expect(handledRequests()).toBe(0);
-    expect(response.headers.get("access-control-allow-origin")).toBeNull();
-  });
+      expect(response.status).toBe(403);
+      expect(handledRequests()).toBe(0);
+      expect(response.headers.get("access-control-allow-origin")).toBeNull();
+    },
+  );
 
   test("rejects cross-site browser requests without an Origin header", async () => {
     const { app } = createApp();
