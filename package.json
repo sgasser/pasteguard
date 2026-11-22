@@ -19,7 +19,7 @@
   "dependencies": {
     "@hono/zod-validator": "^0.9.1",
     "hono": "^4.12.25",
-    "hono-tailwind": "^2.2.0",
+    "hono-tailwind": "^3.0.1",
     "kysely": "^0.29.9",
     "pg": "^8.23.1",
     "tailwindcss": "^4.3.5",
