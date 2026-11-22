@@ -42,6 +42,14 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # Major upgrades of the detector's model stack are made deliberately, not by Dependabot.
+    ignore:
+      - dependency-name: "gliner"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "huggingface-hub"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "transformers"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/docker"
