@@ -19,6 +19,13 @@ describe("GET /dashboard/tailwind.css", () => {
     expect(css).toContain(".rounded-xl");
   });
 
+  test("only generates classes found in the dashboard views", async () => {
+    const css = await (await app.request("/dashboard/tailwind.css")).text();
+
+    // docker/supervisord.conf contains [program:detector], a valid Tailwind candidate
+    expect(css).not.toContain("program");
+  });
+
   test("serves the same CSS on later requests", async () => {
     const first = await (await app.request("/dashboard/tailwind.css")).text();
     const second = await (await app.request("/dashboard/tailwind.css")).text();

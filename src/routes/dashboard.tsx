@@ -16,6 +16,10 @@ const config = getConfig();
 
 export const dashboardRoutes = new Hono();
 
+// Relative to the working directory, like config.yaml. The stylesheet limits
+// Tailwind's class scan to the dashboard views.
+const DASHBOARD_CSS_INPUT = "src/views/dashboard/tailwind.css";
+
 // Build the dashboard CSS once per process. hono-tailwind's tailwind() middleware
 // rebuilds it on every request unless it writes the CSS to a file on disk.
 let dashboardCss: Promise<string> | undefined;
@@ -24,7 +28,7 @@ let dashboardCss: Promise<string> | undefined;
  * GET /dashboard/tailwind.css - Dashboard styles (served without dashboard auth)
  */
 dashboardRoutes.get("/tailwind.css", async (c) => {
-	dashboardCss ??= buildCss().catch((error: unknown) => {
+	dashboardCss ??= buildCss({ in: DASHBOARD_CSS_INPUT }).catch((error: unknown) => {
 		dashboardCss = undefined;
 		throw error;
 	});
