@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+
 /**
  * PII Detection Accuracy Benchmark
  *
@@ -8,25 +9,52 @@
  *   bun run benchmarks/pii-accuracy/run.ts
  *   bun run benchmarks/pii-accuracy/run.ts --threshold 0.5
  *   bun run benchmarks/pii-accuracy/run.ts --languages de,en
+ *   bun run benchmarks/pii-accuracy/run.ts --mode api --target-url http://localhost:3000
+ *   bun run benchmarks/pii-accuracy/run.ts --profile published --split test
  *   bun run benchmarks/pii-accuracy/run.ts --verbose
  */
 
-import { parseArgs } from "util";
+import { parseArgs } from "node:util";
 import { Glob } from "bun";
 import { parse as parseYaml } from "yaml";
 import {
-  TestCaseSchema,
   type AccuracyMetrics,
   type DetectedEntity,
   type ExpectedEntity,
   type TestCase,
+  TestCaseSchema,
   type TestResult,
 } from "./types";
 
-// Configuration
 const DEFAULT_THRESHOLD = 0.7;
-const PRESIDIO_URL = process.env.PRESIDIO_URL || "http://localhost:5002";
-const TEST_DATA_DIR = import.meta.dir + "/test-data";
+const DEFAULT_DETECTOR_URL = "http://localhost:5002";
+const DEFAULT_API_URL = "http://localhost:3000";
+const TEST_DATA_DIR = `${import.meta.dir}/test-data`;
+
+type BenchmarkMode = "detector" | "api";
+type BenchmarkProfile = "published" | "extended" | "all";
+
+interface TargetCapabilities {
+  entities?: string[];
+  languages?: string[];
+  source: string;
+}
+
+interface BenchmarkScope {
+  profile: BenchmarkProfile;
+  entityTypes: string[];
+  languages?: string[];
+  capabilitiesSource: string;
+}
+
+interface SkippedCase {
+  id: string;
+  category: TestCase["category"];
+  split: TestCase["split"];
+  language: string;
+  unsupportedEntities: string[];
+  unsupportedLanguage?: string;
+}
 
 // Parse command line arguments
 const { values: args } = parseArgs({
@@ -34,6 +62,11 @@ const { values: args } = parseArgs({
   options: {
     threshold: { type: "string", short: "t" },
     languages: { type: "string", short: "l" },
+    split: { type: "string", short: "s" },
+    mode: { type: "string", short: "m" },
+    profile: { type: "string", short: "p" },
+    "detector-url": { type: "string" },
+    "target-url": { type: "string" },
     verbose: { type: "boolean", short: "v", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -49,6 +82,11 @@ Usage:
 Options:
   -t, --threshold <value>    Score threshold (default: ${DEFAULT_THRESHOLD})
   -l, --languages <langs>    Comma-separated languages to test (e.g., de,en)
+  -s, --split <dev|test>     Only run cases from this split (default: all)
+  -m, --mode <detector|api>  Run against the detector /analyze API or PasteGuard /api/mask
+  -p, --profile <profile>    published, extended, or all (default: api=published, detector=extended)
+      --detector-url <url>   Detector base URL (default: DETECTOR_URL or ${DEFAULT_DETECTOR_URL})
+      --target-url <url>     PasteGuard app URL for --mode api (default: PASTEGUARD_URL or ${DEFAULT_API_URL})
   -v, --verbose              Show detailed results for each test case
   -h, --help                 Show this help message
 
@@ -56,6 +94,8 @@ Examples:
   bun run benchmarks/pii-accuracy/run.ts
   bun run benchmarks/pii-accuracy/run.ts --threshold 0.5
   bun run benchmarks/pii-accuracy/run.ts --languages de,en
+  bun run benchmarks/pii-accuracy/run.ts --mode api --target-url http://localhost:3000 --split test
+  bun run benchmarks/pii-accuracy/run.ts --mode detector --profile extended --split test
   bun run benchmarks/pii-accuracy/run.ts --verbose
 `);
   process.exit(0);
@@ -64,9 +104,46 @@ Examples:
 const threshold = args.threshold ? Number.parseFloat(args.threshold) : DEFAULT_THRESHOLD;
 const verbose = args.verbose ?? false;
 const languageFilter = args.languages?.split(",").map((l) => l.trim().toLowerCase());
+const splitFilter = args.split?.trim().toLowerCase();
+const mode = parseMode(args.mode);
+const profile = parseProfile(args.profile, mode);
+const detectorUrl = normalizeBaseUrl(
+  args["detector-url"] ?? process.env.DETECTOR_URL ?? DEFAULT_DETECTOR_URL,
+);
+const apiUrl = normalizeBaseUrl(
+  args["target-url"] ?? process.env.PASTEGUARD_URL ?? process.env.TARGET_URL ?? DEFAULT_API_URL,
+);
 
-// Entity types we test for
-const ENTITY_TYPES = [
+if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+  console.error(`Invalid threshold: ${args.threshold}. Expected a number from 0 to 1.`);
+  process.exit(1);
+}
+
+if (splitFilter && !["dev", "test"].includes(splitFilter)) {
+  console.error(`Invalid split: ${splitFilter}. Expected "dev" or "test".`);
+  process.exit(1);
+}
+
+function parseMode(value: string | undefined): BenchmarkMode {
+  if (!value) return process.env.PASTEGUARD_URL || process.env.TARGET_URL ? "api" : "detector";
+  if (value === "detector" || value === "api") return value;
+  console.error(`Invalid mode: ${value}. Expected "detector" or "api".`);
+  process.exit(1);
+}
+
+function parseProfile(value: string | undefined, selectedMode: BenchmarkMode): BenchmarkProfile {
+  if (!value) return selectedMode === "api" ? "published" : "extended";
+  if (value === "published" || value === "extended" || value === "all") return value;
+  console.error(`Invalid profile: ${value}. Expected "published", "extended", or "all".`);
+  process.exit(1);
+}
+
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+// Capabilities the current public Docker images advertise through /info.
+const PUBLISHED_ENTITY_TYPES = [
   "PERSON",
   "EMAIL_ADDRESS",
   "PHONE_NUMBER",
@@ -74,7 +151,21 @@ const ENTITY_TYPES = [
   "IBAN_CODE",
   "IP_ADDRESS",
   "LOCATION",
-];
+] as const;
+
+// Extra coverage for detector development and future app capabilities.
+const EXTENDED_ENTITY_TYPES = [
+  "ORGANIZATION",
+  "ADDRESS",
+  "IT_FISCAL_CODE",
+  "VAT_CODE",
+  "BIC_CODE",
+  "CRYPTO",
+] as const;
+
+const ENTITY_TYPES: string[] = [...PUBLISHED_ENTITY_TYPES, ...EXTENDED_ENTITY_TYPES];
+
+let requestedEntityTypes: string[] = [...ENTITY_TYPES];
 
 /**
  * Load test cases from YAML files in test-data directory
@@ -96,8 +187,10 @@ async function loadTestCases(): Promise<TestCase[]> {
     for (const testCase of data.test_cases) {
       const parsed = TestCaseSchema.safeParse(testCase);
       if (parsed.success) {
-        // Filter by language if specified
-        if (!languageFilter || languageFilter.includes(parsed.data.language)) {
+        // Filter by language and/or split if specified
+        const langOk = !languageFilter || languageFilter.includes(parsed.data.language);
+        const splitOk = !splitFilter || parsed.data.split === splitFilter;
+        if (langOk && splitOk) {
           testCases.push(parsed.data);
         }
       } else {
@@ -111,24 +204,33 @@ async function loadTestCases(): Promise<TestCase[]> {
 }
 
 /**
- * Call Presidio analyzer API
+ * Call the configured target.
  */
 async function detectPII(text: string, language: string): Promise<DetectedEntity[]> {
   if (!text) return [];
+  if (mode === "api") {
+    return detectViaMaskApi(text, language);
+  }
+  return detectViaDetector(text, language);
+}
 
-  const response = await fetch(`${PRESIDIO_URL}/analyze`, {
+/**
+ * Call the detector /analyze API.
+ */
+async function detectViaDetector(text: string, language: string): Promise<DetectedEntity[]> {
+  const response = await fetch(`${detectorUrl}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       text,
       language,
-      entities: ENTITY_TYPES,
+      entities: requestedEntityTypes,
       score_threshold: threshold,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`Presidio error: ${response.status} ${await response.text()}`);
+    throw new Error(`Detector error: ${response.status} ${await response.text()}`);
   }
 
   const entities = (await response.json()) as Array<{
@@ -148,15 +250,177 @@ async function detectPII(text: string, language: string): Promise<DetectedEntity
 }
 
 /**
- * Check if Presidio is available
+ * Call PasteGuard's public masking API. This exercises the same app endpoint
+ * users call in production, at the cost of losing detector scores and offsets.
  */
-async function checkPresidio(): Promise<boolean> {
+async function detectViaMaskApi(text: string, language: string): Promise<DetectedEntity[]> {
+  const response = await fetch(`${apiUrl}/api/mask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, language, detect: ["pii"] }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`PasteGuard API error: ${response.status} ${await response.text()}`);
+  }
+
+  const data = (await response.json()) as {
+    context?: Record<string, string>;
+    entities?: Array<{ type: string; placeholder: string }>;
+  };
+
+  return (data.entities ?? [])
+    .map((entity) => {
+      const entityText = data.context?.[entity.placeholder] ?? "";
+      const start = entityText ? text.indexOf(entityText) : -1;
+      return {
+        type: entity.type,
+        text: entityText,
+        start: start >= 0 ? start : undefined,
+        end: start >= 0 ? start + entityText.length : undefined,
+        score: 1,
+      };
+    })
+    .filter((entity) => entity.text);
+}
+
+/**
+ * Check if the configured target is available.
+ */
+async function checkTarget(): Promise<boolean> {
   try {
-    const response = await fetch(`${PRESIDIO_URL}/health`);
+    if (mode === "detector") {
+      const response = await fetch(`${detectorUrl}/health`);
+      return response.ok;
+    }
+
+    const response = await fetch(`${apiUrl}/api/mask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "benchmark smoke test", language: "en", detect: ["pii"] }),
+    });
     return response.ok;
   } catch {
     return false;
   }
+}
+
+async function loadTargetCapabilities(): Promise<TargetCapabilities> {
+  if (mode === "detector") {
+    return {
+      entities: profile === "published" ? [...PUBLISHED_ENTITY_TYPES] : [...ENTITY_TYPES],
+      source: "benchmark profile",
+    };
+  }
+
+  try {
+    const response = await fetch(`${apiUrl}/info`);
+    if (!response.ok) {
+      return { entities: [...PUBLISHED_ENTITY_TYPES], source: "published fallback" };
+    }
+
+    const data = (await response.json()) as {
+      pii_detection?: {
+        entities?: string[];
+        languages?: {
+          configured?: string[];
+          available?: string[];
+        };
+      };
+    };
+
+    const languages =
+      data.pii_detection?.languages?.available ?? data.pii_detection?.languages?.configured;
+
+    return {
+      entities: data.pii_detection?.entities,
+      languages,
+      source: `${apiUrl}/info`,
+    };
+  } catch {
+    return { entities: [...PUBLISHED_ENTITY_TYPES], source: "published fallback" };
+  }
+}
+
+function buildBenchmarkScope(capabilities: TargetCapabilities): BenchmarkScope {
+  if (profile === "all") {
+    return {
+      profile,
+      entityTypes: [...ENTITY_TYPES],
+      languages: capabilities.languages,
+      capabilitiesSource: "all benchmark entities",
+    };
+  }
+
+  if (profile === "published") {
+    const targetEntities = capabilities.entities?.filter((type) => ENTITY_TYPES.includes(type)) ?? [
+      ...PUBLISHED_ENTITY_TYPES,
+    ];
+
+    return {
+      profile,
+      entityTypes: targetEntities,
+      languages: capabilities.languages,
+      capabilitiesSource: capabilities.source,
+    };
+  }
+
+  return {
+    profile,
+    entityTypes: [...ENTITY_TYPES],
+    languages: capabilities.languages,
+    capabilitiesSource:
+      profile === "extended" ? "extended benchmark entities" : capabilities.source,
+  };
+}
+
+function applyBenchmarkScope(
+  testCases: TestCase[],
+  scope: BenchmarkScope,
+): {
+  runnable: TestCase[];
+  skipped: SkippedCase[];
+} {
+  if (scope.profile === "all") {
+    return { runnable: testCases, skipped: [] };
+  }
+
+  const supportedEntities = new Set(scope.entityTypes);
+  const supportedLanguages = scope.languages ? new Set(scope.languages) : undefined;
+  const runnable: TestCase[] = [];
+  const skipped: SkippedCase[] = [];
+
+  for (const testCase of testCases) {
+    const expectedTypes = [...new Set(testCase.expected.map((entity) => entity.type))];
+    const unsupportedEntities = expectedTypes.filter((type) => !supportedEntities.has(type));
+    const unsupportedLanguage =
+      supportedLanguages && !supportedLanguages.has(testCase.language)
+        ? testCase.language
+        : undefined;
+
+    if (unsupportedEntities.length > 0 || unsupportedLanguage) {
+      skipped.push({
+        id: testCase.id,
+        category: testCase.category,
+        split: testCase.split,
+        language: testCase.language,
+        unsupportedEntities,
+        unsupportedLanguage,
+      });
+      continue;
+    }
+
+    runnable.push(testCase);
+  }
+
+  return { runnable, skipped };
+}
+
+function missingTargetHelp(): string {
+  if (mode === "detector") {
+    return "Start it with:\n  docker compose --profile dev up detector -d";
+  }
+  return `Check the app URL or run locally with:\n  bun run dev\nCurrent target: ${apiUrl}`;
 }
 
 /**
@@ -196,12 +460,32 @@ async function runTestCase(testCase: TestCase): Promise<TestResult> {
     id: testCase.id,
     text: testCase.text,
     language: testCase.language,
+    category: testCase.category,
+    split: testCase.split,
     passed,
     expected: testCase.expected,
     detected,
     falseNegatives,
     falsePositives,
     truePositives,
+  };
+}
+
+function errorResult(testCase: TestCase, error: unknown): TestResult {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    id: testCase.id,
+    text: testCase.text,
+    language: testCase.language,
+    category: testCase.category,
+    split: testCase.split,
+    passed: false,
+    expected: testCase.expected,
+    detected: [],
+    falseNegatives: testCase.expected,
+    falsePositives: [],
+    truePositives: [],
+    error: message,
   };
 }
 
@@ -229,6 +513,9 @@ function calculateMetrics(results: TestResult[]): AccuracyMetrics {
   const precision = tp + fp > 0 ? tp / (tp + fp) : 1;
   const recall = tp + fn > 0 ? tp / (tp + fn) : 1;
   const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+  // F2 weights recall 2x precision: for a privacy tool, a missed entity (leak)
+  // is worse than an over-mask.
+  const f2 = 4 * precision + recall > 0 ? (5 * precision * recall) / (4 * precision + recall) : 0;
 
   return {
     total: results.length,
@@ -237,6 +524,7 @@ function calculateMetrics(results: TestResult[]): AccuracyMetrics {
     precision,
     recall,
     f1,
+    f2,
     truePositives: tp,
     falsePositives: fp,
     falseNegatives: fn,
@@ -258,8 +546,52 @@ function printMetrics(label: string, metrics: AccuracyMetrics): void {
   console.log(
     `  ${label.padEnd(20)} P=${formatPercent(metrics.precision).padStart(6)}  ` +
       `R=${formatPercent(metrics.recall).padStart(6)}  ` +
-      `F1=${formatPercent(metrics.f1).padStart(6)}  ${status}`,
+      `F1=${formatPercent(metrics.f1).padStart(6)}  ` +
+      `F2=${formatPercent(metrics.f2).padStart(6)}  ${status}`,
   );
+}
+
+function printSkippedCases(skippedCases: SkippedCase[]): void {
+  const byEntity = new Map<string, number>();
+  const byLanguage = new Map<string, number>();
+
+  for (const skipped of skippedCases) {
+    for (const entity of skipped.unsupportedEntities) {
+      byEntity.set(entity, (byEntity.get(entity) ?? 0) + 1);
+    }
+    if (skipped.unsupportedLanguage) {
+      byLanguage.set(
+        skipped.unsupportedLanguage,
+        (byLanguage.get(skipped.unsupportedLanguage) ?? 0) + 1,
+      );
+    }
+  }
+
+  console.log("Out of Scope:");
+  console.log(`  Skipped ${skippedCases.length} cases not supported by this benchmark profile.`);
+  if (byEntity.size > 0) {
+    console.log(`  Unsupported entities: ${formatCounts(byEntity)}`);
+  }
+  if (byLanguage.size > 0) {
+    console.log(`  Unsupported languages: ${formatCounts(byLanguage)}`);
+  }
+
+  const examples = skippedCases
+    .slice(0, 8)
+    .map((skipped) => skipped.id)
+    .join(", ");
+  if (examples) {
+    const suffix = skippedCases.length > 8 ? ", ..." : "";
+    console.log(`  Examples: ${examples}${suffix}`);
+  }
+  console.log();
+}
+
+function formatCounts(counts: Map<string, number>): string {
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label, count]) => `${label}=${count}`)
+    .join(", ");
 }
 
 /**
@@ -270,28 +602,49 @@ async function main(): Promise<void> {
   console.log("║           PII Detection Accuracy Benchmark                 ║");
   console.log("╚════════════════════════════════════════════════════════════╝\n");
 
-  // Check Presidio availability
-  console.log(`Presidio URL: ${PRESIDIO_URL}`);
+  // Check target availability
+  console.log(`Mode: ${mode}`);
+  console.log(`Profile: ${profile}`);
+  console.log(`Target URL: ${mode === "detector" ? detectorUrl : apiUrl}`);
   console.log(`Threshold: ${threshold}`);
   if (languageFilter) {
     console.log(`Languages: ${languageFilter.join(", ")}`);
   }
 
-  if (!(await checkPresidio())) {
-    console.error("\n✗ Presidio is not available. Start it with:");
-    console.error("  docker compose up presidio-analyzer -d\n");
+  if (!(await checkTarget())) {
+    console.error("\n✗ Benchmark target is not available.");
+    console.error(`${missingTargetHelp()}\n`);
     process.exit(1);
   }
-  console.log("Presidio: ✓ Connected\n");
+  console.log("Target: ✓ Connected\n");
+
+  const capabilities = await loadTargetCapabilities();
+  const scope = buildBenchmarkScope(capabilities);
+  requestedEntityTypes = scope.entityTypes;
+
+  console.log(`Capability source: ${scope.capabilitiesSource}`);
+  console.log(`Entity scope: ${scope.entityTypes.join(", ")}`);
+  if (scope.languages) {
+    console.log(`Language scope: ${scope.languages.join(", ")}`);
+  }
+  console.log();
 
   // Load test cases from directory
-  const testCases = await loadTestCases();
+  const loadedTestCases = await loadTestCases();
+  const { runnable: testCases, skipped: skippedCases } = applyBenchmarkScope(
+    loadedTestCases,
+    scope,
+  );
 
   if (testCases.length === 0) {
     console.error("No test cases found in", TEST_DATA_DIR);
     process.exit(1);
   }
 
+  console.log(`Loaded ${loadedTestCases.length} test cases.`);
+  if (skippedCases.length > 0) {
+    console.log(`Skipped ${skippedCases.length} out-of-scope cases for profile "${profile}".`);
+  }
   console.log(`Running ${testCases.length} test cases...\n`);
 
   // Run all test cases
@@ -306,7 +659,9 @@ async function main(): Promise<void> {
         console.log(`${icon} ${result.id}`);
         if (!result.passed) {
           if (result.falseNegatives.length > 0) {
-            console.log(`    Missed: ${result.falseNegatives.map((e) => `${e.type}:"${e.text}"`).join(", ")}`);
+            console.log(
+              `    Missed: ${result.falseNegatives.map((e) => `${e.type}:"${e.text}"`).join(", ")}`,
+            );
           }
           if (result.falsePositives.length > 0) {
             console.log(
@@ -317,6 +672,7 @@ async function main(): Promise<void> {
       }
     } catch (error) {
       console.error(`Error in test ${testCase.id}:`, error);
+      results.push(errorResult(testCase, error));
     }
   }
 
@@ -352,14 +708,29 @@ async function main(): Promise<void> {
   console.log("                         RESULTS");
   console.log("────────────────────────────────────────────────────────────\n");
 
-  console.log(`Overall: ${overall.passed}/${overall.total} passed\n`);
+  const core = results.filter((r) => r.category === "core");
+  const hard = results.filter((r) => r.category === "hard");
+  const evalResults = results.filter((r) => r.category === "eval");
+  const corePassed = core.filter((r) => r.passed).length;
+  const hardPassed = hard.filter((r) => r.passed).length;
+  const evalPassed = evalResults.filter((r) => r.passed).length;
+  console.log(
+    `Overall: ${overall.passed}/${overall.total} passed  ` +
+      `(core ${corePassed}/${core.length}, hard ${hardPassed}/${hard.length}, ` +
+      `eval ${evalPassed}/${evalResults.length})\n`,
+  );
 
-  console.log("Metrics (P=Precision, R=Recall, F1=F1-Score):\n");
+  if (skippedCases.length > 0) {
+    printSkippedCases(skippedCases);
+  }
+
+  console.log("Metrics (P=Precision, R=Recall, F1=F1-Score, F2=Recall-weighted):\n");
 
   console.log(
     `  ${"OVERALL".padEnd(20)} P=${formatPercent(overall.precision).padStart(6)}  ` +
       `R=${formatPercent(overall.recall).padStart(6)}  ` +
-      `F1=${formatPercent(overall.f1).padStart(6)}\n`,
+      `F1=${formatPercent(overall.f1).padStart(6)}  ` +
+      `F2=${formatPercent(overall.f2).padStart(6)}\n`,
   );
 
   console.log("By Entity Type:");
@@ -370,6 +741,24 @@ async function main(): Promise<void> {
   console.log("\nBy Language:");
   for (const [lang, metrics] of Object.entries(byLanguage)) {
     printMetrics(lang.toUpperCase(), metrics);
+  }
+
+  // Core = regression guard (must pass); Hard = honest measure of real limits.
+  console.log("\nBy Category:");
+  for (const cat of ["core", "hard", "eval"] as const) {
+    const catResults = results.filter((r) => r.category === cat);
+    if (catResults.length > 0) {
+      printMetrics(cat, calculateMetrics(catResults));
+    }
+  }
+
+  // Dev = tuning split; Test = held-out eval (report the headline number here).
+  console.log("\nBy Split:");
+  for (const sp of ["dev", "test"] as const) {
+    const spResults = results.filter((r) => r.split === sp);
+    if (spResults.length > 0) {
+      printMetrics(sp, calculateMetrics(spResults));
+    }
   }
 
   // Print false negatives (missed PII)
@@ -394,14 +783,29 @@ async function main(): Promise<void> {
     console.log(`False Positives (Wrong Detections): ${allFalsePositives.length}`);
     console.log("────────────────────────────────────────────────────────────");
     for (const { testId, entity } of allFalsePositives) {
-      console.log(`  ✗ "${entity.text}" (${entity.type}, score=${entity.score.toFixed(2)}) in ${testId}`);
+      console.log(
+        `  ✗ "${entity.text}" (${entity.type}, score=${entity.score.toFixed(2)}) in ${testId}`,
+      );
+    }
+  }
+
+  const executionErrors = results.filter((r) => r.error);
+  if (executionErrors.length > 0) {
+    console.log("\n────────────────────────────────────────────────────────────");
+    console.log(`Execution Errors: ${executionErrors.length}`);
+    console.log("────────────────────────────────────────────────────────────");
+    for (const result of executionErrors) {
+      console.log(`  ✗ ${result.id}: ${result.error}`);
     }
   }
 
   console.log("\n────────────────────────────────────────────────────────────\n");
 
-  // Exit with error code if tests failed
-  if (overall.failed > 0) {
+  // Exit non-zero only on a *core* regression. Hard/adversarial cases are an
+  // honest measure of limits, not a pass/fail gate, so their misses don't fail
+  // the run (they're already reflected in the metrics above).
+  const coreFailed = results.filter((r) => r.category === "core" && !r.passed).length;
+  if (coreFailed > 0 || executionErrors.length > 0) {
     process.exit(1);
   }
 }

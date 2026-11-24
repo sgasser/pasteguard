@@ -1,0 +1,45 @@
+# Phase-1 structured identifiers: IPv6, BIC/SWIFT, crypto.
+# All deterministic (format/checksum-validated), so language-agnostic.
+# Synthetic but valid values.
+
+test_cases:
+  - id: ipv6_full
+    text: "The server answers at 2001:0db8:85a3:0000:0000:8a2e:0370:7334 on port 443."
+    language: en
+    expected:
+      - type: IP_ADDRESS
+        text: "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+
+  - id: ipv6_compressed
+    text: "Erreichbar unter 2001:db8::1 im internen Netz."
+    language: de
+    expected:
+      - type: IP_ADDRESS
+        text: "2001:db8::1"
+
+  - id: bic_swift_de
+    text: "Bitte den Betrag an BIC DEUTDEFF500 überweisen."
+    language: de
+    expected:
+      - type: BIC_CODE
+        text: "DEUTDEFF500"
+
+  - id: crypto_eth
+    text: "Refund address: 0x52908400098527886E0F7030069857D2E4169EE7"
+    language: en
+    expected:
+      - type: CRYPTO
+        text: "0x52908400098527886E0F7030069857D2E4169EE7"
+
+  - id: crypto_btc
+    text: "Send the deposit to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa today."
+    language: en
+    expected:
+      - type: CRYPTO
+        text: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+
+  # Negative: a non-checksum-valid base58 lookalike must not be flagged.
+  - id: crypto_btc_invalid_fp
+    text: "Order ref 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfXX in the system."
+    language: en
+    expected: []

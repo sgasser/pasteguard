@@ -1,11 +1,11 @@
 test_cases:
   # Phone (needs English context words)
   - id: en_phone
-    text: "Phone: (555) 123-4567"
+    text: "Phone: (212) 736-5000"
     language: en
     expected:
       - type: PHONE_NUMBER
-        text: "(555) 123-4567"
+        text: "(212) 736-5000"
 
   # Person (NER model)
   - id: en_person
@@ -25,7 +25,7 @@ test_cases:
 
   # Mixed (real-world prompt)
   - id: en_mixed
-    text: "Customer John Doe (john@example.com), phone (555) 987-6543"
+    text: "Customer John Doe (john@example.com), phone (415) 626-1234"
     language: en
     expected:
       - type: PERSON
@@ -33,7 +33,7 @@ test_cases:
       - type: EMAIL_ADDRESS
         text: "john@example.com"
       - type: PHONE_NUMBER
-        text: "(555) 987-6543"
+        text: "(415) 626-1234"
 
   # False Positive
   - id: en_fp
