@@ -178,6 +178,24 @@ describe("createAnthropicUnmaskingStream", () => {
     expect(result).toContain("a@b.com");
   });
 
+  test("never emits an event without data while buffering a placeholder", async () => {
+    const context = createMaskingContext();
+    context.mapping["[[EMAIL_ADDRESS_1]]"] = "a@b.com";
+
+    const chunks = [createTextDelta("[[EMAIL_"), createTextDelta("ADDRESS_1]] world")];
+    const unmaskedStream = createAnthropicUnmaskingStream(
+      createSSEStream(chunks),
+      context,
+      defaultConfig,
+    );
+    const result = await consumeStream(unmaskedStream);
+
+    for (const frame of result.split("\n\n").filter(Boolean)) {
+      expect(frame).toContain("data: ");
+    }
+    expect(result).toContain("a@b.com");
+  });
+
   test("flushes remaining buffer on stream end", async () => {
     const context = createMaskingContext();
     context.mapping["[[EMAIL_ADDRESS_1]]"] = "test@test.com";

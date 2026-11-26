@@ -65,25 +65,6 @@ export const ToolResultBlockSchema = z
   })
   .passthrough();
 
-export const ContentBlockSchema = z.discriminatedUnion("type", [
-  TextBlockSchema,
-  ImageBlockSchema,
-  ToolUseBlockSchema,
-  ToolResultBlockSchema,
-  ThinkingBlockSchema,
-  RedactedThinkingBlockSchema,
-]);
-
-// Message and request types
-export const AnthropicMessageSchema = z
-  .object({
-    // Claude Code can send system reminders as messages when tools are enabled.
-    // Preserve them so PasteGuard stays transparent instead of rejecting upstream traffic.
-    role: z.enum(["user", "assistant", "system"]),
-    content: z.union([z.string(), z.array(ContentBlockSchema)]),
-  })
-  .passthrough();
-
 export const ToolSchema = z
   .object({
     name: z.string(),
@@ -95,6 +76,57 @@ export const ToolSchema = z
         required: z.array(z.string()).optional(),
       })
       .passthrough(),
+  })
+  .passthrough();
+
+// Claude Code adds and removes tools mid-conversation with these blocks inside
+// system-role messages. A tool is either referenced by name or defined inline.
+const ToolReferenceSchema = z
+  .object({
+    type: z.literal("tool_reference"),
+    name: z.string(),
+  })
+  .passthrough();
+
+const ToolDefinitionSchema = z
+  .object({
+    type: z.literal("tool_definition"),
+    definition: ToolSchema,
+  })
+  .passthrough();
+
+export const ToolAdditionBlockSchema = z
+  .object({
+    type: z.literal("tool_addition"),
+    tool: z.discriminatedUnion("type", [ToolReferenceSchema, ToolDefinitionSchema]),
+  })
+  .passthrough();
+
+export const ToolRemovalBlockSchema = z
+  .object({
+    type: z.literal("tool_removal"),
+    tool: ToolReferenceSchema,
+  })
+  .passthrough();
+
+export const ContentBlockSchema = z.discriminatedUnion("type", [
+  TextBlockSchema,
+  ImageBlockSchema,
+  ToolUseBlockSchema,
+  ToolResultBlockSchema,
+  ThinkingBlockSchema,
+  RedactedThinkingBlockSchema,
+  ToolAdditionBlockSchema,
+  ToolRemovalBlockSchema,
+]);
+
+// Message and request types
+export const AnthropicMessageSchema = z
+  .object({
+    // Claude Code can send system reminders as messages when tools are enabled.
+    // Preserve them so PasteGuard stays transparent instead of rejecting upstream traffic.
+    role: z.enum(["user", "assistant", "system"]),
+    content: z.union([z.string(), z.array(ContentBlockSchema)]),
   })
   .passthrough();
 
@@ -156,6 +188,7 @@ export type ToolUseBlock = z.infer<typeof ToolUseBlockSchema>;
 export type ToolResultBlock = z.infer<typeof ToolResultBlockSchema>;
 export type ThinkingBlock = z.infer<typeof ThinkingBlockSchema>;
 export type RedactedThinkingBlock = z.infer<typeof RedactedThinkingBlockSchema>;
+export type ToolAdditionBlock = z.infer<typeof ToolAdditionBlockSchema>;
 export type ContentBlock = z.infer<typeof ContentBlockSchema>;
 export type AnthropicMessage = z.infer<typeof AnthropicMessageSchema>;
 export type Tool = z.infer<typeof ToolSchema>;

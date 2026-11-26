@@ -285,6 +285,84 @@ describe("POST /anthropic/v1/messages", () => {
     });
   });
 
+  test("masks PII in tool_addition descriptions like ordinary system text", async () => {
+    const email = "jane@example.com";
+    const systemText = `Contact ${email} for support`;
+    const description = `Sends mail from ${email}`;
+    const entityIn = (text: string) => ({
+      entity_type: "EMAIL_ADDRESS",
+      start: text.indexOf(email),
+      end: text.indexOf(email) + email.length,
+      score: 0.99,
+    });
+    mockAnalyzeRequest.mockResolvedValueOnce({
+      hasPII: true,
+      spanEntities: [[], [entityIn(systemText)], [entityIn(description)]],
+      allEntities: [entityIn(systemText), entityIn(description)],
+      scanTimeMs: 2,
+    });
+
+    let upstreamBody: { messages: Array<{ content: unknown }> } | undefined;
+    globalThis.fetch = (async (_target: string | URL | Request, init?: RequestInit) => {
+      upstreamBody = JSON.parse(String(init?.body));
+      return Response.json({
+        id: "msg_test",
+        type: "message",
+        role: "assistant",
+        content: [],
+        model: "claude-test",
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+    }) as typeof fetch;
+
+    config.mode = "mask";
+    config.pii_detection.scan_roles = ["user", "system", "tool"];
+    const inputSchema = { type: "object", properties: { to: { type: "string" } } };
+    const response = await app.request("/anthropic/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-test",
+        max_tokens: 128,
+        messages: [
+          { role: "user", content: "Hi" },
+          {
+            role: "system",
+            content: [
+              { type: "text", text: systemText },
+              {
+                type: "tool_addition",
+                tool: {
+                  type: "tool_definition",
+                  definition: { name: "send_mail", description, input_schema: inputSchema },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.stringify(upstreamBody)).not.toContain(email);
+    expect(upstreamBody?.messages[1].content).toEqual([
+      { type: "text", text: "Contact [[EMAIL_ADDRESS_1]] for support" },
+      {
+        type: "tool_addition",
+        tool: {
+          type: "tool_definition",
+          definition: {
+            name: "send_mail",
+            description: "Sends mail from [[EMAIL_ADDRESS_1]]",
+            input_schema: inputSchema,
+          },
+        },
+      },
+    ]);
+  });
+
   test("recursively remasks known secrets in assistant tool-use history", async () => {
     const secret = "sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx";
     let upstreamBody:
@@ -493,6 +571,58 @@ describe("POST /anthropic/v1/messages", () => {
     if (result.success) {
       expect(result.data.messages[1].role).toBe("system");
     }
+  });
+
+  test("accepts Claude Code tool_addition and tool_removal blocks unchanged", () => {
+    const blocks = [
+      { type: "tool_addition", tool: { type: "tool_reference", name: "Read" } },
+      {
+        type: "tool_addition",
+        tool: {
+          type: "tool_definition",
+          definition: {
+            name: "mcp__mail__send",
+            description: "Send an email",
+            input_schema: { type: "object", properties: { to: { type: "string" } } },
+          },
+        },
+        cache_control: { type: "ephemeral" },
+      },
+      { type: "tool_removal", tool: { type: "tool_reference", name: "Write" } },
+    ];
+    const result = AnthropicRequestSchema.safeParse({
+      model: "claude-opus-4-8",
+      max_tokens: 64000,
+      messages: [
+        { role: "user", content: [{ type: "text", text: "Hello" }] },
+        { role: "system", content: [{ type: "text", text: "Tools" }, ...blocks] },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data.messages[1].content as unknown[]).slice(1)).toEqual(blocks);
+    }
+  });
+
+  test("rejects content block types PasteGuard does not know how to scan", () => {
+    const result = AnthropicRequestSchema.safeParse({
+      model: "claude-opus-4-8",
+      max_tokens: 64000,
+      messages: [{ role: "user", content: [{ type: "made_up_block", text: "jane@example.com" }] }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  test("still rejects a known block type with an invalid shape", () => {
+    const result = AnthropicRequestSchema.safeParse({
+      model: "claude-opus-4-8",
+      max_tokens: 64000,
+      messages: [{ role: "user", content: [{ type: "text" }] }],
+    });
+
+    expect(result.success).toBe(false);
   });
 
   test("returns 400 for missing model", async () => {

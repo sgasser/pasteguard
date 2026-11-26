@@ -7,6 +7,21 @@ import type {
 } from "../../providers/anthropic/types";
 import { anthropicExtractor, remaskAnthropicToolUseHistory } from "./anthropic";
 
+/** Claude Code tool_addition block that defines a tool inline */
+function toolAddition(description: string) {
+  return {
+    type: "tool_addition" as const,
+    tool: {
+      type: "tool_definition" as const,
+      definition: {
+        name: "send_mail",
+        description,
+        input_schema: { type: "object" as const, properties: { to: { type: "string" } } },
+      },
+    },
+  };
+}
+
 /** Helper to create a minimal request from messages */
 function createRequest(
   messages: AnthropicMessage[],
@@ -139,6 +154,49 @@ describe("Anthropic Text Extractor", () => {
         partIndex: 0,
         role: "system",
       });
+    });
+
+    test("extracts tool_addition descriptions with the role of their container", () => {
+      const request: AnthropicRequest = {
+        ...createRequest([
+          { role: "user", content: "Hello" },
+          {
+            role: "system",
+            content: [
+              { type: "tool_addition", tool: { type: "tool_reference", name: "Read" } },
+              toolAddition("Mail john@example.com"),
+              { type: "tool_removal", tool: { type: "tool_reference", name: "Write" } },
+            ],
+          },
+        ]),
+        system: [toolAddition("System tool for john@example.com")],
+      };
+
+      const spans = anthropicExtractor.extractTexts(request);
+
+      expect(spans).toEqual([
+        {
+          text: "System tool for john@example.com",
+          path: "system[0].tool.definition.description",
+          messageIndex: -1,
+          partIndex: 0,
+          role: "system",
+        },
+        {
+          text: "Hello",
+          path: "messages[0].content",
+          messageIndex: 0,
+          partIndex: 0,
+          role: "user",
+        },
+        {
+          text: "Mail john@example.com",
+          path: "messages[1].content[1].tool.definition.description",
+          messageIndex: 1,
+          partIndex: 1,
+          role: "system",
+        },
+      ]);
     });
 
     test("extracts text from system array", () => {
@@ -411,6 +469,35 @@ describe("Anthropic Text Extractor", () => {
       const result = anthropicExtractor.applyMasked(request, maskedSpans);
 
       expect(result.system).toBe("You are helping [[PERSON_1]]");
+    });
+
+    test("applies masked text to tool_addition descriptions only", () => {
+      const request: AnthropicRequest = {
+        ...createRequest([
+          { role: "system", content: [{ ...toolAddition("Mail john@example.com"), extra: 1 }] },
+        ]),
+        system: [toolAddition("System tool for john@example.com")],
+      };
+
+      const result = anthropicExtractor.applyMasked(request, [
+        {
+          path: "system[0].tool.definition.description",
+          maskedText: "System tool for [[EMAIL_ADDRESS_1]]",
+          messageIndex: -1,
+          partIndex: 0,
+        },
+        {
+          path: "messages[0].content[0].tool.definition.description",
+          maskedText: "Mail [[EMAIL_ADDRESS_1]]",
+          messageIndex: 0,
+          partIndex: 0,
+        },
+      ]);
+
+      expect(result.system).toEqual([toolAddition("System tool for [[EMAIL_ADDRESS_1]]")]);
+      expect(result.messages[0].content).toEqual([
+        { ...toolAddition("Mail [[EMAIL_ADDRESS_1]]"), extra: 1 },
+      ]);
     });
 
     test("applies masked text to system array", () => {
