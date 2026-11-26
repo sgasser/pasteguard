@@ -422,26 +422,26 @@ describe("OpenAI Text Extractor", () => {
       expect(JSON.parse(toolCalls[0].function.arguments)).toEqual({ person: originalValue });
     });
 
-    test.each([
-      "tool_calls",
-      "function_call",
-    ] as const)("accepts the OpenAI %s finish reason", (finishReason) => {
-      expect(
-        OpenAIResponseSchema.safeParse({
-          id: "test-id",
-          object: "chat.completion",
-          created: 123456,
-          model: "gpt-4",
-          choices: [
-            {
-              index: 0,
-              message: { role: "assistant", content: null },
-              finish_reason: finishReason,
-            },
-          ],
-        }).success,
-      ).toBeTrue();
-    });
+    test.each(["tool_calls", "function_call"] as const)(
+      "accepts the OpenAI %s finish reason",
+      (finishReason) => {
+        expect(
+          OpenAIResponseSchema.safeParse({
+            id: "test-id",
+            object: "chat.completion",
+            created: 123456,
+            model: "gpt-4",
+            choices: [
+              {
+                index: 0,
+                message: { role: "assistant", content: null },
+                finish_reason: finishReason,
+              },
+            ],
+          }).success,
+        ).toBeTrue();
+      },
+    );
 
     test("applies formatValue function when provided", () => {
       const response: OpenAIResponse = {

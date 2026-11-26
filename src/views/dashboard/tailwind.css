@@ -1,0 +1,6 @@
+/*
+ * Dashboard styles. Generate classes only from the dashboard views, never from
+ * other files in the working directory such as config.yaml or data/.
+ */
+@import "tailwindcss" source(none);
+@source "./";
