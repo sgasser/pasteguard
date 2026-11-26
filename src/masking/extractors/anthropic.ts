@@ -17,6 +17,7 @@ import type {
   ContentBlock,
   TextBlock,
   ThinkingBlock,
+  ToolAdditionBlock,
   ToolResultBlock,
   ToolUseBlock,
 } from "../../providers/anthropic/types";
@@ -119,10 +120,35 @@ export function remaskAnthropicToolUseHistory(
   };
 }
 
+/** Path of the free-text description in a tool_addition block that defines a tool */
+const TOOL_ADDITION_DESCRIPTION_PATH = "tool.definition.description";
+
+/**
+ * Description of a tool defined inline by a tool_addition block.
+ * Tool references carry only a name, so they have nothing to scan.
+ */
+function toolAdditionDescription(block: ContentBlock): string {
+  if (block.type !== "tool_addition") return "";
+  const { tool } = block;
+  return tool.type === "tool_definition" ? (tool.definition.description ?? "") : "";
+}
+
+function withToolAdditionDescription(
+  block: ToolAdditionBlock,
+  description: string,
+): ToolAdditionBlock {
+  const { tool } = block;
+  if (tool.type !== "tool_definition") return block;
+  return { ...block, tool: { ...tool, definition: { ...tool.definition, description } } };
+}
+
 /**
  * Extract text from a single content block
  */
 function extractBlockText(block: ContentBlock): string {
+  if (block.type === "tool_addition") {
+    return toolAdditionDescription(block);
+  }
   if (block.type === "text") {
     return (block as TextBlock).text;
   }
@@ -171,7 +197,13 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
           const text = extractBlockText(block);
           if (text) {
             const pathSuffix =
-              block.type === "text" ? "text" : block.type === "thinking" ? "thinking" : null;
+              block.type === "text"
+                ? "text"
+                : block.type === "thinking"
+                  ? "thinking"
+                  : block.type === "tool_addition"
+                    ? TOOL_ADDITION_DESCRIPTION_PATH
+                    : null;
             if (pathSuffix) {
               spans.push({
                 text,
@@ -221,6 +253,17 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
               spans.push({
                 text,
                 path: `messages[${msgIdx}].content[${partIdx}].thinking`,
+                messageIndex: msgIdx,
+                partIndex: partIdx,
+                role: msg.role,
+              });
+            }
+          } else if (block.type === "tool_addition") {
+            const text = toolAdditionDescription(block);
+            if (text) {
+              spans.push({
+                text,
+                path: `messages[${msgIdx}].content[${partIdx}].${TOOL_ADDITION_DESCRIPTION_PATH}`,
                 messageIndex: msgIdx,
                 partIndex: partIdx,
                 role: msg.role,
@@ -288,6 +331,9 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
           if (block.type === "thinking") {
             return { ...block, thinking: span.maskedText };
           }
+          if (block.type === "tool_addition") {
+            return withToolAdditionDescription(block, span.maskedText);
+          }
           return block;
         });
       }
@@ -318,6 +364,10 @@ export const anthropicExtractor: RequestExtractor<AnthropicRequest, AnthropicRes
           if (block.type === "thinking") {
             const span = partSpans.find((s) => s.nestedPartIndex === undefined);
             if (span) return { ...block, thinking: span.maskedText };
+          }
+          if (block.type === "tool_addition") {
+            const span = partSpans.find((s) => s.nestedPartIndex === undefined);
+            if (span) return withToolAdditionDescription(block, span.maskedText);
           }
           if (block.type === "tool_result") {
             const toolResult = block as ToolResultBlock;
