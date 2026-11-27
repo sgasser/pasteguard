@@ -6,9 +6,43 @@ on:
   pull_request:
     branches: [main]
 
+  schedule:
+    - cron: "17 4 * * 1"
+
 jobs:
+  bun-audit:
+    name: Bun Lockfile Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        if: github.event_name != 'schedule'
+        id: changes
+        with:
+          filters: |
+            audit:
+              - 'bun.lock'
+              - '.github/workflows/ci.yml'
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        if: github.event_name == 'schedule' || steps.changes.outputs.audit == 'true'
+        with:
+          bun-version: '1.4.4'
+
+      - name: Audit locked dependencies
+        if: github.event_name == 'schedule' || steps.changes.outputs.audit == 'true'
+        run: bun audit
+
   test:
     name: Test & Lint
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     # Match the production runtime without downloading Bun during setup.
     container: oven/bun:1-slim@sha256:d56a2534ffd262e92c12fd3249d3924d296d97086da773f821d7d0477435ea04
@@ -33,6 +67,7 @@ jobs:
 
   detector:
     name: Detector Lint, Types & Tests (Python ${{ matrix.python-version }})
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -77,7 +112,7 @@ jobs:
   # Python version above passed.
   detector-result:
     name: Detector Lint, Types & Tests
-    if: always()
+    if: always() && github.event_name != 'schedule'
     needs: detector
     runs-on: ubuntu-latest
 
@@ -88,12 +123,38 @@ jobs:
         run: test "$RESULT" = success
 
   docker-build:
-    name: Docker Build Test
+    name: Docker Build and Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      build-result: ${{ steps.image.outcome }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Build the all-in-one image users actually run (proxy + detector).
       - name: Test Docker build
+        id: image
         run: docker build -f docker/Dockerfile -t pasteguard:test .
+
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.2
+      - name: Scan the built image
+        run: trivy image --image-src docker --scanners vuln --severity HIGH,CRITICAL --exit-code 1 pasteguard:test
+
+  # Keep the required build check independent of vulnerability findings.
+  docker-build-result:
+    name: Docker Build Test
+    if: always()
+    needs: docker-build
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require the production image to build
+        env:
+          RESULT: ${{ needs.docker-build.outputs.build-result }}
+        run: test "$RESULT" = success
