@@ -1,0 +1,45 @@
+name: Verify ARM64 CA fix
+
+on:
+  push:
+    branches: [verify-arm64-ca-fix]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build and scan the ARM64 production image
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the production image
+        run: docker build --platform linux/arm64 -f docker/Dockerfile -t pasteguard:arm64-verify .
+      - name: Verify platform and installed CA packages
+        run: |
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' pasteguard:arm64-verify)" = linux/arm64
+          docker run --rm --network none --entrypoint /opt/venv/bin/python pasteguard:arm64-verify -c '
+          from importlib.metadata import version
+          from pathlib import Path
+          import ssl
+
+          import certifi
+
+          db = Path("/lib/apk/db/installed").read_text()
+          bundle = next(entry for entry in db.split("\n\n") if "P:ca-certificates-bundle\n" in entry)
+          print(next(line for line in bundle.splitlines() if line.startswith("V:")))
+          print("certifi", version("certifi"))
+          for context in (ssl.create_default_context(), ssl.create_default_context(cafile=certifi.where())):
+              names = {value for root in context.get_ca_certs()
+                       for group in root["subject"] for key, value in group if key == "commonName"}
+              assert "emSign ECC Root CA - G3" not in names
+              assert "ISRG Root X1" in names
+          '
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.2
+      - name: Scan for critical vulnerabilities
+        run: trivy image --image-src docker --platform linux/arm64 --scanners vuln --severity CRITICAL --exit-code 1 pasteguard:arm64-verify
