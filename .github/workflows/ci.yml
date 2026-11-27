@@ -37,8 +37,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.11 is the floor in detector/pyproject.toml; 3.14 is what the Docker image runs.
-        python-version: ["3.11", "3.14"]
+        # 3.11 is the floor in detector/pyproject.toml; 3.15 is the Docker runtime.
+        python-version: ["3.11", "3.14", "3.15"]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
