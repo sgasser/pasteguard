@@ -123,14 +123,14 @@ jobs:
         run: test "$RESULT" = success
 
   docker-build:
-    name: Docker Build and Scan
+    name: Docker Build and Scan (amd64)
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
       build-result: ${{ steps.image.outcome }}
 
-    steps:
+    steps: &build-and-scan
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -145,6 +145,13 @@ jobs:
           version: v0.76.2
       - name: Scan the built image
         run: trivy image --image-src docker --scanners vuln --severity HIGH,CRITICAL --exit-code 1 pasteguard:test
+
+  docker-build-arm64:
+    name: Docker Build and Scan (arm64)
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps: *build-and-scan
 
   # Keep the required build check independent of vulnerability findings.
   docker-build-result:
