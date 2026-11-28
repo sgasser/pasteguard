@@ -1,5 +1,6 @@
-import { describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
+import { getConversationStore } from "../masking/conversation-store";
 import type { PIIEntity } from "../pii/detect";
 
 const mockDetectPII = mock<(text: string) => Promise<PIIEntity[]>>(() => Promise.resolve([]));
@@ -521,5 +522,159 @@ describe("POST /api/mask", () => {
     expect(body.masked).toContain("john@example.com");
     expect(body.masked).toContain("-----BEGIN RSA PRIVATE KEY-----");
     expect(body.entities).toHaveLength(0);
+  });
+});
+
+describe("POST /api/mask with conversation_id", () => {
+  type MaskBody = {
+    masked: string;
+    context: Record<string, string>;
+    counters: Record<string, number>;
+  };
+
+  async function mask(body: Record<string, unknown>): Promise<MaskBody> {
+    const res = await app.request("/api/mask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(res.status).toBe(200);
+    return (await res.json()) as MaskBody;
+  }
+
+  beforeEach(() => {
+    getConversationStore().clear();
+    // Conversation persistence is disabled by default; enable it for these tests.
+    testConfig.conversation_persistence = {
+      ...testConfig.conversation_persistence,
+      enabled: true,
+    };
+  });
+
+  test("reuses placeholders for values seen earlier in the conversation", async () => {
+    mockDetectPII.mockResolvedValueOnce([
+      { entity_type: "PERSON", start: 0, end: 4, score: 0.9 },
+      { entity_type: "PERSON", start: 9, end: 13, score: 0.9 },
+    ]);
+    const first = await mask({ text: "John and Jane", conversation_id: "conv-1" });
+    expect(first.masked).toBe("[[PERSON_1]] and [[PERSON_2]]");
+
+    mockDetectPII.mockResolvedValueOnce([{ entity_type: "PERSON", start: 9, end: 13, score: 0.9 }]);
+    const second = await mask({ text: "where is John?", conversation_id: "conv-1" });
+    expect(second.masked).toBe("where is [[PERSON_1]]?");
+    // The context accumulates across the conversation
+    expect(second.context["[[PERSON_1]]"]).toBe("John");
+    expect(second.context["[[PERSON_2]]"]).toBe("Jane");
+    expect(second.counters.PERSON).toBe(2);
+  });
+
+  test("continues numbering for new values within a conversation", async () => {
+    mockDetectPII.mockResolvedValueOnce([
+      { entity_type: "PERSON", start: 0, end: 4, score: 0.9 },
+      { entity_type: "PERSON", start: 9, end: 13, score: 0.9 },
+    ]);
+    await mask({ text: "John and Jane", conversation_id: "conv-1" });
+
+    mockDetectPII.mockResolvedValueOnce([{ entity_type: "PERSON", start: 4, end: 8, score: 0.9 }]);
+    const second = await mask({ text: "and Mary?", conversation_id: "conv-1" });
+    expect(second.masked).toBe("and [[PERSON_3]]?");
+    expect(second.context["[[PERSON_3]]"]).toBe("Mary");
+  });
+
+  test("keeps conversations isolated by conversation_id", async () => {
+    mockDetectPII.mockResolvedValueOnce([
+      { entity_type: "PERSON", start: 0, end: 4, score: 0.9 },
+      { entity_type: "PERSON", start: 9, end: 13, score: 0.9 },
+    ]);
+    await mask({ text: "John and Jane", conversation_id: "conv-1" });
+
+    mockDetectPII.mockResolvedValueOnce([{ entity_type: "PERSON", start: 0, end: 4, score: 0.9 }]);
+    const other = await mask({ text: "John", conversation_id: "conv-2" });
+    expect(other.masked).toBe("[[PERSON_1]]");
+    // conv-2 has its own fresh mapping: no knowledge of conv-1's Jane
+    expect(other.context["[[PERSON_2]]"]).toBeUndefined();
+    expect(Object.keys(other.context)).toHaveLength(1);
+  });
+
+  test("requests without conversation_id do not share conversation state", async () => {
+    mockDetectPII.mockResolvedValueOnce([
+      { entity_type: "PERSON", start: 0, end: 4, score: 0.9 },
+      { entity_type: "PERSON", start: 9, end: 13, score: 0.9 },
+    ]);
+    const first = await mask({ text: "John and Jane" });
+    expect(first.masked).toBe("[[PERSON_1]] and [[PERSON_2]]");
+
+    mockDetectPII.mockResolvedValueOnce([{ entity_type: "PERSON", start: 0, end: 4, score: 0.9 }]);
+    const second = await mask({ text: "John" });
+    // Per-request behavior is unchanged: numbering restarts
+    expect(second.masked).toBe("[[PERSON_1]]");
+    expect(Object.keys(second.context)).toHaveLength(1);
+    expect(getConversationStore().size).toBe(0);
+  });
+
+  test("startFrom overrides conversation counters", async () => {
+    mockDetectPII.mockResolvedValueOnce([{ entity_type: "PERSON", start: 0, end: 4, score: 0.9 }]);
+    await mask({ text: "John", conversation_id: "conv-1" });
+
+    mockDetectPII.mockResolvedValueOnce([{ entity_type: "PERSON", start: 0, end: 4, score: 0.9 }]);
+    const second = await mask({
+      text: "Jane",
+      conversation_id: "conv-1",
+      startFrom: { PERSON: 5 },
+    });
+    expect(second.masked).toBe("[[PERSON_6]]");
+    expect(second.counters.PERSON).toBe(6);
+  });
+
+  test("conversation state persists across requests without entities", async () => {
+    mockDetectPII.mockResolvedValueOnce([{ entity_type: "PERSON", start: 0, end: 4, score: 0.9 }]);
+    await mask({ text: "John", conversation_id: "conv-1" });
+
+    mockDetectPII.mockResolvedValueOnce([]);
+    const second = await mask({ text: "hello there", conversation_id: "conv-1" });
+    expect(second.masked).toBe("hello there");
+    expect(second.context["[[PERSON_1]]"]).toBe("John");
+
+    mockDetectPII.mockResolvedValueOnce([{ entity_type: "PERSON", start: 0, end: 4, score: 0.9 }]);
+    const third = await mask({ text: "Jane", conversation_id: "conv-1" });
+    expect(third.masked).toBe("[[PERSON_2]]");
+  });
+
+  test("ignores conversation_id when conversation persistence is disabled", async () => {
+    const previous = testConfig.conversation_persistence;
+    testConfig.conversation_persistence = { ...previous, enabled: false };
+
+    try {
+      mockDetectPII.mockResolvedValueOnce([
+        { entity_type: "PERSON", start: 0, end: 4, score: 0.9 },
+      ]);
+      const first = await mask({ text: "John", conversation_id: "conv-1" });
+      expect(first.masked).toBe("[[PERSON_1]]");
+
+      mockDetectPII.mockResolvedValueOnce([
+        { entity_type: "PERSON", start: 0, end: 4, score: 0.9 },
+      ]);
+      const second = await mask({ text: "Jane", conversation_id: "conv-1" });
+      // No state is retained while disabled: numbering restarts
+      expect(second.masked).toBe("[[PERSON_1]]");
+      expect(Object.keys(second.context)).toHaveLength(1);
+    } finally {
+      testConfig.conversation_persistence = previous;
+    }
+  });
+
+  test("returns 400 for an empty conversation_id", async () => {
+    const res = await app.request("/api/mask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "John", conversation_id: "" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as {
+      error: { type: string; details: { path: string; message: string }[] };
+    };
+    expect(body.error.type).toBe("validation_error");
+    expect(body.error.details).toEqual([{ path: "conversation_id", message: expect.any(String) }]);
   });
 });

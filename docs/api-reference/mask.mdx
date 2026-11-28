@@ -38,6 +38,7 @@ X-PasteGuard-Source: browser-extension
 |-----------|------|----------|-------------|
 | `text` | string | Yes | Text to scan and mask |
 | `startFrom` | object | No | Counter values to continue numbering from previous calls |
+| `conversation_id` | string | No | Conversation identifier. When set, placeholder mapping and counters are kept on the server across requests that reuse the same ID |
 | `detect` | array | No | What to detect: `["pii"]`, `["secrets"]`, or `["pii", "secrets"]` (default: both) |
 
 ## Response
@@ -103,6 +104,8 @@ curl -X POST http://localhost:3000/api/mask \
 
 ## Multi-Turn Support
 
+### Client-Side Continuation (startFrom)
+
 For conversations spanning multiple requests, use the `counters` from the response as `startFrom` in the next request to maintain consistent numbering:
 
 **First request:**
@@ -145,6 +148,70 @@ Response:
   ...
 }
 ```
+
+With `startFrom` alone, numbering continues, but a value that reappears later still receives a new placeholder (the server does not know which placeholder it got before). If you need the same value to keep the same placeholder across requests, use a conversation ID instead.
+
+### Server-Side Conversation State (conversation_id)
+
+> [!NOTE]
+> Disabled by default. Set `conversation_persistence.enabled: true` to use it (see [Mask Mode](/concepts/mask-mode)).
+
+Pass a `conversation_id` and PasteGuard keeps the placeholder mapping and counters for that conversation on the server. Values seen earlier in the conversation keep their placeholder, and numbering continues automatically — no `startFrom` round-tripping needed.
+
+**First request:**
+
+```bash
+curl -X POST http://localhost:3000/api/mask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Contact john@example.com",
+    "conversation_id": "chat-42"
+  }'
+```
+
+Response:
+
+```json
+{
+  "masked": "Contact [[EMAIL_ADDRESS_1]]",
+  "context": { "[[EMAIL_ADDRESS_1]]": "john@example.com" },
+  "counters": { "EMAIL_ADDRESS": 1 },
+  ...
+}
+```
+
+**Second request (same conversation):**
+
+```bash
+curl -X POST http://localhost:3000/api/mask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Also reach out to jane@example.com and john@example.com",
+    "conversation_id": "chat-42"
+  }'
+```
+
+Response:
+
+```json
+{
+  "masked": "Also reach out to [[EMAIL_ADDRESS_2]] and [[EMAIL_ADDRESS_1]]",
+  "context": {
+    "[[EMAIL_ADDRESS_1]]": "john@example.com",
+    "[[EMAIL_ADDRESS_2]]": "jane@example.com"
+  },
+  "counters": { "EMAIL_ADDRESS": 2 },
+  ...
+}
+```
+
+Notes:
+
+- Conversation state is kept in memory per PasteGuard instance and is lost when the process restarts.
+- Idle conversations are forgotten after 24 hours (`conversation_persistence.ttl_hours`), and at most 10,000 conversations are tracked (least recently used first, `conversation_persistence.max_conversations`).
+- The feature is disabled by default because it retains PII mappings in memory; set `conversation_persistence.enabled: true` to use it. While disabled, `conversation_id` is ignored and masking stays fully stateless.
+- `startFrom` still works alongside `conversation_id` and takes precedence for counter values.
+- The `context` field in the response accumulates the mapping for the whole conversation, so it stays suitable for client-side unmasking.
 
 ## Client-Side Unmasking
 

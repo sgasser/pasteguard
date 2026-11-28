@@ -201,6 +201,15 @@ const SecretsDetectionSchema = z.object({
   scan_roles: scanRolesField,
 });
 
+const ConversationPersistenceSchema = z.object({
+  // Disabled by default: the server retains PII mappings in memory while
+  // enabled. When disabled, `conversation_id` is ignored and masking stays
+  // stateless.
+  enabled: z.boolean().default(false),
+  ttl_hours: z.coerce.number().int().min(1).default(24),
+  max_conversations: z.coerce.number().int().min(1).default(10000),
+});
+
 const ConfigSchema = z
   .object({
     mode: z.enum(["route", "mask"]).default("route"),
@@ -218,6 +227,7 @@ const ConfigSchema = z
     logging: LoggingSchema.prefault({}),
     dashboard: DashboardSchema.prefault({}),
     secrets_detection: SecretsDetectionSchema.prefault({}),
+    conversation_persistence: ConversationPersistenceSchema.prefault({}),
   })
   .refine(
     (config) => {
@@ -254,6 +264,7 @@ export type MaskingConfig = z.infer<typeof MaskingSchema>;
 export type AllowlistPattern = z.infer<typeof AllowlistPatternSchema>;
 export type DenylistPattern = z.infer<typeof DenylistPatternSchema>;
 export type SecretsDetectionConfig = z.infer<typeof SecretsDetectionSchema>;
+export type ConversationPersistenceConfig = z.infer<typeof ConversationPersistenceSchema>;
 export type ServerConfig = z.infer<typeof ServerSchema>;
 
 /**
