@@ -65,6 +65,23 @@ masking:
 | `allowlist` | `[]` | Text patterns that are never masked; set `regex: true` for regex patterns |
 | `denylist` | `[]` | Text patterns masked with the configured `type`; set `regex: true` for regex patterns |
 
+### Conversation Persistence
+
+```yaml
+conversation_persistence:
+  enabled: false  # disabled by default
+  ttl_hours: 24
+  max_conversations: 10000
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `false` | Enable server-side conversation state for `conversation_id` on `POST /api/mask`; when disabled, `conversation_id` is ignored |
+| `ttl_hours` | `24` | Idle time before a conversation is forgotten |
+| `max_conversations` | `10000` | Maximum number of tracked conversations (least recently used evicted first) |
+
+Disabled by default because it retains PII mappings in memory. State is kept in memory only: it is lost when the process restarts and is not shared across multiple server instances.
+
 ## Response Headers
 
 Mask mode sets these headers on responses:

@@ -127,6 +127,23 @@ secrets_detection:
   # Log detected secret types (never logs raw secret content)
   log_detected_types: true
 
+# Conversation persistence for /api/mask (see docs: Mask API, Multi-Turn Support)
+# Keeps placeholder mapping per conversation_id in memory so the same value
+# keeps the same placeholder across requests. In-memory only: state is lost
+# on restart and idle conversations are evicted after ttl_hours.
+conversation_persistence:
+  # Enable server-side conversation state (default: false)
+  # Disabled by default because it retains PII mappings in memory. When
+  # disabled, conversation_id is ignored and masking stays stateless
+  enabled: false
+
+  # Idle time before a conversation is forgotten, in hours (default: 24)
+  ttl_hours: 24
+
+  # Maximum number of tracked conversations (default: 10000)
+  # The least recently used conversation is evicted first
+  max_conversations: 10000
+
 # Logging settings
 logging:
   # Storage backend for request logs: "sqlite" (default) or "postgres"

@@ -55,6 +55,11 @@ pii_detection:
         log_detected_types: true,
         scan_roles: ["user", "tool", "function", "mcp"],
       });
+      expect(config.conversation_persistence).toEqual({
+        enabled: false,
+        ttl_hours: 24,
+        max_conversations: 10000,
+      });
     } finally {
       cleanupConfig(path);
     }

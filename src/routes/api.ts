@@ -10,6 +10,7 @@ import { z } from "zod";
 import { getConfig, type SecretsDetectionConfig } from "../config";
 import { logRequest, normalizeRequestSource } from "../logging/logger";
 import { createPlaceholderContext, type PlaceholderContext } from "../masking/context";
+import { getConversationStore } from "../masking/conversation-store";
 import {
   filterAllowlistedEntities,
   findDenylistedEntities,
@@ -27,6 +28,9 @@ const MaskRequestSchema = z.object({
   // Reject blank text without trimming it: clients align `masked` against the original input.
   text: z.string().refine((text) => text.trim().length > 0, "text is required"),
   startFrom: z.record(z.string(), z.number()).optional(),
+  // Optional server-side conversation state: placeholder mapping and counters
+  // persist across requests that reuse the same ID (see masking/conversation-store.ts).
+  conversation_id: z.string().min(1).max(256).optional(),
   detect: z.array(z.enum(["pii", "secrets"])).optional(),
 });
 
@@ -109,7 +113,14 @@ async function maskHandler(c: Context, getDetector: DetectorProvider) {
   const detectSecretsFlag = detectTypes.includes("secrets");
 
   // Initialize context with optional startFrom counters
-  const context = createPlaceholderContext();
+  let context = createPlaceholderContext();
+  if (request.conversation_id && config.conversation_persistence.enabled) {
+    // Reuse the conversation's existing context so values keep their
+    // placeholder across requests. Masking mutates the context in place, so
+    // the store (which owns the object) picks up the new state automatically.
+    // When conversation persistence is disabled, conversation_id is ignored.
+    context = getConversationStore().get(request.conversation_id);
+  }
   if (request.startFrom) {
     for (const [type, count] of Object.entries(request.startFrom)) {
       context.counters[type] = count;
